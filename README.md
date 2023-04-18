@@ -14,7 +14,9 @@ Python script that allows users to create a random melody in a specified key, wi
 # Usage
 Run the script:
 **python melody-generator.py**
-This will open the Melody Generator GUI, where you can enter the desired key, BPM, time signature, and number of notes for your melody. After entering this information, click the "Generate Melody" button to create your random melody. You will be prompted to choose a location to save the generated MIDI file.
+- This will open the Melody Generator GUI, where you can enter the desired key, BPM, time signature, and number of notes for your melody. 
+- After entering this information, click the "Generate Melody" button to create your random melody. 
+- You will be prompted to choose a location to save the generated MIDI file.
 
 # Parameters
 **Key**: Enter the key for the melody (e.g., C, C#, Dm, etc.). Both major and minor keys are supported.
