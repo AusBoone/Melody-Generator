@@ -19,7 +19,7 @@ Run the script:
 - You will be prompted to choose a location to save the generated MIDI file.
 
 # Parameters
-**Key**: Enter the key for the melody (e.g., C, C#, Dm, etc.). Both major and minor keys are supported.
-**BPM**: Enter the beats per minute for the melody (e.g., 120).
-**Time Signature**: Enter the time signature for the melody in the format "numerator/denominator" (e.g., 4/4, 3/4, etc.).
-**Number of notes**: Enter the desired number of notes in the generated melody.
+- **Key**: Enter the key for the melody (e.g., C, C#, Dm, etc.). Both major and minor keys are supported.
+- **BPM**: Enter the beats per minute for the melody (e.g., 120).
+- **Time Signature**: Enter the time signature for the melody in the format "numerator/denominator" (e.g., 4/4, 3/4, etc.).
+- **Number of notes**: Enter the desired number of notes in the generated melody.
