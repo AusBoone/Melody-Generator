@@ -76,9 +76,9 @@ CHORDS = {
 
 # Define some common rhythmic patterns (in terms of fractions of a whole note)
 PATTERNS = [
-    [0.25, 0.25, 0.5],  # quarter, quarter, half
-    [0.25, 0.75],  # quarter, dotted half
-    [0.5, 0.5],  # half, half
+    [0.25, 0.25, 0.5],    # quarter, quarter, half
+    [0.25, 0.75],         # quarter, dotted half
+    [0.5, 0.5],           # half, half
     [0.375, 0.375, 0.25]  # dotted quarter, dotted quarter, quarter
 ]
 
@@ -150,7 +150,7 @@ def generate_melody(key, num_notes, chord_progression, motif_length=4):
     Returns:
         list: The generated melody as a list of note names.
     """
-   # Fetch the scale for the key the melody is in
+# Fetch the scale for the key the melody is in
 notes_in_key = SCALE[key]
 
 # Generate a musical motif (a short, recurring musical idea) within the key
