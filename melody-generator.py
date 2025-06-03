@@ -260,7 +260,13 @@ def generate_melody(key: str, num_notes: int, chord_progression: List[str], moti
 
     return melody
 
-def create_midi_file(melody: List[str], bpm: int, time_signature: Tuple[int, int], output_file: str) -> None:
+def create_midi_file(
+    melody: List[str],
+    bpm: int,
+    time_signature: Tuple[int, int],
+    output_file: str,
+    harmony: bool = False,
+) -> None:
     """
     Create a MIDI file for the given melody, BPM, and time signature.
     This function assigns note durations based on a randomly chosen rhythmic pattern.
@@ -275,6 +281,10 @@ def create_midi_file(melody: List[str], bpm: int, time_signature: Tuple[int, int
     mid = MidiFile(ticks_per_beat=ticks_per_beat)
     track = MidiTrack()
     mid.tracks.append(track)
+    harmony_track = None
+    if harmony:
+        harmony_track = MidiTrack()
+        mid.tracks.append(harmony_track)
 
     # Set tempo and time signature.
     track.append(mido.MetaMessage('set_tempo', tempo=mido.bpm2tempo(bpm)))
@@ -293,6 +303,12 @@ def create_midi_file(melody: List[str], bpm: int, time_signature: Tuple[int, int
         note_off = Message('note_off', note=midi_note, velocity=64, time=note_duration)
         track.append(note_on)
         track.append(note_off)
+        if harmony_track is not None:
+            harmony_note = min(midi_note + 4, 127)
+            h_on = Message('note_on', note=harmony_note, velocity=64, time=0)
+            h_off = Message('note_off', note=harmony_note, velocity=64, time=note_duration)
+            harmony_track.append(h_on)
+            harmony_track.append(h_off)
 
     mid.save(output_file)
     logging.info(f"MIDI file saved to {output_file}")
@@ -309,6 +325,7 @@ def run_cli() -> None:
     parser.add_argument('--notes', type=int, required=True, help="Number of notes in the melody.")
     parser.add_argument('--output', type=str, required=True, help="Output MIDI file path.")
     parser.add_argument('--motif_length', type=int, default=4, help="Length of the initial motif (default: 4).")
+    parser.add_argument('--harmony', action='store_true', help="Add a simple harmony track.")
     args = parser.parse_args()
 
     # Validate key and chord progression.
@@ -329,7 +346,13 @@ def run_cli() -> None:
         sys.exit(1)
 
     melody = generate_melody(args.key, args.notes, chord_progression, motif_length=args.motif_length)
-    create_midi_file(melody, args.bpm, (numerator, denominator), args.output)
+    create_midi_file(
+        melody,
+        args.bpm,
+        (numerator, denominator),
+        args.output,
+        harmony=args.harmony,
+    )
     logging.info("Melody generation complete.")
 
 def run_gui() -> None:
@@ -360,26 +383,27 @@ def run_gui() -> None:
         chord_listbox.insert(tk.END, chord)
     chord_listbox.grid(row=1, column=1)
 
-    # BPM entry.
+    # BPM slider.
     bpm_label = tk.Label(frame, text="BPM:")
     bpm_label.grid(row=2, column=0, sticky='w')
-    bpm_entry = tk.Entry(frame)
-    bpm_entry.grid(row=2, column=1)
-    bpm_entry.insert(0, "120")
+    bpm_var = tk.IntVar(value=120)
+    bpm_scale = tk.Scale(frame, from_=40, to=200, orient=tk.HORIZONTAL, variable=bpm_var)
+    bpm_scale.grid(row=2, column=1)
 
-    # Time Signature entry.
-    timesig_label = tk.Label(frame, text="Time Signature (e.g., 4/4):")
+    # Time Signature dropdown.
+    timesig_label = tk.Label(frame, text="Time Signature:")
     timesig_label.grid(row=3, column=0, sticky='w')
-    timesig_entry = tk.Entry(frame)
-    timesig_entry.grid(row=3, column=1)
-    timesig_entry.insert(0, "4/4")
+    timesig_var = tk.StringVar(value="4/4")
+    timesig_combobox = ttk.Combobox(frame, textvariable=timesig_var,
+                                    values=["2/4", "3/4", "4/4", "6/8"], state='readonly')
+    timesig_combobox.grid(row=3, column=1)
 
-    # Number of notes entry.
+    # Number of notes slider.
     notes_label = tk.Label(frame, text="Number of notes:")
     notes_label.grid(row=4, column=0, sticky='w')
-    notes_entry = tk.Entry(frame)
-    notes_entry.grid(row=4, column=1)
-    notes_entry.insert(0, "16")
+    notes_var = tk.IntVar(value=16)
+    notes_scale = tk.Scale(frame, from_=8, to=64, orient=tk.HORIZONTAL, variable=notes_var)
+    notes_scale.grid(row=4, column=1)
 
     # Motif length entry.
     motif_label = tk.Label(frame, text="Motif Length:")
@@ -387,6 +411,11 @@ def run_gui() -> None:
     motif_entry = tk.Entry(frame)
     motif_entry.grid(row=5, column=1)
     motif_entry.insert(0, "4")
+
+    # Harmony checkbox.
+    harmony_var = tk.BooleanVar(value=False)
+    harmony_check = tk.Checkbutton(frame, text="Add Harmony", variable=harmony_var)
+    harmony_check.grid(row=6, column=0, columnspan=2)
 
     def generate_button_click() -> None:
         """
@@ -400,10 +429,10 @@ def run_gui() -> None:
             return
         chord_progression = [chord_listbox.get(i) for i in selected_indices]
         try:
-            bpm = int(bpm_entry.get())
-            notes_count = int(notes_entry.get())
+            bpm = bpm_var.get()
+            notes_count = notes_var.get()
             motif_length = int(motif_entry.get())
-            timesig_parts = timesig_entry.get().split('/')
+            timesig_parts = timesig_var.get().split('/')
             if len(timesig_parts) != 2:
                 raise ValueError
             numerator, denominator = map(int, timesig_parts)
@@ -414,12 +443,18 @@ def run_gui() -> None:
         output_file = filedialog.asksaveasfilename(defaultextension=".mid", filetypes=[("MIDI files", "*.mid")])
         if output_file:
             melody = generate_melody(key, notes_count, chord_progression, motif_length=motif_length)
-            create_midi_file(melody, bpm, (numerator, denominator), output_file)
+            create_midi_file(
+                melody,
+                bpm,
+                (numerator, denominator),
+                output_file,
+                harmony=harmony_var.get(),
+            )
             messagebox.showinfo("Success", f"MIDI file saved to {output_file}")
 
     # Generate Melody button.
     generate_button = tk.Button(frame, text="Generate Melody", command=generate_button_click)
-    generate_button.grid(row=6, column=0, columnspan=2, pady=10)
+    generate_button.grid(row=7, column=0, columnspan=2, pady=10)
 
     root.mainloop()
 
