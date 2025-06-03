@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
-from typing import Callable, List, Tuple, Dict
+from typing import Callable, List, Tuple, Dict, Optional
 
 class MelodyGeneratorGUI:
     """Tkinter-based GUI for melody generation."""
@@ -14,11 +14,15 @@ class MelodyGeneratorGUI:
         create_midi_file: Callable[[List[str], int, Tuple[int, int], str, bool], None],
         scale: Dict[str, List[str]],
         chords: Dict[str, List[str]],
+        load_settings: Optional[Callable[[], Dict]] = None,
+        save_settings: Optional[Callable[[Dict], None]] = None,
     ) -> None:
         self.generate_melody = generate_melody
         self.create_midi_file = create_midi_file
         self.scale = scale
         self.chords = chords
+        self.load_settings = load_settings
+        self.save_settings = save_settings
 
         self.root = tk.Tk()
         self.root.title("Melody Generator")
@@ -41,7 +45,8 @@ class MelodyGeneratorGUI:
         # Chord progression listbox
         tk.Label(frame, text="Chord Progression (Select multiple):").grid(row=1, column=0, sticky="w")
         self.chord_listbox = tk.Listbox(frame, selectmode=tk.MULTIPLE, height=10)
-        for chord in sorted(self.chords.keys()):
+        self.sorted_chords = sorted(self.chords.keys())
+        for chord in self.sorted_chords:
             self.chord_listbox.insert(tk.END, chord)
         self.chord_listbox.grid(row=1, column=1)
 
@@ -80,6 +85,10 @@ class MelodyGeneratorGUI:
             row=7, column=0, columnspan=2, pady=10
         )
 
+        # Apply persisted settings if available
+        if self.load_settings is not None:
+            self._apply_settings(self.load_settings())
+
     def _generate_button_click(self) -> None:
         key = self.key_var.get()
         selected_indices = self.chord_listbox.curselection()
@@ -113,6 +122,47 @@ class MelodyGeneratorGUI:
                 harmony=self.harmony_var.get(),
             )
             messagebox.showinfo("Success", f"MIDI file saved to {output_file}")
+            if self.save_settings is not None and messagebox.askyesno(
+                "Save Preferences", "Save these settings as defaults?"
+            ):
+                self.save_settings(self._collect_settings())
 
     def run(self) -> None:
         self.root.mainloop()
+
+    def _collect_settings(self) -> Dict:
+        """Gather current widget values into a dictionary."""
+        chords = [self.chord_listbox.get(i) for i in self.chord_listbox.curselection()]
+        return {
+            "key": self.key_var.get(),
+            "bpm": self.bpm_var.get(),
+            "timesig": self.timesig_var.get(),
+            "notes": self.notes_var.get(),
+            "motif_length": int(self.motif_entry.get() or 0),
+            "harmony": self.harmony_var.get(),
+            "chords": chords,
+        }
+
+    def _apply_settings(self, settings: Dict) -> None:
+        """Set widget values based on ``settings`` dictionary."""
+        if not settings:
+            return
+        self.key_var.set(settings.get("key", self.key_var.get()))
+        if "bpm" in settings:
+            self.bpm_var.set(settings["bpm"])
+        if "timesig" in settings:
+            self.timesig_var.set(settings["timesig"])
+        if "notes" in settings:
+            self.notes_var.set(settings["notes"])
+        if "motif_length" in settings:
+            self.motif_entry.delete(0, tk.END)
+            self.motif_entry.insert(0, str(settings["motif_length"]))
+        if "harmony" in settings:
+            self.harmony_var.set(settings["harmony"])
+        chords = settings.get("chords")
+        if chords:
+            self.chord_listbox.selection_clear(0, tk.END)
+            for chord in chords:
+                if chord in self.sorted_chords:
+                    idx = self.sorted_chords.index(chord)
+                    self.chord_listbox.selection_set(idx)

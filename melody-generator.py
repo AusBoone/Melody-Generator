@@ -19,6 +19,7 @@ import sys
 import logging
 import argparse
 import importlib.util
+import json
 from pathlib import Path
 from typing import List, Tuple
 
@@ -31,6 +32,30 @@ MelodyGeneratorGUI = _gui.MelodyGeneratorGUI
 
 # Configure logging for debug and info messages
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+
+# Default path for storing user preferences
+DEFAULT_SETTINGS_FILE = Path.home() / ".melody_generator_settings.json"
+
+
+def load_settings(path: Path = DEFAULT_SETTINGS_FILE) -> dict:
+    """Load saved user settings from ``path`` if it exists."""
+    if path.is_file():
+        try:
+            with open(path, "r", encoding="utf-8") as fh:
+                return json.load(fh)
+        except Exception as exc:  # pragma: no cover - log error but return defaults
+            logging.error(f"Could not load settings: {exc}")
+    return {}
+
+
+def save_settings(settings: dict, path: Path = DEFAULT_SETTINGS_FILE) -> None:
+    """Save user ``settings`` to ``path`` as JSON."""
+    try:
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump(settings, fh, indent=2)
+    except Exception as exc:  # pragma: no cover - log error only
+        logging.error(f"Could not save settings: {exc}")
+
 
 # Define note names and scales
 # NOTE_TO_SEMITONE maps both sharp and flat spellings to the correct
@@ -374,6 +399,8 @@ def main() -> None:
             create_midi_file,
             SCALE,
             CHORDS,
+            load_settings,
+            save_settings,
         )
         gui.run()
 
