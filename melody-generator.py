@@ -144,6 +144,9 @@ CHORDS = {
     "Bm": ["B", "D", "F#"]
 }
 
+# Supported time signatures
+TIME_SIGNATURES: List[str] = ["2/4", "3/4", "4/4", "6/8"]
+
 # Define rhythmic patterns as fractions of a whole note
 PATTERNS: List[List[float]] = [
     [0.25, 0.25, 0.5],    # quarter, quarter, half
@@ -151,6 +154,31 @@ PATTERNS: List[List[float]] = [
     [0.5, 0.5],           # half, half
     [0.375, 0.375, 0.25]   # dotted quarter, dotted quarter, quarter
 ]
+
+# --- CLI Parsing Helpers ----------------------------------------------------
+
+def parse_timesig(value: str) -> Tuple[int, int]:
+    """Validate and parse a time signature string."""
+    if value not in TIME_SIGNATURES:
+        allowed = ", ".join(TIME_SIGNATURES)
+        raise argparse.ArgumentTypeError(
+            f"Time signature must be one of {allowed}."
+        )
+    numerator, denominator = map(int, value.split("/"))
+    return numerator, denominator
+
+
+def parse_chords(value: str) -> List[str]:
+    """Parse a comma-separated chord progression and validate chords."""
+    chords = [c.strip() for c in value.split(",") if c.strip()]
+    if not chords:
+        raise argparse.ArgumentTypeError("Chord progression cannot be empty.")
+    invalid = [c for c in chords if c not in CHORDS]
+    if invalid:
+        raise argparse.ArgumentTypeError(
+            "Invalid chord in progression: " + ", ".join(invalid)
+        )
+    return chords
 
 def note_to_midi(note: str) -> int:
     """
@@ -350,9 +378,9 @@ def run_cli() -> None:
     """
     parser = argparse.ArgumentParser(description="Generate a random melody and save as a MIDI file.")
     parser.add_argument('--key', type=str, required=True, help="Musical key (e.g., C, Dm, etc.).")
-    parser.add_argument('--chords', type=str, required=True, help="Comma-separated chord progression (e.g., C,Am,F,G).")
+    parser.add_argument('--chords', type=parse_chords, required=True, help="Comma-separated chord progression (e.g., C,Am,F,G).")
     parser.add_argument('--bpm', type=int, required=True, help="Beats per minute (integer).")
-    parser.add_argument('--timesig', type=str, required=True, help="Time signature in numerator/denominator format (e.g., 4/4).")
+    parser.add_argument('--timesig', type=parse_timesig, required=True, help="Time signature (e.g., 4/4).")
     parser.add_argument('--notes', type=int, required=True, help="Number of notes in the melody.")
     parser.add_argument('--output', type=str, required=True, help="Output MIDI file path.")
     parser.add_argument('--motif_length', type=int, default=4, help="Length of the initial motif (default: 4).")
@@ -364,17 +392,8 @@ def run_cli() -> None:
         logging.error("Invalid key provided.")
         sys.exit(1)
 
-    chord_progression = [chord.strip() for chord in args.chords.split(',')]
-    for chord in chord_progression:
-        if chord not in CHORDS:
-            logging.error(f"Invalid chord in progression: {chord}")
-            sys.exit(1)
-
-    try:
-        numerator, denominator = map(int, args.timesig.split('/'))
-    except Exception:
-        logging.error("Time signature must be in the format 'numerator/denominator' (e.g., 4/4).")
-        sys.exit(1)
+    chord_progression = args.chords
+    numerator, denominator = args.timesig
 
     melody = generate_melody(args.key, args.notes, chord_progression, motif_length=args.motif_length)
     create_midi_file(

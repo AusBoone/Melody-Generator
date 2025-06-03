@@ -5,6 +5,9 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from typing import Callable, List, Tuple, Dict, Optional
 
+# Allowed time signatures for the interface
+TIME_SIGNATURES: List[str] = ["2/4", "3/4", "4/4", "6/8"]
+
 class MelodyGeneratorGUI:
     """Tkinter-based GUI for melody generation."""
 
@@ -61,7 +64,7 @@ class MelodyGeneratorGUI:
         ttk.Combobox(
             frame,
             textvariable=self.timesig_var,
-            values=["2/4", "3/4", "4/4", "6/8"],
+            values=TIME_SIGNATURES,
             state="readonly",
         ).grid(row=3, column=1)
 
@@ -93,14 +96,30 @@ class MelodyGeneratorGUI:
         key = self.key_var.get()
         selected_indices = self.chord_listbox.curselection()
         if not selected_indices:
-            messagebox.showerror("Input Error", "Please select at least one chord for the progression.")
+            messagebox.showwarning(
+                "Input Error",
+                "Please select at least one chord for the progression."
+            )
             return
         chord_progression = [self.chord_listbox.get(i) for i in selected_indices]
+        if not chord_progression:
+            messagebox.showwarning(
+                "Input Error",
+                "Please select at least one chord for the progression."
+            )
+            return
         try:
             bpm = self.bpm_var.get()
             notes_count = self.notes_var.get()
             motif_length = int(self.motif_entry.get())
-            ts_parts = self.timesig_var.get().split("/")
+            ts_string = self.timesig_var.get()
+            if ts_string not in TIME_SIGNATURES:
+                messagebox.showwarning(
+                    "Input Error",
+                    f"Time signature must be one of {', '.join(TIME_SIGNATURES)}."
+                )
+                return
+            ts_parts = ts_string.split("/")
             if len(ts_parts) != 2:
                 raise ValueError
             numerator, denominator = map(int, ts_parts)
@@ -151,7 +170,9 @@ class MelodyGeneratorGUI:
         if "bpm" in settings:
             self.bpm_var.set(settings["bpm"])
         if "timesig" in settings:
-            self.timesig_var.set(settings["timesig"])
+            ts = settings["timesig"]
+            if ts in TIME_SIGNATURES:
+                self.timesig_var.set(ts)
         if "notes" in settings:
             self.notes_var.set(settings["notes"])
         if "motif_length" in settings:
