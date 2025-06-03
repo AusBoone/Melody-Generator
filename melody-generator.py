@@ -21,7 +21,7 @@ import argparse
 import importlib.util
 import json
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 _gui_spec = importlib.util.spec_from_file_location(
     "gui", Path(__file__).resolve().parent / "gui.py"
@@ -151,6 +151,21 @@ PATTERNS: List[List[float]] = [
     [0.5, 0.5],           # half, half
     [0.375, 0.375, 0.25]   # dotted quarter, dotted quarter, quarter
 ]
+
+
+def generate_random_chord_progression(key: str, length: int = 4) -> List[str]:
+    """Return ``length`` random chords that fit the given ``key``."""
+    root_map = {n.replace('#', '').replace('b', '') for n in SCALE[key]}
+    valid = [c for c in CHORDS if c.rstrip('m').replace('#', '').replace('b', '') in root_map]
+    if not valid:
+        valid = list(CHORDS.keys())
+    return [random.choice(valid) for _ in range(length)]
+
+
+def generate_random_rhythm_pattern(length: int = 3) -> List[float]:
+    """Create a random rhythmic pattern of ``length`` elements."""
+    choices = [0.25, 0.5, 0.75]
+    return [random.choice(choices) for _ in range(length)]
 
 def note_to_midi(note: str) -> int:
     """
@@ -297,6 +312,7 @@ def create_midi_file(
     time_signature: Tuple[int, int],
     output_file: str,
     harmony: bool = False,
+    pattern: Optional[List[float]] = None,
 ) -> None:
     """
     Create a MIDI file for the given melody, BPM, and time signature.
@@ -322,7 +338,8 @@ def create_midi_file(
     track.append(mido.MetaMessage('time_signature', numerator=time_signature[0], denominator=time_signature[1]))
 
     # Select a rhythmic pattern and compute the duration of a whole note in ticks.
-    pattern = random.choice(PATTERNS)
+    if pattern is None:
+        pattern = random.choice(PATTERNS)
     whole_note_ticks = ticks_per_beat * 4
 
     # Generate MIDI events for each note using the rhythmic pattern cyclically.
@@ -350,13 +367,15 @@ def run_cli() -> None:
     """
     parser = argparse.ArgumentParser(description="Generate a random melody and save as a MIDI file.")
     parser.add_argument('--key', type=str, required=True, help="Musical key (e.g., C, Dm, etc.).")
-    parser.add_argument('--chords', type=str, required=True, help="Comma-separated chord progression (e.g., C,Am,F,G).")
+    parser.add_argument('--chords', type=str, help="Comma-separated chord progression (e.g., C,Am,F,G).")
+    parser.add_argument('--random-chords', type=int, metavar='N', help="Generate a random chord progression of N chords, ignoring --chords.")
     parser.add_argument('--bpm', type=int, required=True, help="Beats per minute (integer).")
     parser.add_argument('--timesig', type=str, required=True, help="Time signature in numerator/denominator format (e.g., 4/4).")
     parser.add_argument('--notes', type=int, required=True, help="Number of notes in the melody.")
     parser.add_argument('--output', type=str, required=True, help="Output MIDI file path.")
     parser.add_argument('--motif_length', type=int, default=4, help="Length of the initial motif (default: 4).")
     parser.add_argument('--harmony', action='store_true', help="Add a simple harmony track.")
+    parser.add_argument('--random-rhythm', action='store_true', help="Generate a random rhythmic pattern.")
     args = parser.parse_args()
 
     # Validate key and chord progression.
@@ -364,11 +383,17 @@ def run_cli() -> None:
         logging.error("Invalid key provided.")
         sys.exit(1)
 
-    chord_progression = [chord.strip() for chord in args.chords.split(',')]
-    for chord in chord_progression:
-        if chord not in CHORDS:
-            logging.error(f"Invalid chord in progression: {chord}")
+    if args.random_chords:
+        chord_progression = generate_random_chord_progression(args.key, args.random_chords)
+    else:
+        if not args.chords:
+            logging.error("Chord progression required unless --random-chords is used.")
             sys.exit(1)
+        chord_progression = [chord.strip() for chord in args.chords.split(',')]
+        for chord in chord_progression:
+            if chord not in CHORDS:
+                logging.error(f"Invalid chord in progression: {chord}")
+                sys.exit(1)
 
     try:
         numerator, denominator = map(int, args.timesig.split('/'))
@@ -377,12 +402,14 @@ def run_cli() -> None:
         sys.exit(1)
 
     melody = generate_melody(args.key, args.notes, chord_progression, motif_length=args.motif_length)
+    rhythm = generate_random_rhythm_pattern() if args.random_rhythm else None
     create_midi_file(
         melody,
         args.bpm,
         (numerator, denominator),
         args.output,
         harmony=args.harmony,
+        pattern=rhythm,
     )
     logging.info("Melody generation complete.")
 
@@ -401,6 +428,8 @@ def main() -> None:
             CHORDS,
             load_settings,
             save_settings,
+            generate_random_chord_progression,
+            generate_random_rhythm_pattern,
         )
         gui.run()
 

@@ -27,7 +27,8 @@ can choose to save your current selections after generating a melody.
 Run the script:
 **python melody-generator.py**
 - This will open the Melody Generator GUI, where you can select the key, adjust BPM and note count with sliders, choose a time signature from a drop-down, and optionally add a harmony line.
-- After entering this information, click the "Generate Melody" button to create your random melody. 
+- Use the **Randomize Chords** and **Randomize Rhythm** buttons if you want the application to choose a chord progression and rhythmic pattern for you.
+- After entering this information, click the "Generate Melody" button to create your random melody.
 - You will be prompted to choose a location to save the generated MIDI file.
 
 # Parameters
@@ -36,6 +37,11 @@ Run the script:
 - **Time Signature**: Choose the time signature from the drop-down (e.g., 4/4, 3/4).
 - **Number of notes**: Set how many notes to generate with the slider.
 - **Harmony**: Tick this option to add a simple harmony line.
+
+## CLI Flags
+When running from the command line you can supply optional flags:
+- `--random-chords N` generates a progression of `N` random chords and ignores `--chords`.
+- `--random-rhythm` creates a random rhythmic pattern for the melody.
 
 # Future Work & Improvements 
 
