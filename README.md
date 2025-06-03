@@ -18,6 +18,11 @@ pip install mido tkinter
 ```
 2) Download the **melody-generator.py** script.
 
+# Settings
+User preferences such as BPM and key are stored in a JSON file located at
+`~/.melody_generator_settings.json`. The GUI loads this file on startup and you
+can choose to save your current selections after generating a melody.
+
 # Usage
 Run the script:
 **python melody-generator.py**
