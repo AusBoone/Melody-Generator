@@ -139,11 +139,25 @@ def note_to_midi(note: str) -> int:
         raise
 
     note_name = note[:-1]
+
+    # Map flats to their enharmonic sharps before looking up the semitone index
+    flat_to_sharp = {
+        "Db": "C#",
+        "Eb": "D#",
+        "Fb": "E",
+        "Gb": "F#",
+        "Ab": "G#",
+        "Bb": "A#",
+        "Cb": "B",
+    }
+    note_name = flat_to_sharp.get(note_name, note_name)
+
     try:
         note_idx = NOTE_TO_SEMITONE[note_name]
     except KeyError:
         logging.error(f"Note {note_name} not recognized.")
         raise
+
     return note_idx + (octave * 12)
 
 def get_interval(note1: str, note2: str) -> int:
