@@ -11,11 +11,13 @@ class MelodyGeneratorGUI:
     def __init__(
         self,
         generate_melody: Callable[[str, int, List[str], int], List[str]],
-        create_midi_file: Callable[[List[str], int, Tuple[int, int], str, bool], None],
+        create_midi_file: Callable[[List[str], int, Tuple[int, int], str, bool, Optional[List[float]]], None],
         scale: Dict[str, List[str]],
         chords: Dict[str, List[str]],
         load_settings: Optional[Callable[[], Dict]] = None,
         save_settings: Optional[Callable[[Dict], None]] = None,
+        random_chords_fn: Optional[Callable[[str, int], List[str]]] = None,
+        random_rhythm_fn: Optional[Callable[[], List[float]]] = None,
     ) -> None:
         self.generate_melody = generate_melody
         self.create_midi_file = create_midi_file
@@ -23,6 +25,10 @@ class MelodyGeneratorGUI:
         self.chords = chords
         self.load_settings = load_settings
         self.save_settings = save_settings
+        self.random_chords_fn = random_chords_fn
+        self.random_rhythm_fn = random_rhythm_fn
+
+        self.rhythm_pattern: Optional[List[float]] = None
 
         self.root = tk.Tk()
         self.root.title("Melody Generator")
@@ -80,9 +86,17 @@ class MelodyGeneratorGUI:
         self.harmony_var = tk.BooleanVar(value=False)
         tk.Checkbutton(frame, text="Add Harmony", variable=self.harmony_var).grid(row=6, column=0, columnspan=2)
 
+        # Randomize buttons
+        tk.Button(frame, text="Randomize Chords", command=self._randomize_chords).grid(
+            row=7, column=0, columnspan=2, pady=(5, 0)
+        )
+        tk.Button(frame, text="Randomize Rhythm", command=self._randomize_rhythm).grid(
+            row=8, column=0, columnspan=2, pady=(5, 0)
+        )
+
         # Generate button
         tk.Button(frame, text="Generate Melody", command=self._generate_button_click).grid(
-            row=7, column=0, columnspan=2, pady=10
+            row=9, column=0, columnspan=2, pady=10
         )
 
         # Apply persisted settings if available
@@ -120,12 +134,28 @@ class MelodyGeneratorGUI:
                 (numerator, denominator),
                 output_file,
                 harmony=self.harmony_var.get(),
+                pattern=self.rhythm_pattern,
             )
             messagebox.showinfo("Success", f"MIDI file saved to {output_file}")
             if self.save_settings is not None and messagebox.askyesno(
                 "Save Preferences", "Save these settings as defaults?"
             ):
                 self.save_settings(self._collect_settings())
+
+    def _randomize_chords(self) -> None:
+        if self.random_chords_fn is None:
+            return
+        progression = self.random_chords_fn(self.key_var.get(), 4)
+        self.chord_listbox.selection_clear(0, tk.END)
+        for chord in progression:
+            if chord in self.sorted_chords:
+                idx = self.sorted_chords.index(chord)
+                self.chord_listbox.selection_set(idx)
+
+    def _randomize_rhythm(self) -> None:
+        if self.random_rhythm_fn is None:
+            return
+        self.rhythm_pattern = self.random_rhythm_fn()
 
     def run(self) -> None:
         self.root.mainloop()
