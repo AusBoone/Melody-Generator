@@ -201,6 +201,9 @@ def generate_melody(key: str, num_notes: int, chord_progression: List[str], moti
     Returns:
         List[str]: Generated melody as a list of note names.
     """
+    if num_notes < motif_length:
+        raise ValueError("num_notes must be greater than or equal to motif_length")
+
     notes_in_key = SCALE[key]
     # Generate the initial motif.
     melody = generate_motif(motif_length, key)
