@@ -18,18 +18,33 @@ pip install mido tkinter
 ```
 2) Download the **melody-generator.py** script.
 
+## Getting Started
+
+1. Install the dependencies as shown above.
+2. Run `python melody-generator.py` to open the graphical interface.
+3. Select your key and chord progression, adjust BPM and note count with the sliders, choose a time signature, and decide whether to add a harmony line.
+4. Click **Generate Melody** and choose where to save the resulting MIDI file.
+5. Alternatively, you can generate a melody from the command line:
+
+```bash
+python melody-generator.py --key C --chords C,G,Am,F --bpm 120 --timesig 4/4 --notes 16 --output my_song.mid
+```
+
+Add `--harmony` to include a harmony track.
+
 # Usage
 Run the script:
 **python melody-generator.py**
-- This will open the Melody Generator GUI, where you can enter the desired key, BPM, time signature, and number of notes for your melody. 
+- This will open the Melody Generator GUI, where you can select the key, adjust BPM and note count with sliders, choose a time signature from a drop-down, and optionally add a harmony line.
 - After entering this information, click the "Generate Melody" button to create your random melody. 
 - You will be prompted to choose a location to save the generated MIDI file.
 
 # Parameters
 - **Key**: Enter the key for the melody (e.g., C, C#, Dm, etc.). Both major and minor keys are supported.
-- **BPM**: Enter the beats per minute for the melody (e.g., 120).
-- **Time Signature**: Enter the time signature for the melody in the format "numerator/denominator" (e.g., 4/4, 3/4, etc.).
-- **Number of notes**: Enter the desired number of notes in the generated melody.
+- **BPM**: Adjust the tempo using the slider (e.g., 120 BPM).
+- **Time Signature**: Choose the time signature from the drop-down (e.g., 4/4, 3/4).
+- **Number of notes**: Set how many notes to generate with the slider.
+- **Harmony**: Tick this option to add a simple harmony line.
 
 # Future Work & Improvements 
 
@@ -38,6 +53,6 @@ Run the script:
 - Implement Melodic Rules: The script could benefit from implementing some rules from melodic theory to make the melodies sound more pleasing. For example, leaps (intervals of more than a step) could be followed by a step in the opposite direction, a concept known as "leap compensation." Additionally, the script could limit the size of leaps or ensure that the melody doesn't leap too many times in succession.
 - Introduce Variations: The script could introduce slight variations each time the motif repeats. This could involve changing a note's pitch or duration, adding or removing notes, or inverting or reversing the motif. These variations can prevent the melody from sounding too repetitive.
 - Harmony and Counterpoint: Currently, the script generates a single melody line. Incorporating harmony or counterpoint could add depth and complexity to the output. A simple harmony could duplicate the melody at a fixed interval, while a more complex counterpoint could generate a second melody that complements the first.
-- User-Friendly GUI: The current GUI is quite basic. It could be improved by providing dropdown menus for the key and time signature, sliders for BPM and number of notes, and a checkbox for selecting whether to generate a harmony.
+- User-Friendly GUI: The interface now includes drop-downs for key and time signature, sliders for BPM and note count, and a checkbox to generate a harmony.
 - Include More Scales and Modes: The current version includes only major and minor scales. By including other scales like Dorian, Mixolydian, Pentatonic, and others, the tool could generate a wider variety of melodies.
 - Dynamic Velocity: The script currently uses a fixed velocity (volume) for all notes. Implementing dynamic velocity could make the melody more expressive. The velocity could vary randomly, or the script could implement a larger structure, such as a crescendo or decrescendo.
