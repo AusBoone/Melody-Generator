@@ -8,7 +8,14 @@ Python script that allows users to create a random melody in a specified key, wi
 
 # Installation
 1) Install the required packages:
-**pip install mido**
+You can install them all at once with:
+```bash
+pip install -r requirements.txt
+```
+or individually:
+```bash
+pip install mido tkinter
+```
 2) Download the **melody-generator.py** script.
 
 # Usage
