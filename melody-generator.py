@@ -18,10 +18,16 @@ import random
 import sys
 import logging
 import argparse
-import tkinter as tk
-from tkinter import filedialog, messagebox
-from tkinter import ttk
+import importlib.util
+from pathlib import Path
 from typing import List, Tuple
+
+_gui_spec = importlib.util.spec_from_file_location(
+    "gui", Path(__file__).resolve().parent / "gui.py"
+)
+_gui = importlib.util.module_from_spec(_gui_spec)
+_gui_spec.loader.exec_module(_gui)
+MelodyGeneratorGUI = _gui.MelodyGeneratorGUI
 
 # Configure logging for debug and info messages
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
@@ -355,108 +361,6 @@ def run_cli() -> None:
     )
     logging.info("Melody generation complete.")
 
-def run_gui() -> None:
-    """
-    Run the graphical user interface (GUI) for melody generation using tkinter.
-    """
-    root = tk.Tk()
-    root.title("Melody Generator")
-
-    # Create a frame to hold input widgets.
-    frame = tk.Frame(root, padx=10, pady=10)
-    frame.grid(row=0, column=0)
-
-    # Key selection using a drop-down (Combobox).
-    key_label = tk.Label(frame, text="Key:")
-    key_label.grid(row=0, column=0, sticky='w')
-    key_var = tk.StringVar()
-    key_combobox = ttk.Combobox(frame, textvariable=key_var, values=list(SCALE.keys()), state='readonly')
-    key_combobox.grid(row=0, column=1)
-    key_combobox.current(0)
-
-    # Chord progression selection using a multi-select listbox.
-    chord_label = tk.Label(frame, text="Chord Progression (Select multiple):")
-    chord_label.grid(row=1, column=0, sticky='w')
-    chord_listbox = tk.Listbox(frame, selectmode=tk.MULTIPLE, height=10)
-    sorted_chords = sorted(CHORDS.keys())
-    for chord in sorted_chords:
-        chord_listbox.insert(tk.END, chord)
-    chord_listbox.grid(row=1, column=1)
-
-    # BPM slider.
-    bpm_label = tk.Label(frame, text="BPM:")
-    bpm_label.grid(row=2, column=0, sticky='w')
-    bpm_var = tk.IntVar(value=120)
-    bpm_scale = tk.Scale(frame, from_=40, to=200, orient=tk.HORIZONTAL, variable=bpm_var)
-    bpm_scale.grid(row=2, column=1)
-
-    # Time Signature dropdown.
-    timesig_label = tk.Label(frame, text="Time Signature:")
-    timesig_label.grid(row=3, column=0, sticky='w')
-    timesig_var = tk.StringVar(value="4/4")
-    timesig_combobox = ttk.Combobox(frame, textvariable=timesig_var,
-                                    values=["2/4", "3/4", "4/4", "6/8"], state='readonly')
-    timesig_combobox.grid(row=3, column=1)
-
-    # Number of notes slider.
-    notes_label = tk.Label(frame, text="Number of notes:")
-    notes_label.grid(row=4, column=0, sticky='w')
-    notes_var = tk.IntVar(value=16)
-    notes_scale = tk.Scale(frame, from_=8, to=64, orient=tk.HORIZONTAL, variable=notes_var)
-    notes_scale.grid(row=4, column=1)
-
-    # Motif length entry.
-    motif_label = tk.Label(frame, text="Motif Length:")
-    motif_label.grid(row=5, column=0, sticky='w')
-    motif_entry = tk.Entry(frame)
-    motif_entry.grid(row=5, column=1)
-    motif_entry.insert(0, "4")
-
-    # Harmony checkbox.
-    harmony_var = tk.BooleanVar(value=False)
-    harmony_check = tk.Checkbutton(frame, text="Add Harmony", variable=harmony_var)
-    harmony_check.grid(row=6, column=0, columnspan=2)
-
-    def generate_button_click() -> None:
-        """
-        Callback when 'Generate Melody' is clicked.
-        Validates input, generates the melody, and saves the MIDI file.
-        """
-        key = key_var.get()
-        selected_indices = chord_listbox.curselection()
-        if not selected_indices:
-            messagebox.showerror("Input Error", "Please select at least one chord for the progression.")
-            return
-        chord_progression = [chord_listbox.get(i) for i in selected_indices]
-        try:
-            bpm = bpm_var.get()
-            notes_count = notes_var.get()
-            motif_length = int(motif_entry.get())
-            timesig_parts = timesig_var.get().split('/')
-            if len(timesig_parts) != 2:
-                raise ValueError
-            numerator, denominator = map(int, timesig_parts)
-        except ValueError:
-            messagebox.showerror("Input Error", "Ensure BPM, Number of Notes, and Motif Length are integers and Time Signature is formatted as 'numerator/denominator'.")
-            return
-
-        output_file = filedialog.asksaveasfilename(defaultextension=".mid", filetypes=[("MIDI files", "*.mid")])
-        if output_file:
-            melody = generate_melody(key, notes_count, chord_progression, motif_length=motif_length)
-            create_midi_file(
-                melody,
-                bpm,
-                (numerator, denominator),
-                output_file,
-                harmony=harmony_var.get(),
-            )
-            messagebox.showinfo("Success", f"MIDI file saved to {output_file}")
-
-    # Generate Melody button.
-    generate_button = tk.Button(frame, text="Generate Melody", command=generate_button_click)
-    generate_button.grid(row=7, column=0, columnspan=2, pady=10)
-
-    root.mainloop()
 
 def main() -> None:
     """
@@ -465,7 +369,13 @@ def main() -> None:
     if len(sys.argv) > 1:
         run_cli()
     else:
-        run_gui()
+        gui = MelodyGeneratorGUI(
+            generate_melody,
+            create_midi_file,
+            SCALE,
+            CHORDS,
+        )
+        gui.run()
 
 if __name__ == '__main__':
     main()
