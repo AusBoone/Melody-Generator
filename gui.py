@@ -33,14 +33,24 @@ class MelodyGeneratorGUI:
         self.root = tk.Tk()
         self.root.title("Melody Generator")
 
+        self._setup_theme()
         self._build_widgets()
 
+    def _setup_theme(self) -> None:
+        """Configure colors and fonts for a modern look."""
+        self.bg_color = "#2E1A47"  # deep purple background
+        self.button_color = "#4B0082"  # darker purple for buttons
+        self.accent_color = "#6A0DAD"  # lighter purple for active states
+
+        self.root.configure(bg=self.bg_color)
+        self.root.option_add("*Font", "Helvetica 10")
+
     def _build_widgets(self) -> None:
-        frame = tk.Frame(self.root, padx=10, pady=10)
+        frame = tk.Frame(self.root, padx=10, pady=10, bg=self.bg_color)
         frame.grid(row=0, column=0)
 
         # Key selection
-        tk.Label(frame, text="Key:").grid(row=0, column=0, sticky="w")
+        tk.Label(frame, text="Key:", bg=self.bg_color, fg="white").grid(row=0, column=0, sticky="w")
         self.key_var = tk.StringVar()
         key_combobox = ttk.Combobox(
             frame, textvariable=self.key_var, values=list(self.scale.keys()), state="readonly"
@@ -49,20 +59,30 @@ class MelodyGeneratorGUI:
         key_combobox.current(0)
 
         # Chord progression listbox
-        tk.Label(frame, text="Chord Progression (Select multiple):").grid(row=1, column=0, sticky="w")
-        self.chord_listbox = tk.Listbox(frame, selectmode=tk.MULTIPLE, height=10)
+        tk.Label(frame, text="Chord Progression (Select multiple):", bg=self.bg_color, fg="white").grid(row=1, column=0, sticky="w")
+        self.chord_listbox = tk.Listbox(frame, selectmode=tk.MULTIPLE, height=10, bg="white")
         self.sorted_chords = sorted(self.chords.keys())
         for chord in self.sorted_chords:
             self.chord_listbox.insert(tk.END, chord)
         self.chord_listbox.grid(row=1, column=1)
 
         # BPM slider
-        tk.Label(frame, text="BPM:").grid(row=2, column=0, sticky="w")
+        tk.Label(frame, text="BPM:", bg=self.bg_color, fg="white").grid(row=2, column=0, sticky="w")
         self.bpm_var = tk.IntVar(value=120)
-        tk.Scale(frame, from_=40, to=200, orient=tk.HORIZONTAL, variable=self.bpm_var).grid(row=2, column=1)
+        tk.Scale(
+            frame,
+            from_=40,
+            to=200,
+            orient=tk.HORIZONTAL,
+            variable=self.bpm_var,
+            bg=self.bg_color,
+            fg="white",
+            troughcolor=self.accent_color,
+            highlightthickness=0,
+        ).grid(row=2, column=1)
 
         # Time signature dropdown
-        tk.Label(frame, text="Time Signature:").grid(row=3, column=0, sticky="w")
+        tk.Label(frame, text="Time Signature:", bg=self.bg_color, fg="white").grid(row=3, column=0, sticky="w")
         self.timesig_var = tk.StringVar(value="4/4")
         ttk.Combobox(
             frame,
@@ -72,32 +92,69 @@ class MelodyGeneratorGUI:
         ).grid(row=3, column=1)
 
         # Number of notes slider
-        tk.Label(frame, text="Number of notes:").grid(row=4, column=0, sticky="w")
+        tk.Label(frame, text="Number of notes:", bg=self.bg_color, fg="white").grid(row=4, column=0, sticky="w")
         self.notes_var = tk.IntVar(value=16)
-        tk.Scale(frame, from_=8, to=64, orient=tk.HORIZONTAL, variable=self.notes_var).grid(row=4, column=1)
+        tk.Scale(
+            frame,
+            from_=8,
+            to=64,
+            orient=tk.HORIZONTAL,
+            variable=self.notes_var,
+            bg=self.bg_color,
+            fg="white",
+            troughcolor=self.accent_color,
+            highlightthickness=0,
+        ).grid(row=4, column=1)
 
         # Motif length entry
-        tk.Label(frame, text="Motif Length:").grid(row=5, column=0, sticky="w")
-        self.motif_entry = tk.Entry(frame)
+        tk.Label(frame, text="Motif Length:", bg=self.bg_color, fg="white").grid(row=5, column=0, sticky="w")
+        self.motif_entry = tk.Entry(frame, bg="white")
         self.motif_entry.grid(row=5, column=1)
         self.motif_entry.insert(0, "4")
 
         # Harmony checkbox
         self.harmony_var = tk.BooleanVar(value=False)
-        tk.Checkbutton(frame, text="Add Harmony", variable=self.harmony_var).grid(row=6, column=0, columnspan=2)
+        tk.Checkbutton(
+            frame,
+            text="Add Harmony",
+            variable=self.harmony_var,
+            bg=self.bg_color,
+            fg="white",
+            selectcolor=self.bg_color,
+            activebackground=self.bg_color,
+            activeforeground="white",
+        ).grid(row=6, column=0, columnspan=2)
 
         # Randomize buttons
-        tk.Button(frame, text="Randomize Chords", command=self._randomize_chords).grid(
-            row=7, column=0, columnspan=2, pady=(5, 0)
-        )
-        tk.Button(frame, text="Randomize Rhythm", command=self._randomize_rhythm).grid(
-            row=8, column=0, columnspan=2, pady=(5, 0)
-        )
+        tk.Button(
+            frame,
+            text="Randomize Chords",
+            command=self._randomize_chords,
+            bg=self.button_color,
+            fg="white",
+            activebackground=self.accent_color,
+            activeforeground="white",
+        ).grid(row=7, column=0, columnspan=2, pady=(5, 0))
+        tk.Button(
+            frame,
+            text="Randomize Rhythm",
+            command=self._randomize_rhythm,
+            bg=self.button_color,
+            fg="white",
+            activebackground=self.accent_color,
+            activeforeground="white",
+        ).grid(row=8, column=0, columnspan=2, pady=(5, 0))
 
         # Generate button
-        tk.Button(frame, text="Generate Melody", command=self._generate_button_click).grid(
-            row=9, column=0, columnspan=2, pady=10
-        )
+        tk.Button(
+            frame,
+            text="Generate Melody",
+            command=self._generate_button_click,
+            bg=self.button_color,
+            fg="white",
+            activebackground=self.accent_color,
+            activeforeground="white",
+        ).grid(row=9, column=0, columnspan=2, pady=10)
 
         # Apply persisted settings if available
         if self.load_settings is not None:
