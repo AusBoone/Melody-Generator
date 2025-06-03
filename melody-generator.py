@@ -27,6 +27,35 @@ from typing import List, Tuple
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 
 # Define note names and scales
+# NOTE_TO_SEMITONE maps both sharp and flat spellings to the correct
+# semitone offset within an octave so that functions like ``note_to_midi``
+# can handle enharmonic notes (e.g. ``Db`` and ``C#``).
+NOTE_TO_SEMITONE = {
+    'C': 0,
+    'B#': 0,
+    'C#': 1,
+    'Db': 1,
+    'D': 2,
+    'D#': 3,
+    'Eb': 3,
+    'E': 4,
+    'Fb': 4,
+    'E#': 5,
+    'F': 5,
+    'F#': 6,
+    'Gb': 6,
+    'G': 7,
+    'G#': 8,
+    'Ab': 8,
+    'A': 9,
+    'A#': 10,
+    'Bb': 10,
+    'B': 11,
+    'Cb': 11,
+}
+
+# Keep a basic list of note names (using sharps) for any other logic that
+# relies on it.
 NOTES: List[str] = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 SCALE = {
     'C': ['C', 'D', 'E', 'F', 'G', 'A', 'B'],
@@ -111,9 +140,9 @@ def note_to_midi(note: str) -> int:
 
     note_name = note[:-1]
     try:
-        note_idx = NOTES.index(note_name)
-    except ValueError:
-        logging.error(f"Note {note_name} not found in NOTES list.")
+        note_idx = NOTE_TO_SEMITONE[note_name]
+    except KeyError:
+        logging.error(f"Note {note_name} not recognized.")
         raise
     return note_idx + (octave * 12)
 
