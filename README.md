@@ -5,6 +5,7 @@ Python script that allows users to create a random melody in a specified key, wi
 - Python 3.x
 - mido
 - tkinter
+- Flask (optional, for the web interface)
 
 # Installation
 1) Install the required packages:
@@ -14,7 +15,7 @@ pip install -r requirements.txt
 ```
 or individually:
 ```bash
-pip install mido tkinter
+pip install mido tkinter Flask
 ```
 2) Download the **melody-generator.py** script.
 
@@ -30,6 +31,12 @@ Run the script:
 - Use the **Randomize Chords** and **Randomize Rhythm** buttons if you want the application to choose a chord progression and rhythmic pattern for you.
 - After entering this information, click the "Generate Melody" button to create your random melody.
 - You will be prompted to choose a location to save the generated MIDI file.
+
+For a web-based interface, run:
+```bash
+python web_gui.py
+```
+Then open `http://localhost:5000` in your browser to generate melodies and download the MIDI file.
 
 # Parameters
 - **Key**: Enter the key for the melody (e.g., C, C#, Dm, etc.). Both major and minor keys are supported.
