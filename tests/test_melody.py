@@ -17,6 +17,16 @@ stub_mido.MetaMessage = lambda *args, **kwargs: None
 stub_mido.bpm2tempo = lambda bpm: bpm
 sys.modules.setdefault("mido", stub_mido)
 
+# Provide a minimal stub for the 'tkinter' module so the import succeeds
+tk_stub = types.ModuleType("tkinter")
+tk_stub.filedialog = types.ModuleType("filedialog")
+tk_stub.messagebox = types.ModuleType("messagebox")
+tk_stub.ttk = types.ModuleType("ttk")
+sys.modules.setdefault("tkinter", tk_stub)
+sys.modules.setdefault("tkinter.filedialog", tk_stub.filedialog)
+sys.modules.setdefault("tkinter.messagebox", tk_stub.messagebox)
+sys.modules.setdefault("tkinter.ttk", tk_stub.ttk)
+
 spec.loader.exec_module(melody_generator)
 note_to_midi = melody_generator.note_to_midi
 generate_melody = melody_generator.generate_melody
