@@ -14,6 +14,16 @@ mido_stub.bpm2tempo = bpm2tempo
 mido_stub.MetaMessage = object
 sys.modules['mido'] = mido_stub
 
+# Provide a minimal stub for the 'tkinter' module so the import succeeds
+tk_stub = types.ModuleType("tkinter")
+tk_stub.filedialog = types.ModuleType("filedialog")
+tk_stub.messagebox = types.ModuleType("messagebox")
+tk_stub.ttk = types.ModuleType("ttk")
+sys.modules.setdefault("tkinter", tk_stub)
+sys.modules.setdefault("tkinter.filedialog", tk_stub.filedialog)
+sys.modules.setdefault("tkinter.messagebox", tk_stub.messagebox)
+sys.modules.setdefault("tkinter.ttk", tk_stub.ttk)
+
 spec = importlib.util.spec_from_file_location(
     'melody_generator',
     Path(__file__).resolve().parents[1] / 'melody-generator.py',
