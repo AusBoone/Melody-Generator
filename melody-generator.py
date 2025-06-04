@@ -23,13 +23,6 @@ import json
 from pathlib import Path
 from typing import List, Tuple, Optional
 
-_gui_spec = importlib.util.spec_from_file_location(
-    "gui", Path(__file__).resolve().parent / "gui.py"
-)
-_gui = importlib.util.module_from_spec(_gui_spec)
-_gui_spec.loader.exec_module(_gui)
-MelodyGeneratorGUI = _gui.MelodyGeneratorGUI
-
 # Configure logging for debug and info messages
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 
@@ -421,6 +414,20 @@ def main() -> None:
     if len(sys.argv) > 1:
         run_cli()
     else:
+        try:
+            gui_spec = importlib.util.spec_from_file_location(
+                "gui", Path(__file__).resolve().parent / "gui.py"
+            )
+            gui_module = importlib.util.module_from_spec(gui_spec)
+            gui_spec.loader.exec_module(gui_module)
+            MelodyGeneratorGUI = gui_module.MelodyGeneratorGUI
+        except ImportError as exc:
+            logging.error(
+                "Tkinter is required for the GUI. Run with CLI arguments or install Tkinter."
+            )
+            print("Tkinter is not available. Please run with CLI options or install it.")
+            sys.exit(1)
+
         gui = MelodyGeneratorGUI(
             generate_melody,
             create_midi_file,
