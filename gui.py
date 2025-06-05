@@ -37,20 +37,69 @@ class MelodyGeneratorGUI:
         self._build_widgets()
 
     def _setup_theme(self) -> None:
-        """Configure colors and fonts for a modern look."""
-        self.bg_color = "#2E1A47"  # deep purple background
-        self.button_color = "#4B0082"  # darker purple for buttons
-        self.accent_color = "#6A0DAD"  # lighter purple for active states
+        """Configure ttk theme and basic colors."""
+        self.style = ttk.Style(self.root)
+        try:
+            self.style.theme_use("clam")
+        except tk.TclError:
+            # fall back to default
+            pass
+
+        self.dark_mode = True
+        self.root.option_add("*Font", "Helvetica 10")
+        self._apply_theme()
+
+    def _apply_theme(self) -> None:
+        """Apply styling based on ``self.dark_mode``."""
+        if self.dark_mode:
+            self.bg_color = "#2E1A47"
+            fg = "white"
+            btn_bg = "#4B0082"
+        else:
+            self.bg_color = "#FFFFFF"
+            fg = "black"
+            btn_bg = "#E0E0E0"
 
         self.root.configure(bg=self.bg_color)
-        self.root.option_add("*Font", "Helvetica 10")
+        for name in ("TFrame", "TLabel", "TCheckbutton"):
+            self.style.configure(name, background=self.bg_color, foreground=fg)
+        self.style.configure("TButton", background=btn_bg, foreground=fg)
+        self.style.configure("TEntry", fieldbackground="white", foreground=fg)
+
+    def _toggle_theme(self) -> None:
+        self.dark_mode = bool(self.theme_var.get())
+        self._apply_theme()
+
+    def _create_tooltip(self, widget: tk.Widget, text: str) -> None:
+        """Attach a simple tooltip to ``widget``."""
+        tooltip: Optional[tk.Toplevel] = None
+
+        def show(_event: tk.Event) -> None:
+            nonlocal tooltip
+            if tooltip is not None:
+                return
+            tooltip = tk.Toplevel(widget)
+            tooltip.wm_overrideredirect(True)
+            x = widget.winfo_rootx() + 20
+            y = widget.winfo_rooty() + 20
+            tooltip.wm_geometry(f"+{x}+{y}")
+            ttk.Label(tooltip, text=text, background="yellow").pack(ipadx=2)
+
+        def hide(_event: tk.Event) -> None:
+            nonlocal tooltip
+            if tooltip is not None:
+                tooltip.destroy()
+                tooltip = None
+
+        widget.bind("<Enter>", show)
+        widget.bind("<Leave>", hide)
 
     def _build_widgets(self) -> None:
-        frame = tk.Frame(self.root, padx=10, pady=10, bg=self.bg_color)
+        frame = ttk.Frame(self.root, padding=(10, 10))
         frame.grid(row=0, column=0)
 
         # Key selection
-        tk.Label(frame, text="Key:", bg=self.bg_color, fg="white").grid(row=0, column=0, sticky="w")
+        ttk.Label(frame, text="Key:").grid(row=0, column=0, sticky="w")
         self.key_var = tk.StringVar()
         key_combobox = ttk.Combobox(
             frame, textvariable=self.key_var, values=list(self.scale.keys()), state="readonly"
@@ -59,7 +108,7 @@ class MelodyGeneratorGUI:
         key_combobox.current(0)
 
         # Chord progression listbox
-        tk.Label(frame, text="Chord Progression (Select multiple):", bg=self.bg_color, fg="white").grid(row=1, column=0, sticky="w")
+        ttk.Label(frame, text="Chord Progression (Select multiple):").grid(row=1, column=0, sticky="w")
         self.chord_listbox = tk.Listbox(frame, selectmode=tk.MULTIPLE, height=10, bg="white")
         self.sorted_chords = sorted(self.chords.keys())
         for chord in self.sorted_chords:
@@ -67,104 +116,88 @@ class MelodyGeneratorGUI:
         self.chord_listbox.grid(row=1, column=1)
 
         # BPM slider
-        tk.Label(frame, text="BPM:", bg=self.bg_color, fg="white").grid(row=2, column=0, sticky="w")
+        ttk.Label(frame, text="BPM:").grid(row=2, column=0, sticky="w")
         self.bpm_var = tk.IntVar(value=120)
-        tk.Scale(
+        bpm_scale = ttk.Scale(
             frame,
             from_=40,
             to=200,
             orient=tk.HORIZONTAL,
             variable=self.bpm_var,
-            bg=self.bg_color,
-            fg="white",
-            troughcolor=self.accent_color,
-            highlightthickness=0,
-        ).grid(row=2, column=1)
+        )
+        bpm_scale.grid(row=2, column=1)
+        self._create_tooltip(bpm_scale, "Beats per minute")
 
         # Time signature dropdown
-        tk.Label(frame, text="Time Signature:", bg=self.bg_color, fg="white").grid(row=3, column=0, sticky="w")
+        ttk.Label(frame, text="Time Signature:").grid(row=3, column=0, sticky="w")
         self.timesig_var = tk.StringVar(value="4/4")
-        ttk.Combobox(
+        timesig_box = ttk.Combobox(
             frame,
             textvariable=self.timesig_var,
             values=["2/4", "3/4", "4/4", "6/8"],
             state="readonly",
-        ).grid(row=3, column=1)
+        )
+        timesig_box.grid(row=3, column=1)
+        self._create_tooltip(timesig_box, "Time signature of the piece")
 
         # Number of notes slider
-        tk.Label(frame, text="Number of notes:", bg=self.bg_color, fg="white").grid(row=4, column=0, sticky="w")
+        ttk.Label(frame, text="Number of notes:").grid(row=4, column=0, sticky="w")
         self.notes_var = tk.IntVar(value=16)
-        tk.Scale(
+        ttk.Scale(
             frame,
             from_=8,
             to=64,
             orient=tk.HORIZONTAL,
             variable=self.notes_var,
-            bg=self.bg_color,
-            fg="white",
-            troughcolor=self.accent_color,
-            highlightthickness=0,
         ).grid(row=4, column=1)
 
         # Motif length entry
-        tk.Label(frame, text="Motif Length:", bg=self.bg_color, fg="white").grid(row=5, column=0, sticky="w")
-        self.motif_entry = tk.Entry(frame, bg="white")
+        ttk.Label(frame, text="Motif Length:").grid(row=5, column=0, sticky="w")
+        self.motif_entry = ttk.Entry(frame)
         self.motif_entry.grid(row=5, column=1)
+        self._create_tooltip(self.motif_entry, "Length of repeating motif")
         self.motif_entry.insert(0, "4")
 
         # Harmony checkbox
         self.harmony_var = tk.BooleanVar(value=False)
-        tk.Checkbutton(
+        ttk.Checkbutton(
             frame,
             text="Add Harmony",
             variable=self.harmony_var,
-            bg=self.bg_color,
-            fg="white",
-            selectcolor=self.bg_color,
-            activebackground=self.bg_color,
-            activeforeground="white",
         ).grid(row=6, column=0, columnspan=2)
 
         # Randomize buttons
-        tk.Button(
+        ttk.Button(
             frame,
             text="Randomize Chords",
             command=self._randomize_chords,
-            bg=self.button_color,
-            fg="white",
-            activebackground=self.accent_color,
-            activeforeground="white",
         ).grid(row=7, column=0, columnspan=2, pady=(5, 0))
-        tk.Button(
+        ttk.Button(
             frame,
             text="Randomize Rhythm",
             command=self._randomize_rhythm,
-            bg=self.button_color,
-            fg="white",
-            activebackground=self.accent_color,
-            activeforeground="white",
         ).grid(row=8, column=0, columnspan=2, pady=(5, 0))
 
-        tk.Button(
+        ttk.Button(
             frame,
             text="Load Preferences",
             command=self._load_preferences,
-            bg=self.button_color,
-            fg="white",
-            activebackground=self.accent_color,
-            activeforeground="white",
         ).grid(row=9, column=0, columnspan=2, pady=(5, 0))
 
         # Generate button
-        tk.Button(
+        ttk.Button(
             frame,
             text="Generate Melody",
             command=self._generate_button_click,
-            bg=self.button_color,
-            fg="white",
-            activebackground=self.accent_color,
-            activeforeground="white",
         ).grid(row=10, column=0, columnspan=2, pady=10)
+
+        self.theme_var = tk.BooleanVar(value=self.dark_mode)
+        ttk.Checkbutton(
+            frame,
+            text="Toggle Dark Mode",
+            command=self._toggle_theme,
+            variable=self.theme_var,
+        ).grid(row=11, column=0, columnspan=2, pady=(5, 0))
 
         # Apply persisted settings if available
         if self.load_settings is not None:
