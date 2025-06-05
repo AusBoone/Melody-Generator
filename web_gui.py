@@ -15,7 +15,7 @@ import io
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
-from flask import Flask, render_template_string, request
+from flask import Flask, render_template, request
 import base64
 
 # Dynamically load ``melody-generator.py`` so we can reuse its
@@ -36,46 +36,9 @@ CHORDS = melody_generator.CHORDS
 generate_random_chord_progression = melody_generator.generate_random_chord_progression
 generate_random_rhythm_pattern = melody_generator.generate_random_rhythm_pattern
 
-# Create the Flask application instance.
-app = Flask(__name__)
+# Create the Flask application instance and register templates and static files.
+app = Flask(__name__, template_folder="templates", static_folder="static")
 
-# Minimal HTML template for the web form. The template syntax is
-# rendered with ``render_template_string`` below to keep this file
-# self-contained. In a real application you might use separate
-# template files instead.
-FORM_HTML = """
-<!doctype html>
-<title>Melody Generator</title>
-<h1>Generate Melody</h1>
-<form method="post">
-  Key:
-  <select name="key">
-    {% for k in scale %}<option value="{{k}}">{{k}}</option>{% endfor %}
-  </select><br>
-  Chord progression (comma separated):<br>
-  <input name="chords"><br>
-  <label><input type="checkbox" name="random_chords" value="1"> Random chords</label><br>
-  BPM: <input type="number" name="bpm" value="120"><br>
-  Time Signature: <input name="timesig" value="4/4"><br>
-  Number of notes: <input type="number" name="notes" value="16"><br>
-  Motif length: <input type="number" name="motif_length" value="4"><br>
-  <label><input type="checkbox" name="harmony" value="1"> Harmony</label><br>
-  <label><input type="checkbox" name="random_rhythm" value="1"> Random rhythm</label><br>
-  <input type="submit" value="Generate">
-</form>
-"""
-
-PLAY_HTML = """
-<!doctype html>
-<title>Melody Generated</title>
-<h1>Your Melody</h1>
-<audio controls autoplay>
-  <source src="data:audio/midi;base64,{{data}}" type="audio/midi">
-  Your browser does not support the audio tag.
-</audio>
-<p><a download="melody.mid" href="data:audio/midi;base64,{{data}}">Download MIDI</a></p>
-<p><a href="/">Generate another</a></p>
-"""
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -121,11 +84,11 @@ def index():
             tmp.seek(0)
             data = io.BytesIO(tmp.read())
         encoded = base64.b64encode(data.getvalue()).decode('ascii')
-        return render_template_string(PLAY_HTML, data=encoded)
+        return render_template('play.html', data=encoded)
 
     # On a normal GET request simply render the form so the user can
     # enter their parameters.
-    return render_template_string(FORM_HTML, scale=sorted(SCALE.keys()))
+    return render_template('index.html', scale=sorted(SCALE.keys()))
 
 # Allow the module to be run directly with ``python web_gui.py``.
 # ``pragma: no cover`` keeps test coverage tools from complaining when

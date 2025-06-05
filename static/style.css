@@ -1,0 +1,9 @@
+body {
+    font-family: Arial, sans-serif;
+    max-width: 600px;
+    margin: 2rem auto;
+    text-align: center;
+}
+form {
+    margin-top: 1rem;
+}
