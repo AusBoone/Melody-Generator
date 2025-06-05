@@ -38,6 +38,14 @@ python web_gui.py
 ```
 Then open `http://localhost:5000` in your browser to generate melodies and download the MIDI file.
 
+## Docker Usage
+Build the image and run the web interface:
+```bash
+docker build -t melody-generator .
+docker run -p 5000:5000 melody-generator
+```
+Then visit `http://localhost:5000` in your browser.
+
 # Parameters
 - **Key**: Enter the key for the melody (e.g., C, C#, Dm, etc.). Both major and minor keys are supported.
 - **BPM**: Adjust the tempo using the slider (e.g., 120 BPM).
