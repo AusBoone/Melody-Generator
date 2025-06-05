@@ -80,7 +80,10 @@ NOTE_TO_SEMITONE = {
 
 # Keep a basic list of note names (using sharps) for any other logic that
 # relies on it.
-NOTES: List[str] = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+NOTES: List[str] = [
+    'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'
+]
+
 SCALE = {
     'C': ['C', 'D', 'E', 'F', 'G', 'A', 'B'],
     'C#': ['C#', 'D#', 'E#', 'F#', 'G#', 'A#', 'B#'],
@@ -108,6 +111,32 @@ SCALE = {
     'Bbm': ['Bb', 'C', 'Db', 'Eb', 'F', 'Gb', 'Ab'],
     'Bm': ['B', 'C#', 'D', 'E', 'F#', 'G', 'A']
 }
+
+# Programmatically extend ``SCALE`` with several common modes and pentatonic
+# scales.  This keeps the list of keys manageable while providing additional
+# variety when generating melodies.
+
+def _build_scale(root: str, pattern: List[int]) -> List[str]:
+    """Return a scale starting at ``root`` following ``pattern`` intervals."""
+    root_idx = NOTE_TO_SEMITONE[root]
+    notes = []
+    for interval in pattern:
+        idx = (root_idx + interval) % 12
+        notes.append(NOTES[idx])
+    return notes
+
+
+# Interval patterns for a few additional modes.  Values are semitone offsets
+# from the root note.  Only sharps are used for simplicity.
+_MODE_PATTERNS = {
+    "dorian": [0, 2, 3, 5, 7, 9, 10],
+    "mixolydian": [0, 2, 4, 5, 7, 9, 10],
+    "pentatonic": [0, 2, 4, 7, 9],
+}
+
+for note in NOTES:
+    for mode, pattern in _MODE_PATTERNS.items():
+        SCALE[f"{note}_{mode}"] = _build_scale(note, pattern)
 
 # Define chords with their constituent notes
 CHORDS = {
@@ -142,22 +171,48 @@ PATTERNS: List[List[float]] = [
     [0.25, 0.25, 0.5],    # quarter, quarter, half
     [0.25, 0.75],         # quarter, dotted half
     [0.5, 0.5],           # half, half
-    [0.375, 0.375, 0.25]   # dotted quarter, dotted quarter, quarter
+    [0.375, 0.375, 0.25],  # dotted quarter, dotted quarter, quarter
+    [0.125, 0.125, 0.25, 0.5],  # two eighths, quarter, half
+    [0.0625] * 8          # a run of sixteenth notes
 ]
 
 
 def generate_random_chord_progression(key: str, length: int = 4) -> List[str]:
-    """Return ``length`` random chords that fit the given ``key``."""
-    root_map = {n.replace('#', '').replace('b', '') for n in SCALE[key]}
-    valid = [c for c in CHORDS if c.rstrip('m').replace('#', '').replace('b', '') in root_map]
-    if not valid:
-        valid = list(CHORDS.keys())
-    return [random.choice(valid) for _ in range(length)]
+    """Return a simple chord progression for ``key``.
+
+    The progression is chosen from a small set of common patterns in
+    popular music.  Chords are derived from the selected key so the
+    results fit naturally with generated melodies.
+    """
+
+    major_patterns = [[0, 3, 4, 0], [0, 5, 3, 4], [0, 3, 0, 4]]
+    minor_patterns = [[0, 3, 4, 0], [0, 5, 3, 4], [0, 5, 4, 0]]
+
+    is_minor = key.endswith('m')
+    notes = SCALE[key]
+    patterns = minor_patterns if is_minor else major_patterns
+    degrees = random.choice(patterns)
+
+    def degree_to_chord(idx: int) -> str:
+        note = notes[idx % len(notes)]
+        if is_minor:
+            qualities = ['m', 'dim', '', 'm', 'm', '', '']
+        else:
+            qualities = ['', 'm', 'm', '', '', 'm', 'dim']
+        quality = qualities[idx % len(qualities)]
+        chord = note + (quality if quality != 'dim' else '')
+        return chord if chord in CHORDS else random.choice(list(CHORDS.keys()))
+
+    progression = [degree_to_chord(d) for d in degrees]
+    if length > len(progression):
+        extra = [degree_to_chord(random.randint(0, 5)) for _ in range(length - len(progression))]
+        progression.extend(extra)
+    return progression[:length]
 
 
 def generate_random_rhythm_pattern(length: int = 3) -> List[float]:
     """Create a random rhythmic pattern of ``length`` elements."""
-    choices = [0.25, 0.5, 0.75]
+    choices = [0.25, 0.5, 0.75, 0.125, 0.0625]
     return [random.choice(choices) for _ in range(length)]
 
 def note_to_midi(note: str) -> int:
@@ -261,7 +316,20 @@ def generate_melody(key: str, num_notes: int, chord_progression: List[str], moti
     # Generate the initial motif.
     melody = generate_motif(motif_length, key)
 
+    # Track the direction of the previous large leap so the next note can
+    # compensate by moving in the opposite direction.
+    leap_dir: Optional[int] = None
+
     for i in range(motif_length, num_notes):
+        # Introduce subtle variations whenever the motif would normally repeat
+        if i % motif_length == 0:
+            base = melody[i - motif_length]
+            name, octave = base[:-1], int(base[-1])
+            shift = random.choice([-1, 0, 1])
+            idx = notes_in_key.index(name)
+            new_name = notes_in_key[(idx + shift) % len(notes_in_key)]
+            melody.append(new_name + str(octave))
+            continue
         chord = chord_progression[i % len(chord_progression)]
         chord_notes = get_chord_notes(chord)
         prev_note = melody[-1]
@@ -294,8 +362,25 @@ def generate_melody(key: str, num_notes: int, chord_progression: List[str], moti
             fallback_note = random.choice(notes_in_key) + str(random.randint(4, 6))
             candidates.append(fallback_note)
 
+        # If the previous interval was a leap, favour notes that move back
+        # toward the origin by a small step.
+        if leap_dir is not None:
+            filtered = [c for c in candidates if (
+                (note_to_midi(c) - note_to_midi(prev_note)) * leap_dir < 0
+                and abs(note_to_midi(c) - note_to_midi(prev_note)) <= 2
+            )]
+            if filtered:
+                candidates = filtered
+            leap_dir = None
+
         next_note = random.choice(candidates)
         melody.append(next_note)
+
+        # Determine if this interval constitutes a leap so the next note can
+        # compensate accordingly.
+        interval = note_to_midi(next_note) - note_to_midi(prev_note)
+        if abs(interval) >= 7:
+            leap_dir = 1 if interval > 0 else -1
 
     return melody
 
@@ -340,14 +425,19 @@ def create_midi_file(
         duration_fraction = pattern[i % len(pattern)]
         note_duration = int(duration_fraction * whole_note_ticks)
         midi_note = note_to_midi(note)
-        note_on = Message('note_on', note=midi_note, velocity=64, time=0)
-        note_off = Message('note_off', note=midi_note, velocity=64, time=note_duration)
+
+        # Vary velocity over time to give the melody more expression.  The
+        # range oscillates roughly between 50 and 90.
+        velocity = int(50 + 40 * (i / max(len(melody) - 1, 1)))
+
+        note_on = Message('note_on', note=midi_note, velocity=velocity, time=0)
+        note_off = Message('note_off', note=midi_note, velocity=velocity, time=note_duration)
         track.append(note_on)
         track.append(note_off)
         if harmony_track is not None:
             harmony_note = min(midi_note + 4, 127)
-            h_on = Message('note_on', note=harmony_note, velocity=64, time=0)
-            h_off = Message('note_off', note=harmony_note, velocity=64, time=note_duration)
+            h_on = Message('note_on', note=harmony_note, velocity=max(velocity - 10, 40), time=0)
+            h_off = Message('note_off', note=harmony_note, velocity=max(velocity - 10, 40), time=note_duration)
             harmony_track.append(h_on)
             harmony_track.append(h_off)
 

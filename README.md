@@ -50,13 +50,17 @@ When running from the command line you can supply optional flags:
 - `--random-chords N` generates a progression of `N` random chords and ignores `--chords`.
 - `--random-rhythm` creates a random rhythmic pattern for the melody.
 
-# Future Work & Improvements 
+# New Features
 
-- Incorporate Chord Progressions: The script accepts a chord progression as input but doesn’t automatically generate one. To improve the script, consider adding functionality that generates common chord progressions based on the selected key. This could be done by specifying a list of popular progressions (like I-IV-V-I) and choosing one randomly or using a specific pattern.
-- Use Note Durations: Right now, the script uses random note lengths, choosing from quarter, half, and whole notes. This could be improved by using more rhythmic diversity, such as eighth notes or sixteenth notes. It might also be beneficial to generate rhythmic motifs, much like the pitch motifs already being generated, to give the melody a more consistent rhythmic feel.
-- Implement Melodic Rules: The script could benefit from implementing some rules from melodic theory to make the melodies sound more pleasing. For example, leaps (intervals of more than a step) could be followed by a step in the opposite direction, a concept known as "leap compensation." Additionally, the script could limit the size of leaps or ensure that the melody doesn't leap too many times in succession.
-- Introduce Variations: The script could introduce slight variations each time the motif repeats. This could involve changing a note's pitch or duration, adding or removing notes, or inverting or reversing the motif. These variations can prevent the melody from sounding too repetitive.
-- Harmony and Counterpoint: Currently, the script generates a single melody line. Incorporating harmony or counterpoint could add depth and complexity to the output. A simple harmony could duplicate the melody at a fixed interval, while a more complex counterpoint could generate a second melody that complements the first.
-- User-Friendly GUI: The interface now includes drop-downs for key and time signature, sliders for BPM and note count, and a checkbox to generate a harmony.
-- Include More Scales and Modes: The current version includes only major and minor scales. By including other scales like Dorian, Mixolydian, Pentatonic, and others, the tool could generate a wider variety of melodies.
-- Dynamic Velocity: The script currently uses a fixed velocity (volume) for all notes. Implementing dynamic velocity could make the melody more expressive. The velocity could vary randomly, or the script could implement a larger structure, such as a crescendo or decrescendo.
+- Automatic chord progressions based on common pop patterns.
+- Expanded rhythmic patterns including eighth- and sixteenth-note figures.
+- Melodic rules such as leap compensation to avoid jarring jumps.
+- Variations when motifs repeat so phrases remain interesting.
+- Additional modes like Dorian, Mixolydian and pentatonic scales.
+- Dynamic velocity in the MIDI output for a more natural sound.
+- GUI button to reload saved preferences at any time.
+- Web interface now previews the generated MIDI using an inline player.
+
+# Future Work
+
+- Harmony and counterpoint options for multi-line melodies.
