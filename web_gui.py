@@ -15,7 +15,8 @@ import io
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
-from flask import Flask, render_template_string, request, send_file
+from flask import Flask, render_template_string, request
+import base64
 
 # Dynamically load ``melody-generator.py`` so we can reuse its
 # melody creation functions without duplicating code. ``spec_from_file_location``
@@ -64,6 +65,18 @@ FORM_HTML = """
 </form>
 """
 
+PLAY_HTML = """
+<!doctype html>
+<title>Melody Generated</title>
+<h1>Your Melody</h1>
+<audio controls autoplay>
+  <source src="data:audio/midi;base64,{{data}}" type="audio/midi">
+  Your browser does not support the audio tag.
+</audio>
+<p><a download="melody.mid" href="data:audio/midi;base64,{{data}}">Download MIDI</a></p>
+<p><a href="/">Generate another</a></p>
+"""
+
 @app.route('/', methods=['GET', 'POST'])
 def index():
     """Handle the main form for GET and POST requests."""
@@ -93,8 +106,9 @@ def index():
         melody = generate_melody(key, notes, chords, motif_length=motif_length)
         rhythm = generate_random_rhythm_pattern() if random_rhythm else None
 
-        # Write the MIDI data to a temporary file, then stream it
-        # back to the client as a download.
+        # Write the MIDI data to a temporary file and return a page with
+        # an embedded audio player so the user can immediately preview
+        # the result in the browser.
         with NamedTemporaryFile(suffix='.mid') as tmp:
             create_midi_file(
                 melody,
@@ -106,15 +120,8 @@ def index():
             )
             tmp.seek(0)
             data = io.BytesIO(tmp.read())
-        data.seek(0)
-        # ``send_file`` streams the BytesIO object back to the browser so
-        # the user can save the generated MIDI file.
-        return send_file(
-            data,
-            mimetype='audio/midi',
-            as_attachment=True,
-            download_name='melody.mid',
-        )
+        encoded = base64.b64encode(data.getvalue()).decode('ascii')
+        return render_template_string(PLAY_HTML, data=encoded)
 
     # On a normal GET request simply render the form so the user can
     # enter their parameters.

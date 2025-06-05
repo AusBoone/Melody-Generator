@@ -145,6 +145,16 @@ class MelodyGeneratorGUI:
             activeforeground="white",
         ).grid(row=8, column=0, columnspan=2, pady=(5, 0))
 
+        tk.Button(
+            frame,
+            text="Load Preferences",
+            command=self._load_preferences,
+            bg=self.button_color,
+            fg="white",
+            activebackground=self.accent_color,
+            activeforeground="white",
+        ).grid(row=9, column=0, columnspan=2, pady=(5, 0))
+
         # Generate button
         tk.Button(
             frame,
@@ -154,7 +164,7 @@ class MelodyGeneratorGUI:
             fg="white",
             activebackground=self.accent_color,
             activeforeground="white",
-        ).grid(row=9, column=0, columnspan=2, pady=10)
+        ).grid(row=10, column=0, columnspan=2, pady=10)
 
         # Apply persisted settings if available
         if self.load_settings is not None:
@@ -213,6 +223,12 @@ class MelodyGeneratorGUI:
         if self.random_rhythm_fn is None:
             return
         self.rhythm_pattern = self.random_rhythm_fn()
+
+    def _load_preferences(self) -> None:
+        """Reload settings from disk and apply them to the widgets."""
+        if self.load_settings is None:
+            return
+        self._apply_settings(self.load_settings())
 
     def run(self) -> None:
         self.root.mainloop()
