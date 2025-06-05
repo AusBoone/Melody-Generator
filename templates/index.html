@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Melody Generator</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <h1>Generate Melody</h1>
+  <form method="post">
+    Key:
+    <select name="key">
+      {% for k in scale %}<option value="{{k}}">{{k}}</option>{% endfor %}
+    </select><br>
+    Chord progression (comma separated):<br>
+    <input name="chords"><br>
+    <label><input type="checkbox" name="random_chords" value="1"> Random chords</label><br>
+    BPM: <input type="number" name="bpm" value="120"><br>
+    Time Signature: <input name="timesig" value="4/4"><br>
+    Number of notes: <input type="number" name="notes" value="16"><br>
+    Motif length: <input type="number" name="motif_length" value="4"><br>
+    <label><input type="checkbox" name="harmony" value="1"> Harmony</label><br>
+    <label><input type="checkbox" name="random_rhythm" value="1"> Random rhythm</label><br>
+    <input type="submit" value="Generate">
+  </form>
+</body>
+</html>
