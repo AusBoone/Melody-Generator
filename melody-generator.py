@@ -254,6 +254,23 @@ def note_to_midi(note: str) -> int:
 
     return note_idx + (octave * 12)
 
+def midi_to_note(midi_note: int) -> str:
+    """Convert a MIDI note number back to a note string.
+
+    Parameters
+    ----------
+    midi_note : int
+        MIDI note number (0-127).
+
+    Returns
+    -------
+    str
+        Note string using sharps (e.g. ``C#4``).
+    """
+    octave = midi_note // 12 - 1
+    name = NOTES[midi_note % 12]
+    return f"{name}{octave}"
+
 def get_interval(note1: str, note2: str) -> int:
     """
     Get the interval between two notes in semitones.
@@ -384,6 +401,57 @@ def generate_melody(key: str, num_notes: int, chord_progression: List[str], moti
 
     return melody
 
+
+def generate_harmony_line(melody: List[str], interval: int = 4) -> List[str]:
+    """Return a simple harmony line at ``interval`` semitones from ``melody``.
+
+    The resulting line mirrors the rhythm of ``melody`` while remaining
+    within the valid MIDI range.
+    """
+    harmony = []
+    for note in melody:
+        base = note_to_midi(note)
+        direction = -1 if base + interval > 120 else 1
+        midi_val = max(0, min(127, base + direction * interval))
+        harmony.append(midi_to_note(midi_val))
+    return harmony
+
+
+def generate_counterpoint_melody(melody: List[str], key: str) -> List[str]:
+    """Generate a counterpoint line for ``melody`` in ``key``.
+
+    The line favours contrary motion and consonant intervals such as thirds,
+    sixths, fifths and octaves.
+    """
+    scale_notes = SCALE[key]
+    counter: List[str] = []
+    prev_note = None
+    prev_base = None
+    consonant = {3, 4, 7, 8, 9, 12}
+    for base_note in melody:
+        base_midi = note_to_midi(base_note)
+        candidates: List[str] = []
+        for n in scale_notes:
+            for octave in range(3, 7):
+                cand = f"{n}{octave}"
+                interval = abs(note_to_midi(cand) - base_midi)
+                if interval in consonant:
+                    candidates.append(cand)
+        if not candidates:
+            candidates.append(base_note)
+        choice = random.choice(candidates)
+        if prev_note and prev_base:
+            base_int = note_to_midi(base_note) - note_to_midi(prev_base)
+            cand_int = note_to_midi(choice) - note_to_midi(prev_note)
+            if base_int * cand_int > 0:
+                opposite = [c for c in candidates if (note_to_midi(c) - note_to_midi(prev_note)) * base_int < 0]
+                if opposite:
+                    choice = random.choice(opposite)
+        counter.append(choice)
+        prev_note = choice
+        prev_base = base_note
+    return counter
+
 def create_midi_file(
     melody: List[str],
     bpm: int,
@@ -391,16 +459,20 @@ def create_midi_file(
     output_file: str,
     harmony: bool = False,
     pattern: Optional[List[float]] = None,
+    extra_tracks: Optional[List[List[str]]] = None,
 ) -> None:
     """
     Create a MIDI file for the given melody, BPM, and time signature.
-    This function assigns note durations based on a randomly chosen rhythmic pattern.
+    This function assigns note durations based on a rhythmic pattern and
+    supports additional melody lines on separate tracks.
 
     Args:
         melody (List[str]): List of note names.
         bpm (int): Beats per minute.
         time_signature (Tuple[int, int]): Time signature (numerator, denominator).
         output_file (str): Path for saving the MIDI file.
+        extra_tracks (List[List[str]], optional): Additional melodies to write
+            on separate tracks.
     """
     ticks_per_beat = 480
     mid = MidiFile(ticks_per_beat=ticks_per_beat)
@@ -410,6 +482,12 @@ def create_midi_file(
     if harmony:
         harmony_track = MidiTrack()
         mid.tracks.append(harmony_track)
+    extra_midi_tracks: List[MidiTrack] = []
+    if extra_tracks:
+        for _ in extra_tracks:
+            t = MidiTrack()
+            mid.tracks.append(t)
+            extra_midi_tracks.append(t)
 
     # Set tempo and time signature.
     track.append(mido.MetaMessage('set_tempo', tempo=mido.bpm2tempo(bpm)))
@@ -440,6 +518,12 @@ def create_midi_file(
             h_off = Message('note_off', note=harmony_note, velocity=max(velocity - 10, 40), time=note_duration)
             harmony_track.append(h_on)
             harmony_track.append(h_off)
+        for line, t in zip(extra_tracks or [], extra_midi_tracks):
+            m = note_to_midi(line[i])
+            x_on = Message('note_on', note=m, velocity=velocity, time=0)
+            x_off = Message('note_off', note=m, velocity=velocity, time=note_duration)
+            t.append(x_on)
+            t.append(x_off)
 
     mid.save(output_file)
     logging.info(f"MIDI file saved to {output_file}")
@@ -459,6 +543,9 @@ def run_cli() -> None:
     parser.add_argument('--motif_length', type=int, default=4, help="Length of the initial motif (default: 4).")
     parser.add_argument('--harmony', action='store_true', help="Add a simple harmony track.")
     parser.add_argument('--random-rhythm', action='store_true', help="Generate a random rhythmic pattern.")
+    parser.add_argument('--counterpoint', action='store_true', help="Generate a counterpoint line.")
+    parser.add_argument('--harmony-lines', type=int, default=0, metavar='N',
+                        help="Number of harmony lines to add in parallel")
     args = parser.parse_args()
 
     # Validate key and chord progression.
@@ -486,6 +573,11 @@ def run_cli() -> None:
 
     melody = generate_melody(args.key, args.notes, chord_progression, motif_length=args.motif_length)
     rhythm = generate_random_rhythm_pattern() if args.random_rhythm else None
+    extra: List[List[str]] = []
+    for _ in range(max(0, args.harmony_lines)):
+        extra.append(generate_harmony_line(melody))
+    if args.counterpoint:
+        extra.append(generate_counterpoint_melody(melody, args.key))
     create_midi_file(
         melody,
         args.bpm,
@@ -493,6 +585,7 @@ def run_cli() -> None:
         args.output,
         harmony=args.harmony,
         pattern=rhythm,
+        extra_tracks=extra,
     )
     logging.info("Melody generation complete.")
 
@@ -527,6 +620,8 @@ def main() -> None:
             save_settings,
             generate_random_chord_progression,
             generate_random_rhythm_pattern,
+            generate_harmony_line,
+            generate_counterpoint_melody,
         )
         gui.run()
 

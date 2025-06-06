@@ -11,7 +11,18 @@ melody_generator = importlib.util.module_from_spec(spec)
 # Provide a minimal stub for the 'mido' module so the import succeeds
 stub_mido = types.ModuleType("mido")
 stub_mido.Message = lambda *args, **kwargs: None
-stub_mido.MidiFile = lambda *args, **kwargs: types.SimpleNamespace(tracks=[])
+class DummyMidiFile:
+    """Minimal MidiFile stub that records tracks and save calls."""
+    last_instance = None
+
+    def __init__(self, *args, **kwargs):
+        self.tracks = []
+        DummyMidiFile.last_instance = self
+
+    def save(self, _path):
+        pass
+
+stub_mido.MidiFile = DummyMidiFile
 stub_mido.MidiTrack = lambda *args, **kwargs: []
 stub_mido.MetaMessage = lambda *args, **kwargs: None
 stub_mido.bpm2tempo = lambda bpm: bpm
@@ -30,6 +41,9 @@ sys.modules.setdefault("tkinter.ttk", tk_stub.ttk)
 spec.loader.exec_module(melody_generator)
 note_to_midi = melody_generator.note_to_midi
 generate_melody = melody_generator.generate_melody
+generate_harmony_line = melody_generator.generate_harmony_line
+generate_counterpoint_melody = melody_generator.generate_counterpoint_melody
+create_midi_file = melody_generator.create_midi_file
 
 
 def test_note_to_midi_sharp_and_flat():
@@ -44,3 +58,23 @@ def test_generate_melody_length_and_error():
 
     with pytest.raises(ValueError):
         generate_melody('C', 3, chords, motif_length=4)
+
+
+def test_extra_tracks_created(tmp_path):
+    chords = ['C', 'G', 'Am', 'F']
+    melody = generate_melody('C', 8, chords, motif_length=4)
+    harmony = generate_harmony_line(melody)
+    cp = generate_counterpoint_melody(melody, 'C')
+    out = tmp_path / 'm.mid'
+    create_midi_file(
+        melody,
+        120,
+        (4, 4),
+        str(out),
+        harmony=False,
+        pattern=[0.25],
+        extra_tracks=[harmony, cp],
+    )
+    mid = DummyMidiFile.last_instance
+    assert mid is not None
+    assert len(mid.tracks) == 1 + 2

@@ -14,6 +14,7 @@ import importlib.util
 import io
 from pathlib import Path
 from tempfile import NamedTemporaryFile
+from typing import List
 
 from flask import Flask, render_template, request
 import base64
@@ -35,6 +36,8 @@ SCALE = melody_generator.SCALE
 CHORDS = melody_generator.CHORDS
 generate_random_chord_progression = melody_generator.generate_random_chord_progression
 generate_random_rhythm_pattern = melody_generator.generate_random_rhythm_pattern
+generate_harmony_line = melody_generator.generate_harmony_line
+generate_counterpoint_melody = melody_generator.generate_counterpoint_melody
 
 # Create the Flask application instance and register templates and static files.
 app = Flask(__name__, template_folder="templates", static_folder="static")
@@ -54,6 +57,8 @@ def index():
         motif_length = int(request.form.get('motif_length') or 4)
         harmony = bool(request.form.get('harmony'))
         random_rhythm = bool(request.form.get('random_rhythm'))
+        counterpoint = bool(request.form.get('counterpoint'))
+        harmony_lines = int(request.form.get('harmony_lines') or 0)
 
         # Determine the chord progression. The user may provide one
         # manually or tick the "random" box to generate it.
@@ -68,6 +73,11 @@ def index():
         numerator, denominator = map(int, timesig.split('/'))
         melody = generate_melody(key, notes, chords, motif_length=motif_length)
         rhythm = generate_random_rhythm_pattern() if random_rhythm else None
+        extra: List[List[str]] = []
+        for _ in range(max(0, harmony_lines)):
+            extra.append(generate_harmony_line(melody))
+        if counterpoint:
+            extra.append(generate_counterpoint_melody(melody, key))
 
         # Write the MIDI data to a temporary file and return a page with
         # an embedded audio player so the user can immediately preview
@@ -80,6 +90,7 @@ def index():
                 tmp.name,
                 harmony=harmony,
                 pattern=rhythm,
+                extra_tracks=extra,
             )
             tmp.seek(0)
             data = io.BytesIO(tmp.read())
