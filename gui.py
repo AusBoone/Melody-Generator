@@ -1,4 +1,4 @@
-# GUI module for Melody Generator
+# Tkinter GUI front-end for the Melody Generator application
 from __future__ import annotations
 
 import tkinter as tk
@@ -19,6 +19,13 @@ class MelodyGeneratorGUI:
         random_chords_fn: Optional[Callable[[str, int], List[str]]] = None,
         random_rhythm_fn: Optional[Callable[[], List[float]]] = None,
     ) -> None:
+        """Initialize the GUI and create all widgets.
+
+        Parameters mirror the core melody functions so the GUI can
+        delegate work to them. Optional callbacks are used for loading
+        and saving user preferences as well as generating random chords
+        or rhythms.
+        """
         self.generate_melody = generate_melody
         self.create_midi_file = create_midi_file
         self.scale = scale
@@ -67,6 +74,7 @@ class MelodyGeneratorGUI:
         self.style.configure("TEntry", fieldbackground="white", foreground=fg)
 
     def _toggle_theme(self) -> None:
+        """Switch between dark and light color schemes."""
         self.dark_mode = bool(self.theme_var.get())
         self._apply_theme()
 
@@ -95,6 +103,7 @@ class MelodyGeneratorGUI:
         widget.bind("<Leave>", hide)
 
     def _build_widgets(self) -> None:
+        """Create all GUI widgets and arrange them on the window."""
         frame = ttk.Frame(self.root, padding=(10, 10))
         frame.grid(row=0, column=0)
 
@@ -204,6 +213,7 @@ class MelodyGeneratorGUI:
             self._apply_settings(self.load_settings())
 
     def _generate_button_click(self) -> None:
+        """Validate inputs and generate a MIDI file from the selections."""
         key = self.key_var.get()
         selected_indices = self.chord_listbox.curselection()
         if not selected_indices:
@@ -243,6 +253,7 @@ class MelodyGeneratorGUI:
                 self.save_settings(self._collect_settings())
 
     def _randomize_chords(self) -> None:
+        """Select a random chord progression and apply it to the list box."""
         if self.random_chords_fn is None:
             return
         progression = self.random_chords_fn(self.key_var.get(), 4)
@@ -253,6 +264,7 @@ class MelodyGeneratorGUI:
                 self.chord_listbox.selection_set(idx)
 
     def _randomize_rhythm(self) -> None:
+        """Create a random rhythm pattern and store it for generation."""
         if self.random_rhythm_fn is None:
             return
         self.rhythm_pattern = self.random_rhythm_fn()
@@ -264,6 +276,7 @@ class MelodyGeneratorGUI:
         self._apply_settings(self.load_settings())
 
     def run(self) -> None:
+        """Start the Tk event loop."""
         self.root.mainloop()
 
     def _collect_settings(self) -> Dict:
