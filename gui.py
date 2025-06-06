@@ -18,6 +18,8 @@ class MelodyGeneratorGUI:
         save_settings: Optional[Callable[[Dict], None]] = None,
         random_chords_fn: Optional[Callable[[str, int], List[str]]] = None,
         random_rhythm_fn: Optional[Callable[[], List[float]]] = None,
+        harmony_line_fn: Optional[Callable[[List[str]], List[str]]] = None,
+        counterpoint_fn: Optional[Callable[[List[str], str], List[str]]] = None,
     ) -> None:
         """Initialize the GUI and create all widgets.
 
@@ -34,6 +36,8 @@ class MelodyGeneratorGUI:
         self.save_settings = save_settings
         self.random_chords_fn = random_chords_fn
         self.random_rhythm_fn = random_rhythm_fn
+        self.harmony_line_fn = harmony_line_fn
+        self.counterpoint_fn = counterpoint_fn
 
         self.rhythm_pattern: Optional[List[float]] = None
 
@@ -175,30 +179,42 @@ class MelodyGeneratorGUI:
             variable=self.harmony_var,
         ).grid(row=6, column=0, columnspan=2)
 
+        self.counterpoint_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(
+            frame,
+            text="Add Counterpoint",
+            variable=self.counterpoint_var,
+        ).grid(row=7, column=0, columnspan=2)
+
+        ttk.Label(frame, text="Harmony Lines:").grid(row=8, column=0, sticky="w")
+        self.harmony_lines = tk.Entry(frame)
+        self.harmony_lines.insert(0, "0")
+        self.harmony_lines.grid(row=8, column=1)
+
         # Randomize buttons
         ttk.Button(
             frame,
             text="Randomize Chords",
             command=self._randomize_chords,
-        ).grid(row=7, column=0, columnspan=2, pady=(5, 0))
+        ).grid(row=9, column=0, columnspan=2, pady=(5, 0))
         ttk.Button(
             frame,
             text="Randomize Rhythm",
             command=self._randomize_rhythm,
-        ).grid(row=8, column=0, columnspan=2, pady=(5, 0))
+        ).grid(row=10, column=0, columnspan=2, pady=(5, 0))
 
         ttk.Button(
             frame,
             text="Load Preferences",
             command=self._load_preferences,
-        ).grid(row=9, column=0, columnspan=2, pady=(5, 0))
+        ).grid(row=11, column=0, columnspan=2, pady=(5, 0))
 
         # Generate button
         ttk.Button(
             frame,
             text="Generate Melody",
             command=self._generate_button_click,
-        ).grid(row=10, column=0, columnspan=2, pady=10)
+        ).grid(row=12, column=0, columnspan=2, pady=10)
 
         self.theme_var = tk.BooleanVar(value=self.dark_mode)
         ttk.Checkbutton(
@@ -206,7 +222,7 @@ class MelodyGeneratorGUI:
             text="Toggle Dark Mode",
             command=self._toggle_theme,
             variable=self.theme_var,
-        ).grid(row=11, column=0, columnspan=2, pady=(5, 0))
+        ).grid(row=13, column=0, columnspan=2, pady=(5, 0))
 
         # Apply persisted settings if available
         if self.load_settings is not None:
@@ -238,6 +254,16 @@ class MelodyGeneratorGUI:
         output_file = filedialog.asksaveasfilename(defaultextension=".mid", filetypes=[("MIDI files", "*.mid")])
         if output_file:
             melody = self.generate_melody(key, notes_count, chord_progression, motif_length=motif_length)
+            extra: List[List[str]] = []
+            if self.harmony_line_fn is not None:
+                try:
+                    lines = int(self.harmony_lines.get() or 0)
+                except ValueError:
+                    lines = 0
+                for _ in range(max(0, lines)):
+                    extra.append(self.harmony_line_fn(melody))
+            if self.counterpoint_fn is not None and self.counterpoint_var.get():
+                extra.append(self.counterpoint_fn(melody, key))
             self.create_midi_file(
                 melody,
                 bpm,
@@ -245,6 +271,7 @@ class MelodyGeneratorGUI:
                 output_file,
                 harmony=self.harmony_var.get(),
                 pattern=self.rhythm_pattern,
+                extra_tracks=extra,
             )
             messagebox.showinfo("Success", f"MIDI file saved to {output_file}")
             if self.save_settings is not None and messagebox.askyesno(
@@ -289,6 +316,8 @@ class MelodyGeneratorGUI:
             "notes": self.notes_var.get(),
             "motif_length": int(self.motif_entry.get() or 0),
             "harmony": self.harmony_var.get(),
+            "counterpoint": self.counterpoint_var.get(),
+            "harmony_lines": int(self.harmony_lines.get() or 0),
             "chords": chords,
         }
 
@@ -308,6 +337,11 @@ class MelodyGeneratorGUI:
             self.motif_entry.insert(0, str(settings["motif_length"]))
         if "harmony" in settings:
             self.harmony_var.set(settings["harmony"])
+        if "counterpoint" in settings:
+            self.counterpoint_var.set(settings["counterpoint"])
+        if "harmony_lines" in settings:
+            self.harmony_lines.delete(0, tk.END)
+            self.harmony_lines.insert(0, str(settings["harmony_lines"]))
         chords = settings.get("chords")
         if chords:
             self.chord_listbox.selection_clear(0, tk.END)
