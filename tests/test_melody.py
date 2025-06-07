@@ -1,6 +1,7 @@
 import sys
 from pathlib import Path
 import types
+import importlib
 import pytest
 
 # Provide a minimal stub for the 'mido' module so the import succeeds
@@ -35,7 +36,7 @@ sys.modules.setdefault("tkinter.ttk", tk_stub.ttk)
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import melody_generator
+melody_generator = importlib.import_module("melody_generator")
 note_to_midi = melody_generator.note_to_midi
 generate_melody = melody_generator.generate_melody
 generate_harmony_line = melody_generator.generate_harmony_line
