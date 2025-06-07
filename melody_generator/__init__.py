@@ -196,6 +196,13 @@ def generate_random_chord_progression(key: str, length: int = 4) -> List[str]:
     degrees = random.choice(patterns)
 
     def degree_to_chord(idx: int) -> str:
+        """Return a chord name for the given scale ``idx``.
+
+        The chord quality is derived from the degree and key signature. If
+        the computed chord does not exist in :data:`CHORDS` a random chord is
+        returned as a safe fallback.
+        """
+
         note = notes[idx % len(notes)]
         if is_minor:
             qualities = ['m', 'dim', '', 'm', 'm', '', '']
@@ -213,7 +220,13 @@ def generate_random_chord_progression(key: str, length: int = 4) -> List[str]:
 
 
 def generate_random_rhythm_pattern(length: int = 3) -> List[float]:
-    """Create a random rhythmic pattern of ``length`` elements."""
+    """Create a random rhythmic pattern.
+
+    The pattern is returned as a list of note durations expressed as
+    fractions of a whole note. Durations are chosen from a set of common
+    musical subdivisions such as quarter notes and eighth notes.
+    """
+
     choices = [0.25, 0.5, 0.75, 0.125, 0.0625]
     return [random.choice(choices) for _ in range(length)]
 
@@ -531,8 +544,12 @@ def create_midi_file(
     logging.info(f"MIDI file saved to {output_file}")
 
 def run_cli() -> None:
-    """
-    Run the command-line interface for melody generation.
+    """Parse command line arguments and generate a melody.
+
+    This is a thin wrapper around the core library functions that mirrors
+    the options available in the GUI. It validates the provided arguments,
+    invokes :func:`generate_melody` and finally writes the resulting MIDI
+    file using :func:`create_midi_file`.
     """
     parser = argparse.ArgumentParser(description="Generate a random melody and save as a MIDI file.")
     parser.add_argument('--key', type=str, required=True, help="Musical key (e.g., C, Dm, etc.).")

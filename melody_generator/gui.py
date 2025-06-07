@@ -87,6 +87,8 @@ class MelodyGeneratorGUI:
         tooltip: Optional[tk.Toplevel] = None
 
         def show(_event: tk.Event) -> None:
+            """Display the tooltip window next to the widget."""
+
             nonlocal tooltip
             if tooltip is not None:
                 return
@@ -98,6 +100,8 @@ class MelodyGeneratorGUI:
             ttk.Label(tooltip, text=text, background="yellow").pack(ipadx=2)
 
         def hide(_event: tk.Event) -> None:
+            """Remove the tooltip when the pointer leaves the widget."""
+
             nonlocal tooltip
             if tooltip is not None:
                 tooltip.destroy()
