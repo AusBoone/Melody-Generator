@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Melody Generator: 
+Melody Generator:
 A Python script that creates a random melody in a specified key with a given BPM and time signature.
 Features include:
 - Integrated rhythmic patterns for note durations.
@@ -11,6 +11,8 @@ Features include:
 Author: Austin Boone
 Modified: February 15, 2025
 """
+
+__version__ = "0.1.0"
 
 import mido
 from mido import Message, MidiFile, MidiTrack
