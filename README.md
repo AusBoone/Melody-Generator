@@ -8,16 +8,10 @@ Python script that allows users to create a random melody in a specified key, wi
 - Flask (optional, for the web interface)
 
 # Installation
-1) Install the required packages:
-You can install them all at once with:
+Install the package from source:
 ```bash
-pip install -r requirements.txt
+pip install .
 ```
-or individually:
-```bash
-pip install mido tkinter Flask
-```
-2) Download the **melody-generator.py** script.
 
 # Settings
 User preferences such as BPM and key are stored in a JSON file located at
@@ -26,7 +20,9 @@ can choose to save your current selections after generating a melody.
 
 # Usage
 Run the script:
-**python melody-generator.py**
+```bash
+melody-generator
+```
 - This will open the Melody Generator GUI, where you can select the key, adjust BPM and note count with sliders, choose a time signature from a drop-down, and optionally add a harmony line.
 - Use the **Randomize Chords** and **Randomize Rhythm** buttons if you want the application to choose a chord progression and rhythmic pattern for you.
 - After entering this information, click the "Generate Melody" button to create your random melody.
@@ -34,7 +30,7 @@ Run the script:
 
 For a web-based interface, run:
 ```bash
-python web_gui.py
+python -m melody_generator.web_gui
 ```
 Then open `http://localhost:5000` in your browser to generate melodies and download the MIDI file.
 

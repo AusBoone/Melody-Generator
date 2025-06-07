@@ -1,7 +1,6 @@
-import importlib.util
 import sys
-import types
 from pathlib import Path
+import types
 
 # Provide a minimal dummy 'mido' module so the script can be imported without the dependency
 mido_stub = types.ModuleType('mido')
@@ -24,13 +23,9 @@ sys.modules.setdefault("tkinter.filedialog", tk_stub.filedialog)
 sys.modules.setdefault("tkinter.messagebox", tk_stub.messagebox)
 sys.modules.setdefault("tkinter.ttk", tk_stub.ttk)
 
-spec = importlib.util.spec_from_file_location(
-    'melody_generator',
-    Path(__file__).resolve().parents[1] / 'melody-generator.py',
-)
-melody_generator = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(melody_generator)
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+import melody_generator
 note_to_midi = melody_generator.note_to_midi
 
 

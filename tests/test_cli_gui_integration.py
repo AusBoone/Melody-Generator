@@ -1,14 +1,13 @@
-import importlib.util
+import importlib
 import os
-import pathlib
 import subprocess
 import sys
+from pathlib import Path
 import types
 
 import pytest
 
-MODULE_PATH = pathlib.Path(__file__).resolve().parents[1] / "melody-generator.py"
-GUI_PATH = pathlib.Path(__file__).resolve().parents[1] / "gui.py"
+
 
 
 def load_module():
@@ -39,12 +38,12 @@ def load_module():
     sys.modules.setdefault("tkinter.messagebox", tk_stub.messagebox)
     sys.modules.setdefault("tkinter.ttk", tk_stub.ttk)
 
-    spec = importlib.util.spec_from_file_location("melody_generator", MODULE_PATH)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    gui_spec = importlib.util.spec_from_file_location("gui", GUI_PATH)
-    gui_module = importlib.util.module_from_spec(gui_spec)
-    gui_spec.loader.exec_module(gui_module)
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+    if "melody_generator" in sys.modules:
+        del sys.modules["melody_generator"]
+    module = importlib.import_module("melody_generator")
+    gui_module = importlib.import_module("melody_generator.gui")
     module.gui = gui_module
     return module, gui_module, DummyMidiFile
 
@@ -97,7 +96,8 @@ def test_cli_subprocess_creates_file(tmp_path):
     subprocess.run(
         [
             sys.executable,
-            str(MODULE_PATH),
+            "-m",
+            "melody_generator",
             "--key",
             "C",
             "--chords",
@@ -113,7 +113,6 @@ def test_cli_subprocess_creates_file(tmp_path):
         ],
         check=True,
         env=env,
-        cwd=MODULE_PATH.parent,
     )
     assert output.exists()
 

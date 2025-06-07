@@ -2,30 +2,24 @@
 """Flask web interface for Melody Generator.
 
 This module provides a minimal web front-end that mirrors the
-functionality of the command line and Tkinter interfaces in
-``melody-generator.py``. The goal is to expose the melody
-generation functions over HTTP so users can experiment directly
-from their browser.
+functionality of the command line and Tkinter interfaces provided
+by the :mod:`melody_generator` package. The goal is to expose the
+melody generation functions over HTTP so users can experiment
+directly from their browser.
 """
 
 from __future__ import annotations
 
-import importlib.util
+from importlib import import_module
 import io
-from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import List
 
 from flask import Flask, render_template, request
 import base64
 
-# Dynamically load ``melody-generator.py`` so we can reuse its
-# melody creation functions without duplicating code. ``spec_from_file_location``
-# allows importing a module from an arbitrary path.
-MODULE_PATH = Path(__file__).resolve().parent / "melody-generator.py"
-spec = importlib.util.spec_from_file_location("melody_generator", MODULE_PATH)
-melody_generator = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(melody_generator)
+# Import the core melody generation package.
+melody_generator = import_module("melody_generator")
 
 # Pull the functions and data structures we need from the loaded module.
 # Doing this makes the rest of the code look as if we had imported them

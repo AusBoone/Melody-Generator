@@ -1,7 +1,6 @@
-import importlib.util
+import importlib
 import sys
 import types
-from pathlib import Path
 import pytest
 
 pytest.importorskip("flask")
@@ -24,10 +23,7 @@ sys.modules.setdefault("tkinter.filedialog", stub_tk.filedialog)
 sys.modules.setdefault("tkinter.messagebox", stub_tk.messagebox)
 sys.modules.setdefault("tkinter.ttk", stub_tk.ttk)
 
-WEB_GUI_PATH = Path(__file__).resolve().parents[1] / "web_gui.py"
-spec = importlib.util.spec_from_file_location("web_gui", WEB_GUI_PATH)
-web_gui = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(web_gui)
+web_gui = importlib.import_module("melody_generator.web_gui")
 
 app = web_gui.app
 
