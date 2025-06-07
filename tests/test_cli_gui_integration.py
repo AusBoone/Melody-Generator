@@ -5,11 +5,6 @@ import sys
 from pathlib import Path
 import types
 
-import pytest
-
-
-
-
 def load_module():
     """Load melody-generator with stubbed dependencies."""
     stub_mido = types.ModuleType("mido")
