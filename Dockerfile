@@ -9,4 +9,4 @@ COPY . .
 
 EXPOSE 5000
 
-ENTRYPOINT ["python", "web_gui.py"]
+ENTRYPOINT ["python", "-m", "melody_generator.web_gui"]
