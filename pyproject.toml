@@ -8,7 +8,6 @@ description = "Random melody generator with CLI and GUI"
 authors = [{name = "Austin Boone"}]
 dependencies = [
     "mido",
-    "tkinter",
     "Flask",
 ]
 
