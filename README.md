@@ -13,26 +13,62 @@ Install the package from source:
 pip install .
 ```
 
+Once the project is published on PyPI you will be able to install it with:
+```bash
+pip install melody-generator
+```
+
 # Settings
 User preferences such as BPM and key are stored in a JSON file located at
 `~/.melody_generator_settings.json`. The GUI loads this file on startup and you
 can choose to save your current selections after generating a melody.
 
 # Usage
-Run the script:
+
+Below are step-by-step examples for the three ways of using the project.
+
+### CLI
+
+Generate a melody entirely from the command line:
+
+```bash
+melody-generator \
+  --key C \
+  --chords C,G,Am,F \
+  --bpm 120 \
+  --timesig 4/4 \
+  --notes 16 \
+  --output song.mid \
+  --harmony --counterpoint --harmony-lines 1
+```
+
+This command creates `song.mid` with one harmony line and an additional counterpoint track.
+
+### GUI
+
+Simply run `melody-generator` with no arguments:
+
 ```bash
 melody-generator
 ```
-- This will open the Melody Generator GUI, where you can select the key, adjust BPM and note count with sliders, choose a time signature from a drop-down, and optionally add a harmony line.
-- Use the **Randomize Chords** and **Randomize Rhythm** buttons if you want the application to choose a chord progression and rhythmic pattern for you.
-- After entering this information, click the "Generate Melody" button to create your random melody.
-- You will be prompted to choose a location to save the generated MIDI file.
 
-For a web-based interface, run:
+1. Choose a key, BPM, time signature and chord progression.
+2. Check the **Harmony** or **Counterpoint** boxes to add extra tracks.
+3. Click **Generate Melody** and select where to save the MIDI file.
+
+
+### Web Interface
+
+Start the Flask app:
+
 ```bash
 python -m melody_generator.web_gui
 ```
-Then open `http://localhost:5000` in your browser to generate melodies and download the MIDI file.
+
+1. Open `http://localhost:5000` in your browser.
+2. Fill out the form just like the GUI version.
+3. Submit to preview and download the generated file.
+
 
 ## Docker Usage
 Build the image and run the web interface:
@@ -40,7 +76,9 @@ Build the image and run the web interface:
 docker build -t melody-generator .
 docker run -p 5000:5000 melody-generator
 ```
-Then visit `http://localhost:5000` in your browser.
+
+The container launches the Flask server so you can open `http://localhost:5000`
+and use the web interface without installing Python locally.
 
 # Parameters
 - **Key**: Enter the key for the melody (e.g., C, C#, Dm, etc.). Both major and minor keys are supported.
@@ -48,11 +86,15 @@ Then visit `http://localhost:5000` in your browser.
 - **Time Signature**: Choose the time signature from the drop-down (e.g., 4/4, 3/4).
 - **Number of notes**: Set how many notes to generate with the slider.
 - **Harmony**: Tick this option to add a simple harmony line.
+- **Counterpoint**: Generates an additional melody that moves against the main line.
 
 ## CLI Flags
 When running from the command line you can supply optional flags:
 - `--random-chords N` generates a progression of `N` random chords and ignores `--chords`.
 - `--random-rhythm` creates a random rhythmic pattern for the melody.
+- `--harmony` adds a parallel harmony track.
+- `--harmony-lines N` creates `N` additional harmony parts.
+- `--counterpoint` generates a contrapuntal line based on the melody.
 
 # New Features
 
@@ -64,7 +106,4 @@ When running from the command line you can supply optional flags:
 - Dynamic velocity in the MIDI output for a more natural sound.
 - GUI button to reload saved preferences at any time.
 - Web interface now previews the generated MIDI using an inline player.
-
-# Future Work
-
-- Harmony and counterpoint options for multi-line melodies.
+- Harmony and counterpoint tracks for multi-line melodies.
