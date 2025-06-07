@@ -39,7 +39,13 @@ app = Flask(__name__, template_folder="templates", static_folder="static")
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    """Handle the main form for GET and POST requests."""
+    """Render the form and handle submissions.
+
+    On ``GET`` the function simply renders the input form so the user can
+    specify parameters for the melody generation.  When the form is
+    submitted via ``POST`` a MIDI file is generated in memory and returned
+    to the browser for immediate playback.
+    """
 
     if request.method == 'POST':
         # Extract user selections, applying sensible defaults when
