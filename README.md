@@ -95,6 +95,32 @@ When running from the command line you can supply optional flags:
 - `--harmony-lines N` creates `N` additional harmony parts.
 - `--counterpoint` generates a contrapuntal line based on the melody.
 
+## Development
+
+Run the automated test suite with `pytest`:
+
+```bash
+pytest
+```
+
+External dependencies such as `mido` and `tkinter` are stubbed out in the tests
+so they do not need to be installed in order to run them.
+
+Lint the project using [ruff](https://github.com/astral-sh/ruff):
+
+```bash
+ruff .
+```
+
+To build the Docker image locally run:
+
+```bash
+docker build -t melody-generator .
+```
+
+If this command fails with `command not found`, install Docker or use an
+alternative container runtime such as Podman.
+
 # New Features
 
 - Automatic chord progressions based on common pop patterns.
