@@ -4,7 +4,6 @@ Python script that allows users to create a random melody in a specified key, wi
 # Requirements
 - Python 3.x
 - mido
-- tkinter
 - Flask (optional, for the web interface)
 
 # Installation
