@@ -18,7 +18,7 @@ import random
 import sys
 import logging
 import argparse
-import importlib.util
+from importlib import import_module
 import json
 from pathlib import Path
 from typing import List, Tuple, Optional
@@ -598,13 +598,10 @@ def main() -> None:
         run_cli()
     else:
         try:
-            gui_spec = importlib.util.spec_from_file_location(
-                "gui", Path(__file__).resolve().parent / "gui.py"
-            )
-            gui_module = importlib.util.module_from_spec(gui_spec)
-            gui_spec.loader.exec_module(gui_module)
-            MelodyGeneratorGUI = gui_module.MelodyGeneratorGUI
-        except ImportError as exc:
+            MelodyGeneratorGUI = import_module(
+                "melody_generator.gui"
+            ).MelodyGeneratorGUI
+        except ImportError:
             logging.error(
                 "Tkinter is required for the GUI. Run with CLI arguments or install Tkinter."
             )

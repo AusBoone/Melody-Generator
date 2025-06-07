@@ -1,2 +1,19 @@
 [tool.pytest.ini_options]
 addopts = "-vv"
+
+[project]
+name = "melody-generator"
+version = "0.1.0"
+description = "Random melody generator with CLI and GUI"
+authors = [{name = "Austin Boone"}]
+dependencies = [
+    "mido",
+    "tkinter",
+    "Flask",
+]
+
+[project.scripts]
+melody-generator = "melody_generator:main"
+
+[tool.setuptools.package-data]
+"melody_generator" = ["gui.py", "web_gui.py", "templates/*.html", "static/*"]
