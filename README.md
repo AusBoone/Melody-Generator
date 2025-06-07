@@ -3,8 +3,20 @@ Python script that allows users to create a random melody in a specified key, wi
 
 # Requirements
 - Python 3.x
-- mido
-- Flask (optional, for the web interface)
+- mido (for MIDI generation)
+- Flask (for the web interface)
+- tkinter (for the GUI)
+
+## Installing dependencies
+Running `pip install .` will install these packages automatically. You can also
+set them up manually with:
+
+```bash
+pip install -r requirements.txt
+```
+
+The tests stub out `mido`, `Flask` and `tkinter`, so they are not required to
+run the test suite, but they are necessary for real use.
 
 # Installation
 Install the package from source:
