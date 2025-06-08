@@ -15,7 +15,7 @@ import io
 from tempfile import NamedTemporaryFile
 from typing import List
 
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, flash
 import base64
 
 # Import the core melody generation package.
@@ -35,6 +35,7 @@ generate_counterpoint_melody = melody_generator.generate_counterpoint_melody
 
 # Create the Flask application instance and register templates and static files.
 app = Flask(__name__, template_folder="templates", static_folder="static")
+app.secret_key = "change-me"
 
 
 @app.route('/', methods=['GET', 'POST'])
@@ -70,7 +71,18 @@ def index():
             if not chords:
                 chords = generate_random_chord_progression(key)
 
-        numerator, denominator = map(int, timesig.split('/'))
+        try:
+            parts = timesig.split('/')
+            if len(parts) != 2:
+                raise ValueError
+            numerator, denominator = map(int, parts)
+            if denominator <= 0:
+                raise ValueError
+        except ValueError:
+            flash(
+                "Time signature must be two integers in the form 'numerator/denominator' with denominator > 0."
+            )
+            return render_template('index.html', scale=sorted(SCALE.keys()))
         melody = generate_melody(key, notes, chords, motif_length=motif_length)
         rhythm = generate_random_rhythm_pattern() if random_rhythm else None
         extra: List[List[str]] = []

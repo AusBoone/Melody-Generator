@@ -626,9 +626,16 @@ def run_cli() -> None:
                 sys.exit(1)
 
     try:
-        numerator, denominator = map(int, args.timesig.split('/'))
-    except Exception:
-        logging.error("Time signature must be in the format 'numerator/denominator' (e.g., 4/4).")
+        parts = args.timesig.split('/')
+        if len(parts) != 2:
+            raise ValueError
+        numerator, denominator = map(int, parts)
+        if denominator <= 0:
+            raise ValueError
+    except ValueError:
+        logging.error(
+            "Time signature must be two integers in the form 'numerator/denominator' with denominator > 0."
+        )
         sys.exit(1)
 
     melody = generate_melody(args.key, args.notes, chord_progression, motif_length=args.motif_length)

@@ -34,3 +34,19 @@ def test_index_route():
     assert resp.status_code == 200
     assert b"Generate Melody" in resp.data
 
+
+def test_invalid_timesig_flash():
+    client = app.test_client()
+    resp = client.post(
+        "/",
+        data={
+            "key": "C",
+            "chords": "C",
+            "bpm": "120",
+            "timesig": "4",  # invalid
+            "notes": "8",
+            "motif_length": "4",
+        },
+    )
+    assert b"Time signature must be" in resp.data
+
