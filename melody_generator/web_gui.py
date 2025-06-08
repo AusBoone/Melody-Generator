@@ -75,6 +75,7 @@ def index():
         rhythm = generate_random_rhythm_pattern() if random_rhythm else None
         extra: List[List[str]] = []
         for _ in range(max(0, harmony_lines)):
+            # Create as many harmony lines as requested
             extra.append(generate_harmony_line(melody))
         if counterpoint:
             extra.append(generate_counterpoint_melody(melody, key))

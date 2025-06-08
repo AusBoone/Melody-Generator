@@ -123,6 +123,7 @@ def _build_scale(root: str, pattern: List[int]) -> List[str]:
     root_idx = NOTE_TO_SEMITONE[root]
     notes = []
     for interval in pattern:
+        # Step through the interval pattern building the scale one note at a time
         idx = (root_idx + interval) % 12
         notes.append(NOTES[idx])
     return notes
@@ -138,6 +139,7 @@ _MODE_PATTERNS = {
 
 for note in NOTES:
     for mode, pattern in _MODE_PATTERNS.items():
+        # Pre-compute common modal scales for every root note
         SCALE[f"{note}_{mode}"] = _build_scale(note, pattern)
 
 # Define chords with their constituent notes
@@ -212,8 +214,10 @@ def generate_random_chord_progression(key: str, length: int = 4) -> List[str]:
         chord = note + (quality if quality != 'dim' else '')
         return chord if chord in CHORDS else random.choice(list(CHORDS.keys()))
 
+    # Convert degree numbers to concrete chord names
     progression = [degree_to_chord(d) for d in degrees]
     if length > len(progression):
+        # Pad the progression with random chords if the requested length is longer
         extra = [degree_to_chord(random.randint(0, 5)) for _ in range(length - len(progression))]
         progression.extend(extra)
     return progression[:length]
@@ -353,7 +357,7 @@ def generate_melody(key: str, num_notes: int, chord_progression: List[str], moti
     leap_dir: Optional[int] = None
 
     for i in range(motif_length, num_notes):
-        # Introduce subtle variations whenever the motif would normally repeat
+        # Repeat the motif with slight shifts to avoid exact repetition
         if i % motif_length == 0:
             base = melody[i - motif_length]
             name, octave = base[:-1], int(base[-1])
@@ -370,7 +374,7 @@ def generate_melody(key: str, num_notes: int, chord_progression: List[str], moti
 
         # Determine the smallest interval from the previous note for notes in the chord.
         for note in notes_in_key:
-            for octave in range(4, 7):  # Consider octaves 4 through 6
+            for octave in range(4, 7):  # Evaluate candidate pitches across octaves
                 candidate_note = note + str(octave)
                 if note in chord_notes:
                     interval = get_interval(prev_note, candidate_note)
@@ -397,6 +401,7 @@ def generate_melody(key: str, num_notes: int, chord_progression: List[str], moti
         # If the previous interval was a leap, favour notes that move back
         # toward the origin by a small step.
         if leap_dir is not None:
+            # Bias selection toward motion opposite the previous large leap
             filtered = [c for c in candidates if (
                 (note_to_midi(c) - note_to_midi(prev_note)) * leap_dir < 0
                 and abs(note_to_midi(c) - note_to_midi(prev_note)) <= 2
@@ -425,6 +430,7 @@ def generate_harmony_line(melody: List[str], interval: int = 4) -> List[str]:
     """
     harmony = []
     for note in melody:
+        # Shift each melody note by the specified interval
         base = note_to_midi(note)
         direction = -1 if base + interval > 120 else 1
         midi_val = max(0, min(127, base + direction * interval))
@@ -446,6 +452,7 @@ def generate_counterpoint_melody(melody: List[str], key: str) -> List[str]:
     for base_note in melody:
         base_midi = note_to_midi(base_note)
         candidates: List[str] = []
+        # Gather consonant pitches around the current melody note
         for n in scale_notes:
             for octave in range(3, 7):
                 cand = f"{n}{octave}"
@@ -458,6 +465,7 @@ def generate_counterpoint_melody(melody: List[str], key: str) -> List[str]:
         if prev_note and prev_base:
             base_int = note_to_midi(base_note) - note_to_midi(prev_base)
             cand_int = note_to_midi(choice) - note_to_midi(prev_note)
+            # Prefer contrary motion by flipping direction if possible
             if base_int * cand_int > 0:
                 opposite = [c for c in candidates if (note_to_midi(c) - note_to_midi(prev_note)) * base_int < 0]
                 if opposite:
@@ -499,6 +507,7 @@ def create_midi_file(
         mid.tracks.append(harmony_track)
     extra_midi_tracks: List[MidiTrack] = []
     if extra_tracks:
+        # Pre-create MIDI tracks to mirror any additional melody lines
         for _ in extra_tracks:
             t = MidiTrack()
             mid.tracks.append(t)
@@ -534,6 +543,7 @@ def create_midi_file(
             harmony_track.append(h_on)
             harmony_track.append(h_off)
         for line, t in zip(extra_tracks or [], extra_midi_tracks):
+            # Write corresponding notes for any extra melody lines
             m = note_to_midi(line[i])
             x_on = Message('note_on', note=m, velocity=velocity, time=0)
             x_off = Message('note_off', note=m, velocity=velocity, time=note_duration)
@@ -579,6 +589,7 @@ def run_cli() -> None:
             logging.error("Chord progression required unless --random-chords is used.")
             sys.exit(1)
         chord_progression = [chord.strip() for chord in args.chords.split(',')]
+        # Validate that every chord exists in the chord dictionary
         for chord in chord_progression:
             if chord not in CHORDS:
                 logging.error(f"Invalid chord in progression: {chord}")
@@ -594,6 +605,7 @@ def run_cli() -> None:
     rhythm = generate_random_rhythm_pattern() if args.random_rhythm else None
     extra: List[List[str]] = []
     for _ in range(max(0, args.harmony_lines)):
+        # Generate any requested parallel harmony lines
         extra.append(generate_harmony_line(melody))
     if args.counterpoint:
         extra.append(generate_counterpoint_melody(melody, args.key))
