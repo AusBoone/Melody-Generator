@@ -86,6 +86,8 @@ NOTES: List[str] = [
     'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'
 ]
 
+# Map key names to the notes that make up their diatonic scale. Functions that
+# generate melodies or harmonies reference this to stay in the chosen key.
 SCALE = {
     'C': ['C', 'D', 'E', 'F', 'G', 'A', 'B'],
     'C#': ['C#', 'D#', 'E#', 'F#', 'G#', 'A#', 'B#'],
@@ -147,7 +149,8 @@ for note in NOTES:
         # Pre-compute common modal scales for every root note
         SCALE[f"{note}_{mode}"] = _build_scale(note, pattern)
 
-# Define chords with their constituent notes
+# ``CHORDS`` maps chord names to the notes they contain. This lookup table is
+# used when constructing harmony lines and validating chord progressions.
 CHORDS = {
     "C": ["C", "E", "G"],
     "Cm": ["C", "Eb", "G"],
@@ -175,7 +178,9 @@ CHORDS = {
     "Bm": ["B", "D", "F#"]
 }
 
-# Define rhythmic patterns as fractions of a whole note
+# ``PATTERNS`` stores common rhythmic figures. Each inner list represents a
+# sequence of note durations (in fractions of a whole note) that repeat while
+# creating the MIDI file.
 PATTERNS: List[List[float]] = [
     [0.25, 0.25, 0.5],    # quarter, quarter, half
     [0.25, 0.75],         # quarter, dotted half

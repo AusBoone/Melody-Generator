@@ -1,13 +1,17 @@
+/* Center the main content and use a readable font */
 body {
     font-family: Arial, sans-serif;
     max-width: 600px;
     margin: 2rem auto;
     text-align: center;
 }
+
+/* Add spacing above the input form */
 form {
     margin-top: 1rem;
 }
 
+/* Style for flash message list */
 .flashes {
     list-style: none;
     padding: 0;
