@@ -76,3 +76,25 @@ def test_extra_tracks_created(tmp_path):
     mid = DummyMidiFile.last_instance
     assert mid is not None
     assert len(mid.tracks) == 1 + 2
+
+
+def test_extra_tracks_shorter_line(tmp_path):
+    chords = ['C', 'G', 'Am', 'F']
+    melody = generate_melody('C', 6, chords, motif_length=4)
+    harmony = generate_harmony_line(melody)[:3]
+    cp = generate_counterpoint_melody(melody, 'C')[:5]
+    out = tmp_path / 'short.mid'
+    create_midi_file(
+        melody,
+        120,
+        (4, 4),
+        str(out),
+        harmony=False,
+        pattern=[0.25],
+        extra_tracks=[harmony, cp],
+    )
+    mid = DummyMidiFile.last_instance
+    assert mid is not None
+    assert len(mid.tracks) == 1 + 2
+    assert len(mid.tracks[1]) == 2 * len(harmony)
+    assert len(mid.tracks[2]) == 2 * len(cp)

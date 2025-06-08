@@ -568,7 +568,12 @@ def create_midi_file(
             harmony_track.append(h_on)
             harmony_track.append(h_off)
         for line, t in zip(extra_tracks or [], extra_midi_tracks):
-            # Write corresponding notes for any extra melody lines
+            # Write corresponding notes for any extra melody lines.  Some lines
+            # may be shorter than ``melody`` so guard against ``IndexError`` by
+            # skipping notes that do not exist.  This allows callers to supply
+            # partial tracks without needing to manually pad them out.
+            if i >= len(line):
+                continue
             m = note_to_midi(line[i])
             x_on = Message('note_on', note=m, velocity=velocity, time=0)
             x_off = Message('note_off', note=m, velocity=velocity, time=note_duration)
