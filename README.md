@@ -121,7 +121,7 @@ so they do not need to be installed in order to run them.
 Lint the project using [ruff](https://github.com/astral-sh/ruff):
 
 ```bash
-ruff .
+ruff check .
 ```
 
 To build the Docker image locally run:
