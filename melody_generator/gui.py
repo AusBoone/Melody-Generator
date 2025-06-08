@@ -1,4 +1,10 @@
-# Tkinter GUI front-end for the Melody Generator application
+"""Tkinter GUI front-end for the Melody Generator application.
+
+This module contains :class:`MelodyGeneratorGUI`, a thin wrapper around the
+core melody functions that exposes them through a simple Tkinter interface.
+All user interaction and validation logic lives here while the heavy lifting
+is delegated to :mod:`melody_generator`.
+"""
 from __future__ import annotations
 
 import tkinter as tk

@@ -119,7 +119,12 @@ SCALE = {
 # variety when generating melodies.
 
 def _build_scale(root: str, pattern: List[int]) -> List[str]:
-    """Return a scale starting at ``root`` following ``pattern`` intervals."""
+    """Return a scale starting at ``root`` following ``pattern`` intervals.
+
+    ``pattern`` is a sequence of semitone offsets from the root note that
+    defines the mode.  The function walks the pattern wrapping around the
+    twelve-tone chromatic scale to create the resulting list of note names.
+    """
     root_idx = NOTE_TO_SEMITONE[root]
     notes = []
     for interval in pattern:
@@ -226,9 +231,10 @@ def generate_random_chord_progression(key: str, length: int = 4) -> List[str]:
 def generate_random_rhythm_pattern(length: int = 3) -> List[float]:
     """Create a random rhythmic pattern.
 
-    The pattern is returned as a list of note durations expressed as
-    fractions of a whole note. Durations are chosen from a set of common
-    musical subdivisions such as quarter notes and eighth notes.
+    The pattern is returned as a list of note durations expressed as fractions
+    of a whole note.  Each duration is selected at random from a small set of
+    common musical subdivisions such as quarter notes and eighth notes.  The
+    resulting pattern can be fed directly into :func:`create_midi_file`.
     """
 
     choices = [0.25, 0.5, 0.75, 0.125, 0.0625]
@@ -357,7 +363,8 @@ def generate_melody(key: str, num_notes: int, chord_progression: List[str], moti
     leap_dir: Optional[int] = None
 
     for i in range(motif_length, num_notes):
-        # Repeat the motif with slight shifts to avoid exact repetition
+        # At the start of each phrase repeat the motif but allow a small shift
+        # so the melody evolves over time and does not sound mechanical.
         if i % motif_length == 0:
             base = melody[i - motif_length]
             name, octave = base[:-1], int(base[-1])
@@ -372,7 +379,9 @@ def generate_melody(key: str, num_notes: int, chord_progression: List[str], moti
         candidates = []
         min_interval = None
 
-        # Determine the smallest interval from the previous note for notes in the chord.
+        # Scan all chord tones and keep track of which candidate is closest to
+        # the previous note. This gives us a baseline for selecting smooth
+        # melodic motion.
         for note in notes_in_key:
             for octave in range(4, 7):  # Evaluate candidate pitches across octaves
                 candidate_note = note + str(octave)
@@ -381,7 +390,8 @@ def generate_melody(key: str, num_notes: int, chord_progression: List[str], moti
                     if min_interval is None or interval < min_interval:
                         min_interval = interval
 
-        # Collect candidates within a threshold (min_interval + 1 semitone).
+        # Collect any notes that are within a semitone of that best interval so
+        # we have a small pool of options that still move by a reasonable step.
         if min_interval is not None:
             threshold = min_interval + 1
             for note in notes_in_key:
@@ -430,7 +440,10 @@ def generate_harmony_line(melody: List[str], interval: int = 4) -> List[str]:
     """
     harmony = []
     for note in melody:
-        # Shift each melody note by the specified interval
+        # Shift each melody note by the specified interval while clamping the
+        # value so it stays within the valid MIDI range (0-127).  When the shift
+        # would exceed the range, move in the opposite direction to keep the
+        # harmony line usable.
         base = note_to_midi(note)
         direction = -1 if base + interval > 120 else 1
         midi_val = max(0, min(127, base + direction * interval))
@@ -452,7 +465,8 @@ def generate_counterpoint_melody(melody: List[str], key: str) -> List[str]:
     for base_note in melody:
         base_midi = note_to_midi(base_note)
         candidates: List[str] = []
-        # Gather consonant pitches around the current melody note
+        # Gather consonant pitches around the current melody note so any chosen
+        # note forms a pleasant interval when played together with ``base_note``.
         for n in scale_notes:
             for octave in range(3, 7):
                 cand = f"{n}{octave}"
@@ -465,7 +479,8 @@ def generate_counterpoint_melody(melody: List[str], key: str) -> List[str]:
         if prev_note and prev_base:
             base_int = note_to_midi(base_note) - note_to_midi(prev_base)
             cand_int = note_to_midi(choice) - note_to_midi(prev_note)
-            # Prefer contrary motion by flipping direction if possible
+            # Prefer contrary motion by flipping direction if the voices are
+            # moving the same way relative to their previous notes.
             if base_int * cand_int > 0:
                 opposite = [c for c in candidates if (note_to_midi(c) - note_to_midi(prev_note)) * base_int < 0]
                 if opposite:
@@ -485,15 +500,21 @@ def create_midi_file(
     extra_tracks: Optional[List[List[str]]] = None,
 ) -> None:
     """
-    Create a MIDI file for the given melody, BPM, and time signature.
-    This function assigns note durations based on a rhythmic pattern and
-    supports additional melody lines on separate tracks.
+    Create a MIDI file for the given melody.
+
+    The function converts the list of note strings into MIDI events using
+    ``mido``.  A rhythmic ``pattern`` can be supplied to control note lengths
+    and a basic harmony track can be toggled with ``harmony``.  Additional
+    melodies may be provided in ``extra_tracks`` which are written to their own
+    tracks in the output file.
 
     Args:
         melody (List[str]): List of note names.
         bpm (int): Beats per minute.
         time_signature (Tuple[int, int]): Time signature (numerator, denominator).
         output_file (str): Path for saving the MIDI file.
+        harmony (bool, optional): Whether to include a parallel harmony line.
+        pattern (List[float], optional): Rhythmic pattern as fractions of a whole note.
         extra_tracks (List[List[str]], optional): Additional melodies to write
             on separate tracks.
     """
@@ -519,6 +540,9 @@ def create_midi_file(
 
     # Select a rhythmic pattern and compute the duration of a whole note in ticks.
     if pattern is None:
+        # Pick one of the predefined rhythms if the caller did not supply a
+        # pattern. This keeps the timing interesting while still deterministic
+        # for a given melody length.
         pattern = random.choice(PATTERNS)
     whole_note_ticks = ticks_per_beat * 4
 
@@ -528,8 +552,9 @@ def create_midi_file(
         note_duration = int(duration_fraction * whole_note_ticks)
         midi_note = note_to_midi(note)
 
-        # Vary velocity over time to give the melody more expression.  The
-        # range oscillates roughly between 50 and 90.
+        # Vary velocity over time to give the melody more expression. The value
+        # gradually increases so the phrase has a natural swell instead of a
+        # static mechanical feel. The range oscillates roughly between 50 and 90.
         velocity = int(50 + 40 * (i / max(len(melody) - 1, 1)))
 
         note_on = Message('note_on', note=midi_note, velocity=velocity, time=0)
