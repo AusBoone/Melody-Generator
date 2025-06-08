@@ -7,3 +7,9 @@ body {
 form {
     margin-top: 1rem;
 }
+
+.flashes {
+    list-style: none;
+    padding: 0;
+    color: red;
+}

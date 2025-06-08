@@ -4,6 +4,7 @@ import subprocess
 import sys
 from pathlib import Path
 import types
+import pytest
 
 def load_module():
     """Load melody-generator with stubbed dependencies."""
@@ -186,3 +187,28 @@ def test_generate_button_click(tmp_path, monkeypatch):
     assert infos
     assert calls["args"][3] == str(out)
     assert len(calls["args"][6]) == 2
+
+
+def test_cli_invalid_timesig_exits(tmp_path):
+    mod, _, _ = load_module()
+    out = tmp_path / "bad.mid"
+    argv = [
+        "prog",
+        "--key",
+        "C",
+        "--chords",
+        "C,G",
+        "--bpm",
+        "120",
+        "--timesig",
+        "4",  # missing denominator
+        "--notes",
+        "8",
+        "--output",
+        str(out),
+    ]
+    old = sys.argv
+    sys.argv = argv
+    with pytest.raises(SystemExit):
+        mod.run_cli()
+    sys.argv = old

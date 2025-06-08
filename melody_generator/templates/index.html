@@ -7,6 +7,15 @@
 </head>
 <body>
   <h1>Generate Melody</h1>
+  {% with messages = get_flashed_messages() %}
+    {% if messages %}
+      <ul class="flashes">
+      {% for msg in messages %}
+        <li>{{ msg }}</li>
+      {% endfor %}
+      </ul>
+    {% endif %}
+  {% endwith %}
   <form method="post">
     Key:
     <select name="key">
