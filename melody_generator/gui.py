@@ -129,6 +129,7 @@ class MelodyGeneratorGUI:
         self.chord_listbox = tk.Listbox(frame, selectmode=tk.MULTIPLE, height=10, bg="white")
         self.sorted_chords = sorted(self.chords.keys())
         for chord in self.sorted_chords:
+            # Populate the list box with every available chord
             self.chord_listbox.insert(tk.END, chord)
         self.chord_listbox.grid(row=1, column=1)
 
@@ -239,6 +240,7 @@ class MelodyGeneratorGUI:
         if not selected_indices:
             messagebox.showerror("Input Error", "Please select at least one chord for the progression.")
             return
+        # Build the chord progression from the selected listbox entries
         chord_progression = [self.chord_listbox.get(i) for i in selected_indices]
         try:
             bpm = self.bpm_var.get()
@@ -249,6 +251,7 @@ class MelodyGeneratorGUI:
                 raise ValueError
             numerator, denominator = map(int, ts_parts)
         except ValueError:
+            # Show one error message for any invalid numeric input
             messagebox.showerror(
                 "Input Error",
                 "Ensure BPM, Number of Notes, and Motif Length are integers and Time Signature is formatted as 'numerator/denominator'.",
@@ -264,9 +267,11 @@ class MelodyGeneratorGUI:
                     lines = int(self.harmony_lines.get() or 0)
                 except ValueError:
                     lines = 0
+                # Generate the requested number of harmony tracks
                 for _ in range(max(0, lines)):
                     extra.append(self.harmony_line_fn(melody))
             if self.counterpoint_fn is not None and self.counterpoint_var.get():
+                # Optionally add a counterpoint melody line
                 extra.append(self.counterpoint_fn(melody, key))
             self.create_midi_file(
                 melody,
@@ -292,12 +297,14 @@ class MelodyGeneratorGUI:
         for chord in progression:
             if chord in self.sorted_chords:
                 idx = self.sorted_chords.index(chord)
+                # Highlight each chord in the listbox
                 self.chord_listbox.selection_set(idx)
 
     def _randomize_rhythm(self) -> None:
         """Create a random rhythm pattern and store it for generation."""
         if self.random_rhythm_fn is None:
             return
+        # Store the newly generated pattern for use during MIDI export
         self.rhythm_pattern = self.random_rhythm_fn()
 
     def _load_preferences(self) -> None:
@@ -312,6 +319,7 @@ class MelodyGeneratorGUI:
 
     def _collect_settings(self) -> Dict:
         """Gather current widget values into a dictionary."""
+        # Persist any chords currently selected in the listbox
         chords = [self.chord_listbox.get(i) for i in self.chord_listbox.curselection()]
         return {
             "key": self.key_var.get(),
@@ -352,4 +360,5 @@ class MelodyGeneratorGUI:
             for chord in chords:
                 if chord in self.sorted_chords:
                     idx = self.sorted_chords.index(chord)
+                    # Restore selection state for each saved chord
                     self.chord_listbox.selection_set(idx)
