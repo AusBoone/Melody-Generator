@@ -78,11 +78,11 @@ def index():
             if len(parts) != 2:
                 raise ValueError
             numerator, denominator = map(int, parts)
-            if denominator <= 0:
+            if numerator <= 0 or denominator <= 0:
                 raise ValueError
         except ValueError:
             flash(
-                "Time signature must be two integers in the form 'numerator/denominator' with denominator > 0."
+                "Time signature must be two integers in the form 'numerator/denominator' with numerator > 0 and denominator > 0."
             )
             return render_template('index.html', scale=sorted(SCALE.keys()))
         melody = generate_melody(key, notes, chords, motif_length=motif_length)

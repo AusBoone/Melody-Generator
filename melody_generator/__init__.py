@@ -684,11 +684,11 @@ def run_cli() -> None:
         if len(parts) != 2:
             raise ValueError
         numerator, denominator = map(int, parts)
-        if denominator <= 0:
+        if numerator <= 0 or denominator <= 0:
             raise ValueError
     except ValueError:
         logging.error(
-            "Time signature must be two integers in the form 'numerator/denominator' with denominator > 0."
+            "Time signature must be two integers in the form 'numerator/denominator' with numerator > 0 and denominator > 0."
         )
         sys.exit(1)
 

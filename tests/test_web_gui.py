@@ -50,3 +50,35 @@ def test_invalid_timesig_flash():
     )
     assert b"Time signature must be" in resp.data
 
+
+def test_invalid_numerator_flash():
+    client = app.test_client()
+    resp = client.post(
+        "/",
+        data={
+            "key": "C",
+            "chords": "C",
+            "bpm": "120",
+            "timesig": "0/4",
+            "notes": "8",
+            "motif_length": "4",
+        },
+    )
+    assert b"Time signature must be" in resp.data
+
+
+def test_negative_numerator_flash():
+    client = app.test_client()
+    resp = client.post(
+        "/",
+        data={
+            "key": "C",
+            "chords": "C",
+            "bpm": "120",
+            "timesig": "-3/4",
+            "notes": "8",
+            "motif_length": "4",
+        },
+    )
+    assert b"Time signature must be" in resp.data
+
