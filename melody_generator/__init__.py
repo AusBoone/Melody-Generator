@@ -648,6 +648,17 @@ def run_cli() -> None:
     # Parse the provided CLI arguments
     args = parser.parse_args()
 
+    # Basic numeric sanity checks
+    if args.bpm <= 0:
+        logging.error("BPM must be a positive integer.")
+        sys.exit(1)
+    if args.notes <= 0:
+        logging.error("Number of notes must be a positive integer.")
+        sys.exit(1)
+    if args.motif_length <= 0:
+        logging.error("Motif length must be a positive integer.")
+        sys.exit(1)
+
     # Validate key and chord progression.
     if args.key not in SCALE:
         logging.error("Invalid key provided.")
