@@ -246,3 +246,30 @@ def test_cli_invalid_timesig_exits(tmp_path):
     with pytest.raises(SystemExit):
         mod.run_cli()
     sys.argv = old
+
+
+def test_cli_non_positive_values_exit(tmp_path):
+    mod, _, _ = load_module()
+    out = tmp_path / "bad.mid"
+    argv = [
+        "prog",
+        "--key",
+        "C",
+        "--chords",
+        "C,G",
+        "--bpm",
+        "0",
+        "--timesig",
+        "4/4",
+        "--notes",
+        "-1",
+        "--motif_length",
+        "0",
+        "--output",
+        str(out),
+    ]
+    old = sys.argv
+    sys.argv = argv
+    with pytest.raises(SystemExit):
+        mod.run_cli()
+    sys.argv = old
