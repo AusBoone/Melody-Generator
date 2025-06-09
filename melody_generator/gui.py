@@ -252,6 +252,8 @@ class MelodyGeneratorGUI:
             bpm = self.bpm_var.get()
             notes_count = self.notes_var.get()
             motif_length = int(self.motif_entry.get())
+            if bpm <= 0 or notes_count <= 0 or motif_length <= 0:
+                raise ValueError
             ts_parts = self.timesig_var.get().split("/")
             if len(ts_parts) != 2:
                 raise ValueError

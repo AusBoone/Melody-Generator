@@ -194,6 +194,35 @@ def test_generate_button_click(tmp_path, monkeypatch):
     assert len(calls["args"][6]) == 2
 
 
+def test_generate_button_click_non_positive(tmp_path, monkeypatch):
+    mod, gui_mod, _ = load_module()
+    gui = gui_mod.MelodyGeneratorGUI.__new__(gui_mod.MelodyGeneratorGUI)
+    gui.generate_melody = lambda *a, **k: []
+    gui.create_midi_file = lambda *a, **k: None
+    gui.harmony_line_fn = None
+    gui.counterpoint_fn = None
+    gui.save_settings = None
+    gui.rhythm_pattern = None
+    gui.key_var = types.SimpleNamespace(get=lambda: "C")
+    gui.bpm_var = types.SimpleNamespace(get=lambda: 0)
+    gui.timesig_var = types.SimpleNamespace(get=lambda: "4/4")
+    gui.notes_var = types.SimpleNamespace(get=lambda: -1)
+    gui.motif_entry = types.SimpleNamespace(get=lambda: "0")
+    gui.harmony_var = types.SimpleNamespace(get=lambda: False)
+    gui.counterpoint_var = types.SimpleNamespace(get=lambda: False)
+    gui.harmony_lines = types.SimpleNamespace(get=lambda: "0")
+    lb = types.SimpleNamespace(curselection=lambda: (0,), get=lambda idx: "C")
+    gui.chord_listbox = lb
+
+    monkeypatch.setattr(gui_mod.filedialog, "asksaveasfilename", lambda **k: str(tmp_path / "x.mid"), raising=False)
+    errs = []
+    monkeypatch.setattr(gui_mod.messagebox, "showerror", lambda *a, **k: errs.append(a), raising=False)
+
+    gui._generate_button_click()
+
+    assert errs
+
+
 def test_cli_invalid_timesig_exits(tmp_path):
     mod, _, _ = load_module()
     out = tmp_path / "bad.mid"
