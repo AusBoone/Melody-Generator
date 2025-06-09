@@ -18,7 +18,8 @@ from typing import List
 from flask import Flask, render_template, request, flash
 import base64
 
-# Import the core melody generation package.
+# Import the core melody generation package dynamically so the
+# Flask app can live in a separate module without circular imports.
 melody_generator = import_module("melody_generator")
 
 # Pull the functions and data structures we need from the loaded module.
@@ -118,4 +119,5 @@ def index():
 # ``pragma: no cover`` keeps test coverage tools from complaining when
 # this block is skipped during automated testing.
 if __name__ == '__main__':  # pragma: no cover - manual usage
+    # Launch the development server
     app.run(debug=True)
