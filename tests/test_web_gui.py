@@ -82,3 +82,20 @@ def test_negative_numerator_flash():
     )
     assert b"Time signature must be" in resp.data
 
+
+def test_invalid_key_flash():
+    client = app.test_client()
+    resp = client.post(
+        "/",
+        data={
+            "key": "InvalidKey",
+            "chords": "C",
+            "bpm": "120",
+            "timesig": "4/4",
+            "notes": "8",
+            "motif_length": "4",
+        },
+    )
+    assert resp.status_code == 200
+    assert b"Invalid key selected" in resp.data
+
