@@ -258,6 +258,8 @@ class MelodyGeneratorGUI:
             if len(ts_parts) != 2:
                 raise ValueError
             numerator, denominator = map(int, ts_parts)
+            if denominator <= 0:
+                raise ValueError
         except ValueError:
             # Show one error message for any invalid numeric input
             messagebox.showerror(
