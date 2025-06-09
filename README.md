@@ -79,6 +79,8 @@ python -m melody_generator.web_gui
 1. Open `http://localhost:5000` in your browser.
 2. Fill out the form just like the GUI version.
 3. Submit to preview and download the generated file.
+4. Set the `FLASK_SECRET` environment variable to override the default Flask
+   session key.
 
 
 ## Docker Usage

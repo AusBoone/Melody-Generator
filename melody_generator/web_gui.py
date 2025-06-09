@@ -17,6 +17,7 @@ from typing import List
 
 from flask import Flask, render_template, request, flash
 import base64
+import os
 
 # Import the core melody generation package dynamically so the
 # Flask app can live in a separate module without circular imports.
@@ -36,7 +37,7 @@ generate_counterpoint_melody = melody_generator.generate_counterpoint_melody
 
 # Create the Flask application instance and register templates and static files.
 app = Flask(__name__, template_folder="templates", static_folder="static")
-app.secret_key = "change-me"
+app.secret_key = os.environ.get("FLASK_SECRET", "change-me")
 
 
 @app.route('/', methods=['GET', 'POST'])
