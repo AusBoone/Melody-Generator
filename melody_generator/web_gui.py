@@ -54,6 +54,10 @@ def index():
         # Extract user selections, applying sensible defaults when
         # values are missing.
         key = request.form.get('key') or 'C'
+        if key not in SCALE:
+            flash("Invalid key selected. Please choose a valid key.")
+            return render_template('index.html', scale=sorted(SCALE.keys()))
+
         bpm = int(request.form.get('bpm') or 120)
         timesig = request.form.get('timesig') or '4/4'
         notes = int(request.form.get('notes') or 16)
