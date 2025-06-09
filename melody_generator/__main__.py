@@ -6,7 +6,10 @@ package can be launched as a script.  Keeping the logic in
 installed ``melody-generator`` console script and during testing.
 """
 
+# Reuse the package level ``main`` function so both ``python -m`` and the
+# installed console script behave identically.
 from . import main
 
 if __name__ == "__main__":
+    # Delegate execution to the package entry point
     main()

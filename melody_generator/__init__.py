@@ -29,11 +29,15 @@ from typing import List, Tuple, Optional
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 
 # Default path for storing user preferences
+# The file lives in the user's home directory so settings persist
+# between runs of the application.
 DEFAULT_SETTINGS_FILE = Path.home() / ".melody_generator_settings.json"
 
 
 def load_settings(path: Path = DEFAULT_SETTINGS_FILE) -> dict:
     """Load saved user settings from ``path`` if it exists."""
+    # Prefer the user's saved options but fall back to an empty
+    # dictionary when the settings file is missing or unreadable.
     if path.is_file():
         try:
             with open(path, "r", encoding="utf-8") as fh:
@@ -45,6 +49,8 @@ def load_settings(path: Path = DEFAULT_SETTINGS_FILE) -> dict:
 
 def save_settings(settings: dict, path: Path = DEFAULT_SETTINGS_FILE) -> None:
     """Save user ``settings`` to ``path`` as JSON."""
+    # Any IOError is logged but ignored so failing to save
+    # preferences never prevents melody generation.
     try:
         with open(path, "w", encoding="utf-8") as fh:
             json.dump(settings, fh, indent=2)
@@ -182,11 +188,17 @@ CHORDS = {
 # sequence of note durations (in fractions of a whole note) that repeat while
 # creating the MIDI file.
 PATTERNS: List[List[float]] = [
+    # Basic march-like rhythm
     [0.25, 0.25, 0.5],    # quarter, quarter, half
+    # Simple syncopation with a dotted half
     [0.25, 0.75],         # quarter, dotted half
+    # Even half notes
     [0.5, 0.5],           # half, half
+    # Dotted quarter pattern often found in waltzes
     [0.375, 0.375, 0.25],  # dotted quarter, dotted quarter, quarter
+    # Eighth-note lead in to a half note
     [0.125, 0.125, 0.25, 0.5],  # two eighths, quarter, half
+    # Continuous run of sixteenth notes
     [0.0625] * 8          # a run of sixteenth notes
 ]
 
@@ -199,12 +211,16 @@ def generate_random_chord_progression(key: str, length: int = 4) -> List[str]:
     results fit naturally with generated melodies.
     """
 
+    # Roman numeral progressions for major and minor keys encoded as
+    # scale degrees (0 = I/i). These simple loops mimic typical pop
+    # progressions and keep the harmony sounding familiar.
     major_patterns = [[0, 3, 4, 0], [0, 5, 3, 4], [0, 3, 0, 4]]
     minor_patterns = [[0, 3, 4, 0], [0, 5, 3, 4], [0, 5, 4, 0]]
 
     is_minor = key.endswith('m')
     notes = SCALE[key]
     patterns = minor_patterns if is_minor else major_patterns
+    # Pick one pattern at random to build the progression
     degrees = random.choice(patterns)
 
     def degree_to_chord(idx: int) -> str:
@@ -220,15 +236,19 @@ def generate_random_chord_progression(key: str, length: int = 4) -> List[str]:
             qualities = ['m', 'dim', '', 'm', 'm', '', '']
         else:
             qualities = ['', 'm', 'm', '', '', 'm', 'dim']
+        # Look up the chord quality for this scale degree (major, minor or diminished)
         quality = qualities[idx % len(qualities)]
         chord = note + (quality if quality != 'dim' else '')
         return chord if chord in CHORDS else random.choice(list(CHORDS.keys()))
 
     # Convert degree numbers to concrete chord names
+    # (e.g. 0 -> C, 4 -> G when key is C)
     progression = [degree_to_chord(d) for d in degrees]
     if length > len(progression):
         # Pad the progression with random chords if the requested length is longer
-        extra = [degree_to_chord(random.randint(0, 5)) for _ in range(length - len(progression))]
+        extra = [degree_to_chord(random.randint(0, 5))
+                 for _ in range(length - len(progression))]
+        # Extend with random chords so the returned list matches ``length``
         progression.extend(extra)
     return progression[:length]
 
@@ -243,6 +263,7 @@ def generate_random_rhythm_pattern(length: int = 3) -> List[float]:
     """
 
     choices = [0.25, 0.5, 0.75, 0.125, 0.0625]
+    # Randomly pick note lengths from the available subdivisions
     return [random.choice(choices) for _ in range(length)]
 
 def note_to_midi(note: str) -> int:
@@ -257,11 +278,13 @@ def note_to_midi(note: str) -> int:
         int: Corresponding MIDI note number.
     """
     try:
+        # MIDI octaves start at -1 so offset by +1 from the human-readable value
         octave = int(note[-1]) + 1
     except ValueError:
         logging.error(f"Invalid note format: {note}")
         raise
 
+    # Strip the octave number to get the pitch class
     note_name = note[:-1]
 
     # Map flats to their enharmonic sharps before looking up the semitone index
@@ -277,11 +300,13 @@ def note_to_midi(note: str) -> int:
     note_name = flat_to_sharp.get(note_name, note_name)
 
     try:
+        # Look up the semitone index within the octave
         note_idx = NOTE_TO_SEMITONE[note_name]
     except KeyError:
         logging.error(f"Note {note_name} not recognized.")
         raise
 
+    # MIDI note number is calculated relative to C0 at index 12
     return note_idx + (octave * 12)
 
 def midi_to_note(midi_note: int) -> str:
@@ -298,6 +323,7 @@ def midi_to_note(midi_note: int) -> str:
         Note string using sharps (e.g. ``C#4``).
     """
     octave = midi_note // 12 - 1
+    # Wrap around the NOTES list to get the pitch class
     name = NOTES[midi_note % 12]
     return f"{name}{octave}"
 
@@ -312,6 +338,7 @@ def get_interval(note1: str, note2: str) -> int:
     Returns:
         int: Interval in semitones.
     """
+    # Interval is the absolute difference in semitone numbers
     return abs(note_to_midi(note1) - note_to_midi(note2))
 
 def get_chord_notes(chord: str) -> List[str]:
@@ -338,6 +365,7 @@ def generate_motif(length: int, key: str) -> List[str]:
         List[str]: List of note names forming the motif.
     """
     notes_in_key = SCALE[key]
+    # Choose random notes within the key and place them in a comfortable octave range
     return [random.choice(notes_in_key) + str(random.randint(4, 6)) for _ in range(length)]
 
 def generate_melody(key: str, num_notes: int, chord_progression: List[str], motif_length: int = 4) -> List[str]:
@@ -553,8 +581,10 @@ def create_midi_file(
 
     # Generate MIDI events for each note using the rhythmic pattern cyclically.
     for i, note in enumerate(melody):
+        # Determine how long this note should last based on the pattern
         duration_fraction = pattern[i % len(pattern)]
         note_duration = int(duration_fraction * whole_note_ticks)
+        # Convert note name to MIDI number for writing events
         midi_note = note_to_midi(note)
 
         # Vary velocity over time to give the melody more expression. The value
@@ -567,11 +597,13 @@ def create_midi_file(
         track.append(note_on)
         track.append(note_off)
         if harmony_track is not None:
+            # Simple parallel harmony a major/minor third above
             harmony_note = min(midi_note + 4, 127)
             h_on = Message('note_on', note=harmony_note, velocity=max(velocity - 10, 40), time=0)
             h_off = Message('note_off', note=harmony_note, velocity=max(velocity - 10, 40), time=note_duration)
             harmony_track.append(h_on)
             harmony_track.append(h_off)
+        # Iterate over any additional melody lines alongside their target tracks
         for line, t in zip(extra_tracks or [], extra_midi_tracks):
             # Write corresponding notes for any extra melody lines.  Some lines
             # may be shorter than ``melody`` so guard against ``IndexError`` by
@@ -585,6 +617,7 @@ def create_midi_file(
             t.append(x_on)
             t.append(x_off)
 
+    # Write all tracks to disk
     mid.save(output_file)
     logging.info(f"MIDI file saved to {output_file}")
 
@@ -596,7 +629,9 @@ def run_cli() -> None:
     invokes :func:`generate_melody` and finally writes the resulting MIDI
     file using :func:`create_midi_file`.
     """
-    parser = argparse.ArgumentParser(description="Generate a random melody and save as a MIDI file.")
+    parser = argparse.ArgumentParser(
+        description="Generate a random melody and save as a MIDI file."
+    )
     parser.add_argument('--key', type=str, required=True, help="Musical key (e.g., C, Dm, etc.).")
     parser.add_argument('--chords', type=str, help="Comma-separated chord progression (e.g., C,Am,F,G).")
     parser.add_argument('--random-chords', type=int, metavar='N', help="Generate a random chord progression of N chords, ignoring --chords.")
@@ -610,6 +645,7 @@ def run_cli() -> None:
     parser.add_argument('--counterpoint', action='store_true', help="Generate a counterpoint line.")
     parser.add_argument('--harmony-lines', type=int, default=0, metavar='N',
                         help="Number of harmony lines to add in parallel")
+    # Parse the provided CLI arguments
     args = parser.parse_args()
 
     # Validate key and chord progression.
@@ -618,6 +654,7 @@ def run_cli() -> None:
         sys.exit(1)
 
     if args.random_chords:
+        # Let the helper pick a progression based solely on the key
         chord_progression = generate_random_chord_progression(args.key, args.random_chords)
     else:
         if not args.chords:
@@ -631,6 +668,7 @@ def run_cli() -> None:
                 sys.exit(1)
 
     try:
+        # Parse "numerator/denominator" into two integers
         parts = args.timesig.split('/')
         if len(parts) != 2:
             raise ValueError
@@ -645,6 +683,7 @@ def run_cli() -> None:
 
     melody = generate_melody(args.key, args.notes, chord_progression, motif_length=args.motif_length)
     rhythm = generate_random_rhythm_pattern() if args.random_rhythm else None
+    # Collect additional harmony tracks requested on the command line
     extra: List[List[str]] = []
     for _ in range(max(0, args.harmony_lines)):
         # Generate any requested parallel harmony lines
@@ -667,10 +706,12 @@ def main() -> None:
     """
     Main entry point. Runs the CLI if arguments are provided; otherwise, launches the GUI.
     """
+    # Decide between CLI and GUI based on whether arguments were supplied
     if len(sys.argv) > 1:
         run_cli()
     else:
         try:
+            # Import the GUI lazily so tests without Tkinter can still run
             MelodyGeneratorGUI = import_module(
                 "melody_generator.gui"
             ).MelodyGeneratorGUI
@@ -693,6 +734,7 @@ def main() -> None:
             generate_harmony_line,
             generate_counterpoint_melody,
         )
+        # Start the Tk event loop
         gui.run()
 
 if __name__ == '__main__':

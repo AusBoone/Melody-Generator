@@ -321,6 +321,7 @@ class MelodyGeneratorGUI:
 
     def run(self) -> None:
         """Start the Tk event loop."""
+        # Hand control over to Tkinter
         self.root.mainloop()
 
     def _collect_settings(self) -> Dict:
@@ -341,6 +342,7 @@ class MelodyGeneratorGUI:
 
     def _apply_settings(self, settings: Dict) -> None:
         """Set widget values based on ``settings`` dictionary."""
+        # Ignore empty dictionaries to avoid resetting controls unnecessarily
         if not settings:
             return
         self.key_var.set(settings.get("key", self.key_var.get()))

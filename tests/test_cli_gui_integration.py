@@ -8,6 +8,8 @@ import pytest
 
 def load_module():
     """Load melody-generator with stubbed dependencies."""
+    # Create minimal replacements for optional packages so the tests
+    # can run without installing them.
     stub_mido = types.ModuleType("mido")
     class DummyMidiFile:
         last_instance = None
@@ -87,8 +89,10 @@ def test_cli_subprocess_creates_file(tmp_path):
         encoding="utf-8",
     )
     env = os.environ.copy()
+    # Point PYTHONPATH at our stub directory so the subprocess imports them
     env["PYTHONPATH"] = f"{stub_dir}:{env.get('PYTHONPATH','')}"
     output = tmp_path / "out.mid"
+    # Execute the CLI in a subprocess to ensure the console script works end-to-end
     subprocess.run(
         [
             sys.executable,
@@ -159,6 +163,7 @@ def test_generate_button_click(tmp_path, monkeypatch):
         lambda **k: str(out),
         raising=False,
     )
+    # Capture any messagebox calls so we can assert on them later
     errs = []
     infos = []
     monkeypatch.setattr(
