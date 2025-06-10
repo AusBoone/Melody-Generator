@@ -90,6 +90,10 @@ def index():
                 "Time signature must be two integers in the form 'numerator/denominator' with numerator > 0 and denominator > 0."
             )
             return render_template('index.html', scale=sorted(SCALE.keys()))
+
+        if motif_length > notes:
+            flash("Motif length cannot exceed the number of notes.")
+            return render_template('index.html', scale=sorted(SCALE.keys()))
         melody = generate_melody(key, notes, chords, motif_length=motif_length)
         rhythm = generate_random_rhythm_pattern() if random_rhythm else None
         extra: List[List[str]] = []

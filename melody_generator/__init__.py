@@ -679,6 +679,9 @@ def run_cli() -> None:
     if args.motif_length <= 0:
         logging.error("Motif length must be a positive integer.")
         sys.exit(1)
+    if args.motif_length > args.notes:
+        logging.error("Motif length cannot exceed the number of notes.")
+        sys.exit(1)
 
     # Validate key and chord progression.
     if args.key not in SCALE:

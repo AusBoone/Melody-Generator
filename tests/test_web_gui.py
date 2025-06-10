@@ -99,3 +99,19 @@ def test_invalid_key_flash():
     assert resp.status_code == 200
     assert b"Invalid key selected" in resp.data
 
+
+def test_motif_exceeds_notes_flash():
+    client = app.test_client()
+    resp = client.post(
+        "/",
+        data={
+            "key": "C",
+            "chords": "C",
+            "bpm": "120",
+            "timesig": "4/4",
+            "notes": "2",
+            "motif_length": "4",
+        },
+    )
+    assert b"Motif length cannot exceed" in resp.data
+

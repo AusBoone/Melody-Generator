@@ -268,6 +268,13 @@ class MelodyGeneratorGUI:
             )
             return
 
+        if motif_length > notes_count:
+            messagebox.showerror(
+                "Input Error",
+                "Motif length cannot exceed the number of notes."
+            )
+            return
+
         output_file = filedialog.asksaveasfilename(defaultextension=".mid", filetypes=[("MIDI files", "*.mid")])
         if output_file:
             melody = self.generate_melody(key, notes_count, chord_progression, motif_length=motif_length)
