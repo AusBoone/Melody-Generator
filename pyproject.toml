@@ -1,6 +1,10 @@
 [tool.pytest.ini_options]
 addopts = "-vv"
 
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "melody-generator"
 version = "0.1.0"
