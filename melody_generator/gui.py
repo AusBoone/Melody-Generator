@@ -324,8 +324,9 @@ class MelodyGeneratorGUI:
         self._apply_settings(self.load_settings())
 
     def run(self) -> None:
-        """Start the Tk event loop."""
-        # Hand control over to Tkinter
+        """Start the Tk event loop to display the window."""
+        # Hand control over to Tkinter so the application becomes interactive.
+        # This call blocks until the window is closed.
         self.root.mainloop()
 
     def _collect_settings(self) -> Dict:

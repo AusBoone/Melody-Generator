@@ -37,6 +37,7 @@ generate_counterpoint_melody = melody_generator.generate_counterpoint_melody
 
 # Create the Flask application instance and register templates and static files.
 app = Flask(__name__, template_folder="templates", static_folder="static")
+# Allow overriding the session secret via the environment for production use.
 app.secret_key = os.environ.get("FLASK_SECRET", "change-me")
 
 

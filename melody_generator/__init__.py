@@ -144,15 +144,18 @@ def _build_scale(root: str, pattern: List[int]) -> List[str]:
 
 # Interval patterns for a few additional modes.  Values are semitone offsets
 # from the root note.  Only sharps are used for simplicity.
+# Mapping of mode name to the sequence of semitone steps that forms the mode.
 _MODE_PATTERNS = {
     "dorian": [0, 2, 3, 5, 7, 9, 10],
     "mixolydian": [0, 2, 4, 5, 7, 9, 10],
+    # Pentatonic only contains five degrees so it produces a shorter scale.
     "pentatonic": [0, 2, 4, 7, 9],
 }
 
 for note in NOTES:
     for mode, pattern in _MODE_PATTERNS.items():
-        # Pre-compute common modal scales for every root note
+        # Pre-compute common modal scales for every root note.  The resulting
+        # key names take the form "C_dorian", "G_pentatonic", etc.
         SCALE[f"{note}_{mode}"] = _build_scale(note, pattern)
 
 # ``CHORDS`` maps chord names to the notes they contain. This lookup table is
@@ -369,20 +372,36 @@ def generate_motif(length: int, key: str) -> List[str]:
     return [random.choice(notes_in_key) + str(random.randint(4, 6)) for _ in range(length)]
 
 def generate_melody(key: str, num_notes: int, chord_progression: List[str], motif_length: int = 4) -> List[str]:
-    """
-    Generate a random melody based on a given key and chord progression.
-    The melody starts with a motif, then for each subsequent note, candidate notes from the current chord 
-    are evaluated for closeness in interval to the previous note. Candidates within (min_interval + 1 semitone)
-    are collected and one is chosen at random. If no candidate is found, a fallback note from the key is used.
+    """Return a melody in ``key`` spanning ``num_notes`` notes.
 
-    Args:
-        key (str): Musical key.
-        num_notes (int): Total number of notes in the melody.
-        chord_progression (List[str]): Chord progression.
-        motif_length (int, optional): Length of the initial motif. Defaults to 4.
+    The algorithm works in several stages:
 
-    Returns:
-        List[str]: Generated melody as a list of note names.
+    1.  Build a short motif using :func:`generate_motif`.
+    2.  Repeat that motif throughout the phrase, shifting it slightly so it does
+        not sound overly mechanical.
+    3.  For each new note, examine the current chord and pick pitches that are
+        close to the previous note.  Preference is given to notes within one
+        semitone of the best interval found.
+    4.  If no suitable candidate exists, choose a random note from the key as a
+        safe fallback.
+    5.  Large leaps are tracked so the following note can "correct" the motion
+        by moving back toward the starting pitch.
+
+    Parameters
+    ----------
+    key : str
+        Musical key for the melody.
+    num_notes : int
+        Total number of notes to generate.
+    chord_progression : List[str]
+        Progression to base note choices on.
+    motif_length : int, optional
+        Length of the initial motif, by default ``4``.
+
+    Returns
+    -------
+    List[str]
+        Generated melody as a list of note strings.
     """
     if num_notes < motif_length:
         raise ValueError("num_notes must be greater than or equal to motif_length")
@@ -627,7 +646,9 @@ def run_cli() -> None:
     This is a thin wrapper around the core library functions that mirrors
     the options available in the GUI. It validates the provided arguments,
     invokes :func:`generate_melody` and finally writes the resulting MIDI
-    file using :func:`create_midi_file`.
+    file using :func:`create_midi_file`. Invalid parameters cause the
+    process to exit with ``sys.exit`` so the calling shell can detect
+    failures.
     """
     parser = argparse.ArgumentParser(
         description="Generate a random melody and save as a MIDI file."
