@@ -8,7 +8,16 @@ pytest.importorskip("flask")
 # Stub mido and tkinter so the imports succeed
 stub_mido = types.ModuleType("mido")
 stub_mido.Message = lambda *a, **k: None
-stub_mido.MidiFile = lambda *a, **k: types.SimpleNamespace(tracks=[])
+class DummyMidiFile:
+    """Minimal MidiFile stub with a save method."""
+
+    def __init__(self, *a, **k):
+        self.tracks = []
+
+    def save(self, _path):
+        pass
+
+stub_mido.MidiFile = DummyMidiFile
 stub_mido.MidiTrack = lambda *a, **k: []
 stub_mido.MetaMessage = lambda *a, **k: None
 stub_mido.bpm2tempo = lambda bpm: bpm
