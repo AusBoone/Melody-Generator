@@ -105,19 +105,32 @@ def index():
 
         # Write the MIDI data to a temporary file and return a page with
         # an embedded audio player so the user can immediately preview
-        # the result in the browser.
-        with NamedTemporaryFile(suffix='.mid') as tmp:
-            create_midi_file(
-                melody,
-                bpm,
-                (numerator, denominator),
-                tmp.name,
-                harmony=harmony,
-                pattern=rhythm,
-                extra_tracks=extra,
-            )
-            tmp.seek(0)
-            data = io.BytesIO(tmp.read())
+        # the result in the browser. The temporary file is created with
+        # ``delete=False`` so it can be reopened on Windows systems where
+        # a file cannot be read while still open for writing.
+        tmp = NamedTemporaryFile(suffix='.mid', delete=False)
+        try:
+            tmp_path = tmp.name
+        finally:
+            # Ensure the handle is closed immediately so the file can be
+            # reopened by ``create_midi_file`` on all platforms.
+            tmp.close()
+
+        create_midi_file(
+            melody,
+            bpm,
+            (numerator, denominator),
+            tmp_path,
+            harmony=harmony,
+            pattern=rhythm,
+            extra_tracks=extra,
+        )
+
+        # Read the generated MIDI data back into memory then delete the
+        # temporary file.
+        with open(tmp_path, 'rb') as fh:
+            data = io.BytesIO(fh.read())
+        os.remove(tmp_path)
         encoded = base64.b64encode(data.getvalue()).decode('ascii')
         return render_template('play.html', data=encoded)
 
