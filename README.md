@@ -146,3 +146,13 @@ alternative container runtime such as Podman.
 - GUI button to reload saved preferences at any time.
 - Web interface now previews the generated MIDI using an inline player.
 - Harmony and counterpoint tracks for multi-line melodies.
+
+## Algorithm Overview
+
+The library creates melodies using a short motif that repeats
+throughout the phrase.  Each subsequent note is chosen from the current
+chord and biased toward small intervals from the previous pitch.  Large
+leaps are tracked so the next note compensates by moving in the
+opposite direction.  When no suitable candidate exists a random pitch
+from the key acts as a safe fallback.  Rhythm can either be selected
+from a library of common patterns or generated randomly.
