@@ -10,6 +10,16 @@ name = "melody-generator"
 version = "0.1.0"
 description = "Random melody generator with CLI and GUI"
 authors = [{name = "Austin Boone"}]
+readme = "README.md"
+license = {file = "LICENSE"}
+requires-python = ">=3.8"
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Framework :: Flask",
+]
 dependencies = [
     "mido",
     "Flask",
