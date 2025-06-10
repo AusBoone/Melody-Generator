@@ -25,9 +25,6 @@ import json
 from pathlib import Path
 from typing import List, Tuple, Optional
 
-# Configure logging for debug and info messages
-logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
-
 # Default path for storing user preferences
 # The file lives in the user's home directory so settings persist
 # between runs of the application.
@@ -741,6 +738,9 @@ def main() -> None:
     """
     Main entry point. Runs the CLI if arguments are provided; otherwise, launches the GUI.
     """
+    # Configure logging only when executing the application directly
+    logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+
     # Decide between CLI and GUI based on whether arguments were supplied
     if len(sys.argv) > 1:
         run_cli()
