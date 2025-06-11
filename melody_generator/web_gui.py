@@ -18,6 +18,8 @@ from typing import List
 from flask import Flask, render_template, request, flash
 import base64
 import os
+import secrets
+import logging
 
 # Import the core melody generation package dynamically so the
 # Flask app can live in a separate module without circular imports.
@@ -37,8 +39,18 @@ generate_counterpoint_melody = melody_generator.generate_counterpoint_melody
 
 # Create the Flask application instance and register templates and static files.
 app = Flask(__name__, template_folder="templates", static_folder="static")
-# Allow overriding the session secret via the environment for production use.
-app.secret_key = os.environ.get("FLASK_SECRET", "change-me")
+
+logger = logging.getLogger(__name__)
+
+# Configure the session secret.
+secret = os.environ.get("FLASK_SECRET")
+if not secret:
+    secret = secrets.token_urlsafe(32)
+    logger.warning(
+        "FLASK_SECRET environment variable not set. "
+        "Using a randomly generated key; sessions will not persist across restarts."
+    )
+app.secret_key = secret
 
 
 @app.route('/', methods=['GET', 'POST'])
