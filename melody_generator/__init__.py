@@ -438,7 +438,14 @@ def generate_motif(length: int, key: str) -> List[str]:
     # Choose random notes within the key and place them in a comfortable octave range
     return [random.choice(notes_in_key) + str(random.randint(4, 6)) for _ in range(length)]
 
-def generate_melody(key: str, num_notes: int, chord_progression: List[str], motif_length: int = 4) -> List[str]:
+def generate_melody(
+    key: str,
+    num_notes: int,
+    chord_progression: List[str],
+    motif_length: int = 4,
+    time_signature: Tuple[int, int] = (4, 4),
+    pattern: Optional[List[float]] = None,
+) -> List[str]:
     """Return a melody in ``key`` spanning ``num_notes`` notes.
 
     The algorithm works in several stages:
@@ -453,6 +460,8 @@ def generate_melody(key: str, num_notes: int, chord_progression: List[str], moti
         safe fallback.
     5.  Large leaps are tracked so the following note can "correct" the motion
         by moving back toward the starting pitch.
+    6.  Strong beats (determined from ``pattern`` and ``time_signature``) are
+        restricted to chord tones while weaker beats may use any scale note.
 
     Parameters
     ----------
@@ -464,6 +473,15 @@ def generate_melody(key: str, num_notes: int, chord_progression: List[str], moti
         Progression to base note choices on.
     motif_length : int, optional
         Length of the initial motif, by default ``4``.
+    time_signature : Tuple[int, int], optional
+        ``(numerator, denominator)`` pair describing the meter. The
+        denominator determines the beat unit used when evaluating
+        strong versus weak beats. Defaults to ``(4, 4)``.
+    pattern : List[float], optional
+        Rhythmic pattern expressed as fractions of a whole note. When
+        provided it is used to calculate the start beat of each note so
+        downbeats can be aligned with chord tones. If ``None``, a random
+        pattern is chosen.
 
     Returns
     -------
@@ -474,6 +492,12 @@ def generate_melody(key: str, num_notes: int, chord_progression: List[str], moti
         raise ValueError("num_notes must be greater than or equal to motif_length")
 
     notes_in_key = SCALE[key]
+    if pattern is None:
+        pattern = random.choice(PATTERNS)
+
+    beat_unit = 1 / time_signature[1]
+    start_beat = 0.0
+
     # Generate the initial motif.
     melody = generate_motif(motif_length, key)
 
@@ -491,6 +515,23 @@ def generate_melody(key: str, num_notes: int, chord_progression: List[str], moti
                 octave += 1
             melody[j] = notes_in_key[idx] + str(octave)
 
+    # Align motif notes with the underlying harmony on strong beats
+    for j in range(motif_length):
+        strong = abs(start_beat - round(start_beat)) < 1e-6
+        chord = chord_progression[j % len(chord_progression)]
+        chord_notes = get_chord_notes(chord)
+        if strong:
+            name, octv = melody[j][:-1], melody[j][-1]
+            if name not in chord_notes:
+                closest = min(
+                    chord_notes,
+                    key=lambda n: abs(
+                        note_to_midi(n + octv) - note_to_midi(melody[j])
+                    ),
+                )
+                melody[j] = closest + octv
+        start_beat += pattern[j % len(pattern)] / beat_unit
+
     # Track the direction of the previous large leap so the next note can
     # compensate by moving in the opposite direction.
     leap_dir: Optional[int] = None
@@ -498,6 +539,7 @@ def generate_melody(key: str, num_notes: int, chord_progression: List[str], moti
     half_point = num_notes // 2
 
     for i in range(motif_length, num_notes):
+        strong = abs(start_beat - round(start_beat)) < 1e-6
         # Determine the current overall direction based on position in the
         # melody.  The first half trends upward and the second half downward.
         direction = 1 if i < half_point else -1
@@ -517,7 +559,18 @@ def generate_melody(key: str, num_notes: int, chord_progression: List[str], moti
                 new_idx -= len(notes_in_key)
                 octave += 1
             new_name = notes_in_key[new_idx]
+            chord = chord_progression[i % len(chord_progression)]
+            chord_notes = get_chord_notes(chord)
+            if strong and new_name not in chord_notes:
+                new_name = min(
+                    chord_notes,
+                    key=lambda n: abs(
+                        note_to_midi(n + str(octave))
+                        - note_to_midi(new_name + str(octave))
+                    ),
+                )
             melody.append(new_name + str(octave))
+            start_beat += pattern[i % len(pattern)] / beat_unit
             continue
         chord = chord_progression[i % len(chord_progression)]
         chord_notes = get_chord_notes(chord)
@@ -525,33 +578,35 @@ def generate_melody(key: str, num_notes: int, chord_progression: List[str], moti
         candidates = []
         min_interval = None
 
-        # Scan all chord tones and keep track of which candidate is closest to
-        # the previous note. This gives us a baseline for selecting smooth
-        # melodic motion.
-        for note in notes_in_key:
-            for octave in range(4, 7):  # Evaluate candidate pitches across octaves
+        source_pool = chord_notes if strong else notes_in_key
+
+        # Scan candidate pitches and keep track of which is closest to the
+        # previous note. This gives a baseline for selecting smooth motion.
+        for note in source_pool:
+            for octave in range(4, 7):
                 candidate_note = note + str(octave)
-                if note in chord_notes:
-                    interval = get_interval(prev_note, candidate_note)
-                    if min_interval is None or interval < min_interval:
-                        min_interval = interval
+                interval = get_interval(prev_note, candidate_note)
+                if min_interval is None or interval < min_interval:
+                    min_interval = interval
 
         # Collect any notes that are within a semitone of that best interval so
         # we have a small pool of options that still move by a reasonable step.
         if min_interval is not None:
             threshold = min_interval + 1
-            for note in notes_in_key:
+            for note in source_pool:
                 for octave in range(4, 7):
                     candidate_note = note + str(octave)
-                    if note in chord_notes:
-                        interval = get_interval(prev_note, candidate_note)
-                        if interval <= threshold:
-                            candidates.append(candidate_note)
+                    interval = get_interval(prev_note, candidate_note)
+                    if interval <= threshold:
+                        candidates.append(candidate_note)
 
         # Fallback: If no candidates are found, choose a random note from the key.
         if not candidates:
-            logging.warning(f"No candidate found for chord {chord} with previous note {prev_note}. Using fallback.")
-            fallback_note = random.choice(notes_in_key) + str(random.randint(4, 6))
+            logging.warning(
+                f"No candidate found for chord {chord} with previous note {prev_note}. Using fallback."
+            )
+            pool = chord_notes if strong else notes_in_key
+            fallback_note = random.choice(pool) + str(random.randint(4, 6))
             candidates.append(fallback_note)
 
         # If the previous interval was a leap, favour notes that move back
@@ -577,6 +632,8 @@ def generate_melody(key: str, num_notes: int, chord_progression: List[str], moti
 
         next_note = random.choice(candidates)
         melody.append(next_note)
+
+        start_beat += pattern[i % len(pattern)] / beat_unit
 
         # Determine if this interval constitutes a leap so the next note can
         # compensate accordingly.

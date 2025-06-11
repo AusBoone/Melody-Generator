@@ -127,3 +127,23 @@ def test_melody_trends_up_then_down():
 
     assert up_trend >= 0
     assert down_trend <= 0
+
+
+def test_downbeats_match_chords():
+    chords = ["C", "G", "Am", "F"]
+    pattern = [0.25]
+    mel = generate_melody(
+        "C",
+        8,
+        chords,
+        motif_length=4,
+        time_signature=(4, 4),
+        pattern=pattern,
+    )
+    beat_unit = 1 / 4
+    start = 0.0
+    for i, note in enumerate(mel):
+        if abs(start - round(start)) < 1e-6:
+            chord = chords[i % len(chords)]
+            assert note[:-1] in melody_generator.CHORDS[chord]
+        start += pattern[i % len(pattern)] / beat_unit
