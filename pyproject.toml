@@ -2,7 +2,7 @@
 addopts = "-vv"
 
 [build-system]
-requires = ["setuptools>=61"]
+requires = ["setuptools>=80"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
@@ -14,7 +14,7 @@ version = "0.1.0"
 description = "Random melody generator with CLI and GUI"
 authors = [{name = "Austin Boone"}]
 readme = "README.md"
-license = "MIT"
+license = {file = "LICENSE"}
 license-files = ["LICENSE"]
 requires-python = ">=3.8"
 classifiers = [
