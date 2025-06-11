@@ -97,7 +97,7 @@ SCALE = {
     'D': ['D', 'E', 'F#', 'G', 'A', 'B', 'C#'],
     'Eb': ['Eb', 'F', 'G', 'Ab', 'Bb', 'C', 'D'],
     'E': ['E', 'F#', 'G#', 'A', 'B', 'C#', 'D#'],
-    'F': ['F', 'G', 'A', 'A#', 'C', 'D', 'E'],
+    'F': ['F', 'G', 'A', 'Bb', 'C', 'D', 'E'],
     'F#': ['F#', 'G#', 'A#', 'B', 'C#', 'D#', 'E#'],
     'G': ['G', 'A', 'B', 'C', 'D', 'E', 'F#'],
     'Ab': ['Ab', 'Bb', 'C', 'Db', 'Eb', 'F', 'G'],
@@ -176,12 +176,18 @@ CHORDS = {
     "Gm": ["G", "Bb", "D"],
     "G#": ["G#", "B#", "D#"],
     "G#m": ["G#", "B", "D#"],
+    "Ab": ["Ab", "C", "Eb"],
+    "Abm": ["Ab", "Cb", "Eb"],
     "A": ["A", "C#", "E"],
+    "A#": ["A#", "D", "F"],
+    "A#m": ["A#", "C#", "F"],
     "Am": ["A", "C", "E"],
     "Bb": ["Bb", "D", "F"],
     "Bbm": ["Bb", "Db", "F"],
     "B": ["B", "D#", "F#"],
-    "Bm": ["B", "D", "F#"]
+    "Bm": ["B", "D", "F#"],
+    "Db": ["Db", "F", "Ab"],
+    "Dbm": ["Db", "E", "Ab"]
 }
 
 # ``PATTERNS`` stores common rhythmic figures. Each inner list represents a
@@ -239,6 +245,17 @@ def generate_random_chord_progression(key: str, length: int = 4) -> List[str]:
         # Look up the chord quality for this scale degree (major, minor or diminished)
         quality = qualities[idx % len(qualities)]
         chord = note + (quality if quality != 'dim' else '')
+        if chord not in CHORDS:
+            # Translate enharmonic spellings to match available chord names
+            translation = {
+                'A#': 'Bb',
+                'A#m': 'Bbm',
+                'Db': 'C#',
+                'Dbm': 'C#m',
+                'Ab': 'G#',
+                'Abm': 'G#m',
+            }
+            chord = translation.get(chord, chord)
         return chord if chord in CHORDS else random.choice(list(CHORDS.keys()))
 
     # Convert degree numbers to concrete chord names

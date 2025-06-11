@@ -98,3 +98,9 @@ def test_extra_tracks_shorter_line(tmp_path):
     assert len(mid.tracks) == 1 + 2
     assert len(mid.tracks[1]) == 2 * len(harmony)
     assert len(mid.tracks[2]) == 2 * len(cp)
+
+
+def test_progression_chords_exist():
+    for key in ["F", "Ab"]:
+        prog = melody_generator.generate_random_chord_progression(key, 4)
+        assert all(ch in melody_generator.CHORDS for ch in prog)
