@@ -21,7 +21,7 @@ classifiers = [
     "Framework :: Flask",
 ]
 dependencies = [
-    "mido",
+    "mido==1.2.10",
     "Flask",
 ]
 
