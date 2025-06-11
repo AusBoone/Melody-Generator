@@ -67,7 +67,8 @@ melody-generator
 
 1. Choose a key, BPM, time signature and chord progression.
 2. Check the **Harmony** or **Counterpoint** boxes to add extra tracks.
-3. Click **Generate Melody** and select where to save the MIDI file.
+3. Click **Preview Melody** to hear the result without saving.
+4. Click **Generate Melody** and select where to save the MIDI file.
 
 
 ### Web Interface
@@ -149,6 +150,7 @@ alternative container runtime such as Podman.
 - Additional modes like Dorian, Mixolydian and pentatonic scales.
 - Dynamic velocity in the MIDI output for a more natural sound.
 - GUI button to reload saved preferences at any time.
+- GUI can preview the generated melody before saving.
 - Web interface now previews the generated MIDI using an inline player.
 - Harmony and counterpoint tracks for multi-line melodies.
 

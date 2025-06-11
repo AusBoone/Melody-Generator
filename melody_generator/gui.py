@@ -10,6 +10,10 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from typing import Callable, List, Tuple, Dict, Optional
+import os
+import subprocess
+import sys
+from tempfile import NamedTemporaryFile
 
 class MelodyGeneratorGUI:
     """Tkinter-based GUI for melody generation."""
@@ -52,6 +56,8 @@ class MelodyGeneratorGUI:
 
         self._setup_theme()
         self._build_widgets()
+        # Apply theme again so newly created widgets inherit colors
+        self._apply_theme()
 
     def _setup_theme(self) -> None:
         """Configure ttk theme and basic colors."""
@@ -82,6 +88,11 @@ class MelodyGeneratorGUI:
             self.style.configure(name, background=self.bg_color, foreground=fg)
         self.style.configure("TButton", background=btn_bg, foreground=fg)
         self.style.configure("TEntry", fieldbackground="white", foreground=fg)
+        if hasattr(self, "chord_listbox"):
+            if self.dark_mode:
+                self.chord_listbox.configure(bg="black", fg="white")
+            else:
+                self.chord_listbox.configure(bg="white", fg="black")
 
     def _toggle_theme(self) -> None:
         """Switch between dark and light color schemes."""
@@ -220,12 +231,18 @@ class MelodyGeneratorGUI:
             command=self._load_preferences,
         ).grid(row=11, column=0, columnspan=2, pady=(5, 0))
 
+        ttk.Button(
+            frame,
+            text="Preview Melody",
+            command=self._preview_button_click,
+        ).grid(row=12, column=0, columnspan=2, pady=(5, 0))
+
         # Generate button
         ttk.Button(
             frame,
             text="Generate Melody",
             command=self._generate_button_click,
-        ).grid(row=12, column=0, columnspan=2, pady=10)
+        ).grid(row=13, column=0, columnspan=2, pady=10)
 
         self.theme_var = tk.BooleanVar(value=self.dark_mode)
         ttk.Checkbutton(
@@ -233,7 +250,7 @@ class MelodyGeneratorGUI:
             text="Toggle Dark Mode",
             command=self._toggle_theme,
             variable=self.theme_var,
-        ).grid(row=13, column=0, columnspan=2, pady=(5, 0))
+        ).grid(row=14, column=0, columnspan=2, pady=(5, 0))
 
         # Apply persisted settings if available
         if self.load_settings is not None:
@@ -304,6 +321,74 @@ class MelodyGeneratorGUI:
                 "Save Preferences", "Save these settings as defaults?"
             ):
                 self.save_settings(self._collect_settings())
+
+    def _preview_button_click(self) -> None:
+        """Play the generated melody in the default MIDI player."""
+        key = self.key_var.get()
+        selected_indices = self.chord_listbox.curselection()
+        if not selected_indices:
+            messagebox.showerror(
+                "Input Error", "Please select at least one chord for the progression."
+            )
+            return
+        chords = [self.chord_listbox.get(i) for i in selected_indices]
+        try:
+            bpm = self.bpm_var.get()
+            notes_count = self.notes_var.get()
+            motif_length = int(self.motif_entry.get())
+            if bpm <= 0 or notes_count <= 0 or motif_length <= 0:
+                raise ValueError
+            ts_parts = self.timesig_var.get().split("/")
+            if len(ts_parts) != 2:
+                raise ValueError
+            numerator, denominator = map(int, ts_parts)
+            if numerator <= 0 or denominator <= 0:
+                raise ValueError
+        except ValueError:
+            messagebox.showerror(
+                "Input Error",
+                "Ensure BPM, Number of Notes, and Motif Length are integers and Time Signature is formatted as 'numerator/denominator'.",
+            )
+            return
+
+        if motif_length > notes_count:
+            messagebox.showerror(
+                "Input Error", "Motif length cannot exceed the number of notes."
+            )
+            return
+
+        melody = self.generate_melody(key, notes_count, chords, motif_length=motif_length)
+        extra: List[List[str]] = []
+        if self.harmony_line_fn is not None:
+            try:
+                lines = int(self.harmony_lines.get() or 0)
+            except ValueError:
+                lines = 0
+            for _ in range(max(0, lines)):
+                extra.append(self.harmony_line_fn(melody))
+        if self.counterpoint_fn is not None and self.counterpoint_var.get():
+            extra.append(self.counterpoint_fn(melody, key))
+        tmp = NamedTemporaryFile(suffix=".mid", delete=False)
+        tmp_path = tmp.name
+        tmp.close()
+        self.create_midi_file(
+            melody,
+            bpm,
+            (numerator, denominator),
+            tmp_path,
+            harmony=self.harmony_var.get(),
+            pattern=self.rhythm_pattern,
+            extra_tracks=extra,
+        )
+        try:
+            if sys.platform.startswith("win"):
+                os.startfile(tmp_path)  # type: ignore[attr-defined]
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", tmp_path])
+            else:
+                subprocess.Popen(["xdg-open", tmp_path])
+        except Exception as exc:
+            messagebox.showerror("Preview Error", f"Could not open MIDI file: {exc}")
 
     def _randomize_chords(self) -> None:
         """Select a random chord progression and apply it to the list box."""
