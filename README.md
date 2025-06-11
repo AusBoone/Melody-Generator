@@ -33,6 +33,8 @@ pip install melody-generator
 User preferences such as BPM and key are stored in a JSON file located at
 `~/.melody_generator_settings.json`. The GUI loads this file on startup and you
 can choose to save your current selections after generating a melody.
+You can override the location by setting the `MELODY_SETTINGS_FILE` environment
+variable before starting the application.
 
 # Usage
 
