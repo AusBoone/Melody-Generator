@@ -771,7 +771,9 @@ def main() -> None:
             logging.error(
                 "Tkinter is required for the GUI. Run with CLI arguments or install Tkinter."
             )
-            print("Tkinter is not available. Please run with CLI options or install it.")
+            logging.error(
+                "Tkinter is not available. Please run with CLI options or install it."
+            )
             sys.exit(1)
 
         gui = MelodyGeneratorGUI(
