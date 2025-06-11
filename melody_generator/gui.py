@@ -407,10 +407,17 @@ class MelodyGeneratorGUI:
             extra_tracks=extra,
         )
         try:
+            player = os.environ.get("MELODY_PLAYER")
             if sys.platform.startswith("win"):
-                os.startfile(tmp_path)  # type: ignore[attr-defined]
+                if player:
+                    subprocess.Popen([player, tmp_path])
+                else:
+                    os.startfile(tmp_path)  # type: ignore[attr-defined]
             elif sys.platform == "darwin":
-                subprocess.Popen(["open", tmp_path])
+                if player:
+                    subprocess.Popen(["open", "-a", player, tmp_path])
+                else:
+                    subprocess.Popen(["open", tmp_path])
             else:
                 subprocess.Popen(["xdg-open", tmp_path])
         except Exception as exc:

@@ -35,6 +35,7 @@ User preferences such as BPM and key are stored in a JSON file located at
 can choose to save your current selections after generating a melody.
 You can override the location by setting the `MELODY_SETTINGS_FILE` environment
 variable before starting the application.
+Set the `MELODY_PLAYER` environment variable to a MIDI-capable application if the default player cannot handle `.mid` files. For example, `export MELODY_PLAYER=Music` on macOS or `set MELODY_PLAYER="C:\\Program Files\\Windows Media Player\\wmplayer.exe"` on Windows. The GUI's preview feature will then open files in that player instead of the system default.
 
 # Usage
 
