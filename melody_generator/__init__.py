@@ -458,19 +458,46 @@ def generate_melody(key: str, num_notes: int, chord_progression: List[str], moti
     # Generate the initial motif.
     melody = generate_motif(motif_length, key)
 
+    # Adjust the motif so it moves upward in a stepwise fashion.  This provides
+    # a clear starting direction for the overall phrase.
+    for j in range(1, motif_length):
+        prev = melody[j - 1]
+        curr = melody[j]
+        if note_to_midi(curr) <= note_to_midi(prev):
+            name, octave = prev[:-1], int(prev[-1])
+            idx = notes_in_key.index(name)
+            idx += 1
+            if idx >= len(notes_in_key):
+                idx -= len(notes_in_key)
+                octave += 1
+            melody[j] = notes_in_key[idx] + str(octave)
+
     # Track the direction of the previous large leap so the next note can
     # compensate by moving in the opposite direction.
     leap_dir: Optional[int] = None
 
+    half_point = num_notes // 2
+
     for i in range(motif_length, num_notes):
-        # At the start of each phrase repeat the motif but allow a small shift
-        # so the melody evolves over time and does not sound mechanical.
+        # Determine the current overall direction based on position in the
+        # melody.  The first half trends upward and the second half downward.
+        direction = 1 if i < half_point else -1
+
+        # At the start of each phrase repeat the motif but shift it by one
+        # scale degree in the current direction so the line gradually moves
+        # upward then downward.
         if i % motif_length == 0:
             base = melody[i - motif_length]
             name, octave = base[:-1], int(base[-1])
-            shift = random.choice([-1, 0, 1])
             idx = notes_in_key.index(name)
-            new_name = notes_in_key[(idx + shift) % len(notes_in_key)]
+            new_idx = idx + direction
+            if new_idx < 0:
+                new_idx += len(notes_in_key)
+                octave -= 1
+            elif new_idx >= len(notes_in_key):
+                new_idx -= len(notes_in_key)
+                octave += 1
+            new_name = notes_in_key[new_idx]
             melody.append(new_name + str(octave))
             continue
         chord = chord_progression[i % len(chord_progression)]
@@ -519,6 +546,15 @@ def generate_melody(key: str, num_notes: int, chord_progression: List[str], moti
             if filtered:
                 candidates = filtered
             leap_dir = None
+
+        # Bias overall motion toward the current direction when possible.
+        directional = [
+            c
+            for c in candidates
+            if (note_to_midi(c) - note_to_midi(prev_note)) * direction >= 0
+        ]
+        if directional:
+            candidates = directional
 
         next_note = random.choice(candidates)
         melody.append(next_note)
