@@ -84,6 +84,8 @@ python -m melody_generator.web_gui
 4. Set the `FLASK_SECRET` environment variable to a persistent secret. If it
    is not provided a random key is generated on startup and a warning is
    logged.
+5. Optionally set `FLASK_DEBUG=1` to enable Flask debug mode during
+   development.
 
 
 ## Docker Usage
