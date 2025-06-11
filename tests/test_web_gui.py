@@ -124,3 +124,20 @@ def test_motif_exceeds_notes_flash():
     )
     assert b"Motif length cannot exceed" in resp.data
 
+
+def test_invalid_chord_flash():
+    client = app.test_client()
+    resp = client.post(
+        "/",
+        data={
+            "key": "C",
+            "chords": "C,Unknown",
+            "bpm": "120",
+            "timesig": "4/4",
+            "notes": "8",
+            "motif_length": "4",
+        },
+    )
+    assert resp.status_code == 200
+    assert b"Unknown chord" in resp.data
+
