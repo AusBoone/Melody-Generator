@@ -24,11 +24,16 @@ from importlib import import_module
 import json
 from pathlib import Path
 from typing import List, Tuple, Optional
+import os
 
 # Default path for storing user preferences
 # The file lives in the user's home directory so settings persist
 # between runs of the application.
-DEFAULT_SETTINGS_FILE = Path.home() / ".melody_generator_settings.json"
+env_path = os.environ.get("MELODY_SETTINGS_FILE")
+if env_path:
+    DEFAULT_SETTINGS_FILE = Path(env_path).expanduser()
+else:
+    DEFAULT_SETTINGS_FILE = Path.home() / ".melody_generator_settings.json"
 
 
 def load_settings(path: Path = DEFAULT_SETTINGS_FILE) -> dict:
