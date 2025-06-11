@@ -160,4 +160,6 @@ def index():
 # this block is skipped during automated testing.
 if __name__ == '__main__':  # pragma: no cover - manual usage
     # Launch the development server
-    app.run(debug=True)
+    if os.environ.get("FLASK_DEBUG", "").lower() in {"1", "true", "yes"}:
+        app.debug = True
+    app.run()
