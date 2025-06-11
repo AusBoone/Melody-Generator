@@ -305,17 +305,36 @@ def diatonic_chords(key: str) -> List[str]:
 
 
 def generate_random_rhythm_pattern(length: int = 3) -> List[float]:
-    """Create a random rhythmic pattern.
+    """Create a random rhythmic pattern based on a repeating motif.
 
-    The pattern is returned as a list of note durations expressed as fractions
-    of a whole note.  Each duration is selected at random from a small set of
-    common musical subdivisions such as quarter notes and eighth notes.  The
-    resulting pattern can be fed directly into :func:`create_midi_file`.
+    A motif is chosen from a predefined set of short patterns. The motif is
+    then repeated until ``length`` durations have been produced.  All note
+    lengths come from the same allowed set as before so the return value is
+    compatible with older callers.  To keep things from sounding too rigid, a
+    small variation may be applied after the first full repetition by replacing
+    one value with an eighth note (``0.125``).
     """
 
-    choices = [0.25, 0.5, 0.75, 0.125, 0.0625]
-    # Randomly pick note lengths from the available subdivisions
-    return [random.choice(choices) for _ in range(length)]
+    allowed = [0.25, 0.5, 0.75, 0.125, 0.0625]
+    motifs = [
+        [0.25, 0.25],
+        [0.25, 0.5],
+        [0.5, 0.25],
+        [0.125, 0.125, 0.25],
+        [0.75, 0.25],
+        [0.5, 0.5],
+    ]
+
+    motif = random.choice(motifs)
+    pattern = (motif * (length // len(motif) + 1))[:length]
+
+    # Optionally vary after the first full repetition of the motif to add a bit
+    # of syncopation while preserving the allowed values.
+    if length > len(motif) * 2 and random.random() < 0.3:
+        idx = random.randrange(len(motif) * 2, length)
+        pattern[idx] = random.choice(allowed)
+
+    return pattern
 
 def note_to_midi(note: str) -> int:
     """

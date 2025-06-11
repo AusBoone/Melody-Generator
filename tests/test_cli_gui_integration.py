@@ -52,9 +52,16 @@ def test_random_helpers():
     assert len(chords) == 4
     for chord in chords:
         assert chord in mod.CHORDS
-    pattern = mod.generate_random_rhythm_pattern(5)
+    pattern = mod.generate_random_rhythm_pattern(6)
     allowed = {0.25, 0.5, 0.75, 0.125, 0.0625}
-    assert len(pattern) == 5 and all(p in allowed for p in pattern)
+    assert len(pattern) == 6 and all(p in allowed for p in pattern)
+    # Ensure a motif is repeated at least once in the returned pattern.
+    repeated = any(
+        pattern[:i] == pattern[i : 2 * i]
+        for i in range(1, 4)
+        if 2 * i <= len(pattern)
+    )
+    assert repeated
 
 
 def test_harmony_and_counterpoint_intervals_and_tracks(tmp_path):
