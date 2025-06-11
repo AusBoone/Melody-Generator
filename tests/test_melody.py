@@ -112,3 +112,18 @@ def test_diatonic_chords_major_minor():
 
     minor = melody_generator.diatonic_chords("Am")
     assert minor == ["Am", "B", "C", "Dm", "Em", "F", "G"]
+
+
+def test_melody_trends_up_then_down():
+    chords = ["C", "G", "Am", "F"]
+    mel = generate_melody("C", 12, chords, motif_length=4)
+    midi_vals = [note_to_midi(n) for n in mel]
+    mid = len(midi_vals) // 2
+    first_half = midi_vals[:mid]
+    second_half = midi_vals[mid:]
+
+    up_trend = sum(b - a for a, b in zip(first_half, first_half[1:])) / (len(first_half) - 1)
+    down_trend = sum(b - a for a, b in zip(second_half, second_half[1:])) / (len(second_half) - 1)
+
+    assert up_trend >= 0
+    assert down_trend <= 0
