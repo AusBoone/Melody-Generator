@@ -129,6 +129,14 @@ class MelodyGeneratorGUI:
         widget.bind("<Enter>", show)
         widget.bind("<Leave>", hide)
 
+    def _update_bpm_label(self, value: str | int) -> None:
+        """Display the current BPM next to the slider."""
+        self.bpm_label.config(text=str(int(float(value))))
+
+    def _update_notes_label(self, value: str | int) -> None:
+        """Display the current number of notes next to the slider."""
+        self.notes_label.config(text=str(int(float(value))))
+
     def _update_chord_list(self) -> None:
         """Refresh the chord list based on the selected key."""
 
@@ -159,7 +167,7 @@ class MelodyGeneratorGUI:
         self._update_chord_list()
         self.chord_listbox.grid(row=1, column=1)
 
-        # BPM slider
+        # BPM slider and value label
         ttk.Label(frame, text="BPM:").grid(row=2, column=0, sticky="w")
         self.bpm_var = tk.IntVar(value=120)
         bpm_scale = ttk.Scale(
@@ -168,9 +176,13 @@ class MelodyGeneratorGUI:
             to=200,
             orient=tk.HORIZONTAL,
             variable=self.bpm_var,
+            command=self._update_bpm_label,
         )
         bpm_scale.grid(row=2, column=1)
+        self.bpm_label = ttk.Label(frame, text=str(self.bpm_var.get()))
+        self.bpm_label.grid(row=2, column=2, padx=(5, 0))
         self._create_tooltip(bpm_scale, "Beats per minute")
+        self._update_bpm_label(self.bpm_var.get())
 
         # Time signature dropdown
         ttk.Label(frame, text="Time Signature:").grid(row=3, column=0, sticky="w")
@@ -184,16 +196,21 @@ class MelodyGeneratorGUI:
         timesig_box.grid(row=3, column=1)
         self._create_tooltip(timesig_box, "Time signature of the piece")
 
-        # Number of notes slider
+        # Number of notes slider and value label
         ttk.Label(frame, text="Number of notes:").grid(row=4, column=0, sticky="w")
         self.notes_var = tk.IntVar(value=16)
-        ttk.Scale(
+        notes_scale = ttk.Scale(
             frame,
             from_=8,
             to=64,
             orient=tk.HORIZONTAL,
             variable=self.notes_var,
-        ).grid(row=4, column=1)
+            command=self._update_notes_label,
+        )
+        notes_scale.grid(row=4, column=1)
+        self.notes_label = ttk.Label(frame, text=str(self.notes_var.get()))
+        self.notes_label.grid(row=4, column=2, padx=(5, 0))
+        self._update_notes_label(self.notes_var.get())
 
         # Motif length entry
         ttk.Label(frame, text="Motif Length:").grid(row=5, column=0, sticky="w")
@@ -477,3 +494,6 @@ class MelodyGeneratorGUI:
                     idx = self.sorted_chords.index(chord)
                     # Restore selection state for each saved chord
                     self.chord_listbox.selection_set(idx)
+        # Refresh slider labels after applying new settings
+        self._update_bpm_label(self.bpm_var.get())
+        self._update_notes_label(self.notes_var.get())
