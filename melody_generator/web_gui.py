@@ -77,6 +77,11 @@ def index():
             chords = [c.strip() for c in chords_str.split(',') if c.strip()]
             if not chords:
                 chords = generate_random_chord_progression(key)
+            # Validate that each supplied chord exists in the dictionary
+            for chord in chords:
+                if chord not in CHORDS:
+                    flash(f"Unknown chord: {chord}")
+                    return render_template('index.html', scale=sorted(SCALE.keys()))
 
         try:
             parts = timesig.split('/')
