@@ -147,3 +147,41 @@ def test_downbeats_match_chords():
             chord = chords[i % len(chords)]
             assert note[:-1] in melody_generator.CHORDS[chord]
         start += pattern[i % len(pattern)] / beat_unit
+
+
+def test_base_octave_range(monkeypatch):
+    chords = ["C", "G", "Am", "F"]
+    monkeypatch.setattr(melody_generator.random, "random", lambda: 0.5)
+    mel = generate_melody("C", 8, chords, motif_length=4, base_octave=3)
+    assert {int(n[-1]) for n in mel}.issubset({3, 4})
+
+
+def test_octave_shift_occurs(monkeypatch):
+    chords = ["C", "G", "Am", "F"]
+    seq = iter([0.05])
+
+    monkeypatch.setattr(
+        melody_generator.random,
+        "random",
+        lambda: next(seq, 0.5),
+    )
+
+    orig_choice = melody_generator.random.choice
+
+    def choice(seq_val):
+        if seq_val == [-1, 1]:
+            return 1
+        return orig_choice(seq_val)
+
+    monkeypatch.setattr(melody_generator.random, "choice", choice)
+
+    mel = generate_melody(
+        "C",
+        8,
+        chords,
+        motif_length=4,
+        base_octave=4,
+        pattern=[0.25],
+    )
+    octs = [int(n[-1]) for n in mel]
+    assert any(o > 5 for o in octs)

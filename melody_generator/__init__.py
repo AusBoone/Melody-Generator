@@ -423,20 +423,26 @@ def get_chord_notes(chord: str) -> List[str]:
     """
     return CHORDS[chord]
 
-def generate_motif(length: int, key: str) -> List[str]:
+def generate_motif(length: int, key: str, base_octave: int = 4) -> List[str]:
     """
     Generate a motif (short, recurring musical idea) in the specified key.
 
     Args:
         length (int): Number of notes in the motif.
         key (str): Musical key.
+        base_octave (int, optional): Starting octave for the motif. Notes
+            primarily fall within ``base_octave`` and ``base_octave + 1``.
+            Defaults to ``4``.
 
     Returns:
         List[str]: List of note names forming the motif.
     """
     notes_in_key = SCALE[key]
-    # Choose random notes within the key and place them in a comfortable octave range
-    return [random.choice(notes_in_key) + str(random.randint(4, 6)) for _ in range(length)]
+    # Choose random notes within the key and place them in the requested octave range
+    return [
+        random.choice(notes_in_key) + str(random.randint(base_octave, base_octave + 1))
+        for _ in range(length)
+    ]
 
 def generate_melody(
     key: str,
@@ -445,6 +451,7 @@ def generate_melody(
     motif_length: int = 4,
     time_signature: Tuple[int, int] = (4, 4),
     pattern: Optional[List[float]] = None,
+    base_octave: int = 4,
 ) -> List[str]:
     """Return a melody in ``key`` spanning ``num_notes`` notes.
 
@@ -482,6 +489,10 @@ def generate_melody(
         provided it is used to calculate the start beat of each note so
         downbeats can be aligned with chord tones. If ``None``, a random
         pattern is chosen.
+    base_octave : int, optional
+        Preferred octave for the melody. Notes typically remain within
+        ``base_octave`` to ``base_octave + 1`` with rare octave shifts at
+        phrase boundaries. Defaults to ``4``.
 
     Returns
     -------
@@ -498,8 +509,12 @@ def generate_melody(
     beat_unit = 1 / time_signature[1]
     start_beat = 0.0
 
+    # Current octave offset relative to ``base_octave``. This may shift by
+    # one at phrase boundaries to vary the register slightly.
+    octave_offset = 0
+
     # Generate the initial motif.
-    melody = generate_motif(motif_length, key)
+    melody = generate_motif(motif_length, key, base_octave + octave_offset)
 
     # Adjust the motif so it moves upward in a stepwise fashion.  This provides
     # a clear starting direction for the overall phrase.
@@ -513,6 +528,9 @@ def generate_melody(
             if idx >= len(notes_in_key):
                 idx -= len(notes_in_key)
                 octave += 1
+            allowed_min = base_octave + octave_offset
+            allowed_max = allowed_min + 1
+            octave = max(allowed_min, min(allowed_max, octave))
             melody[j] = notes_in_key[idx] + str(octave)
 
     # Align motif notes with the underlying harmony on strong beats
@@ -548,6 +566,13 @@ def generate_melody(
         # scale degree in the current direction so the line gradually moves
         # upward then downward.
         if i % motif_length == 0:
+            # Occasionally shift the register by an octave to add variety
+            diff = 0
+            if random.random() < 0.1:
+                new_off = max(-1, min(1, octave_offset + random.choice([-1, 1])))
+                diff = new_off - octave_offset
+                octave_offset = new_off
+
             base = melody[i - motif_length]
             name, octave = base[:-1], int(base[-1])
             idx = notes_in_key.index(name)
@@ -558,6 +583,9 @@ def generate_melody(
             elif new_idx >= len(notes_in_key):
                 new_idx -= len(notes_in_key)
                 octave += 1
+            allowed_min = base_octave + octave_offset
+            allowed_max = allowed_min + 1
+            octave = max(allowed_min, min(allowed_max, octave + diff))
             new_name = notes_in_key[new_idx]
             chord = chord_progression[i % len(chord_progression)]
             chord_notes = get_chord_notes(chord)
@@ -583,7 +611,7 @@ def generate_melody(
         # Scan candidate pitches and keep track of which is closest to the
         # previous note. This gives a baseline for selecting smooth motion.
         for note in source_pool:
-            for octave in range(4, 7):
+            for octave in range(base_octave + octave_offset, base_octave + octave_offset + 2):
                 candidate_note = note + str(octave)
                 interval = get_interval(prev_note, candidate_note)
                 if min_interval is None or interval < min_interval:
@@ -594,7 +622,7 @@ def generate_melody(
         if min_interval is not None:
             threshold = min_interval + 1
             for note in source_pool:
-                for octave in range(4, 7):
+                for octave in range(base_octave + octave_offset, base_octave + octave_offset + 2):
                     candidate_note = note + str(octave)
                     interval = get_interval(prev_note, candidate_note)
                     if interval <= threshold:
@@ -606,7 +634,9 @@ def generate_melody(
                 f"No candidate found for chord {chord} with previous note {prev_note}. Using fallback."
             )
             pool = chord_notes if strong else notes_in_key
-            fallback_note = random.choice(pool) + str(random.randint(4, 6))
+            fallback_note = random.choice(pool) + str(
+                random.randint(base_octave + octave_offset, base_octave + octave_offset + 1)
+            )
             candidates.append(fallback_note)
 
         # If the previous interval was a leap, favour notes that move back

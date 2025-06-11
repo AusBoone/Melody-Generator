@@ -107,6 +107,9 @@ and use the web interface without installing Python locally.
 - **Number of notes**: Set how many notes to generate with the slider.
 - **Harmony**: Tick this option to add a simple harmony line.
 - **Counterpoint**: Generates an additional melody that moves against the main line.
+- **Base Octave**: Starting octave for the melody. Notes typically stay
+  between this octave and the next higher one with rare octave shifts at
+  phrase boundaries.
 
 ## CLI Flags
 When running from the command line you can supply optional flags:
@@ -154,6 +157,8 @@ alternative container runtime such as Podman.
 - GUI can preview the generated melody before saving.
 - Web interface now previews the generated MIDI using an inline player.
 - Harmony and counterpoint tracks for multi-line melodies.
+- Optional base octave parameter to constrain the melody's register with
+  occasional octave shifts.
 
 ## Algorithm Overview
 
