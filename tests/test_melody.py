@@ -104,3 +104,11 @@ def test_progression_chords_exist():
     for key in ["F", "Ab"]:
         prog = melody_generator.generate_random_chord_progression(key, 4)
         assert all(ch in melody_generator.CHORDS for ch in prog)
+
+
+def test_diatonic_chords_major_minor():
+    major = melody_generator.diatonic_chords("C")
+    assert major == ["C", "Dm", "Em", "F", "G", "Am", "B"]
+
+    minor = melody_generator.diatonic_chords("Am")
+    assert minor == ["Am", "B", "C", "Dm", "Em", "F", "G"]

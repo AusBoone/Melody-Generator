@@ -275,6 +275,35 @@ def generate_random_chord_progression(key: str, length: int = 4) -> List[str]:
     return progression[:length]
 
 
+def diatonic_chords(key: str) -> List[str]:
+    """Return the diatonic triads for ``key``.
+
+    The chords mirror the quality of each scale degree. Diminished
+    chords fall back to their major spelling when an exact match is not
+    present in :data:`CHORDS`.
+    """
+
+    is_minor = key.endswith('m')
+    notes = SCALE[key]
+    qualities = ['m', 'dim', '', 'm', 'm', '', ''] if is_minor else ['', 'm', 'm', '', '', 'm', 'dim']
+    chords = []
+    translation = {
+        'A#': 'Bb',
+        'A#m': 'Bbm',
+        'Db': 'C#',
+        'Dbm': 'C#m',
+        'Ab': 'G#',
+        'Abm': 'G#m',
+    }
+    for note, qual in zip(notes, qualities):
+        chord = note + (qual if qual != 'dim' else '')
+        if chord not in CHORDS:
+            chord = translation.get(chord, chord)
+        if chord in CHORDS and chord not in chords:
+            chords.append(chord)
+    return chords
+
+
 def generate_random_rhythm_pattern(length: int = 3) -> List[float]:
     """Create a random rhythmic pattern.
 

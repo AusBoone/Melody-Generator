@@ -15,6 +15,8 @@ import subprocess
 import sys
 from tempfile import NamedTemporaryFile
 
+from . import diatonic_chords
+
 class MelodyGeneratorGUI:
     """Tkinter-based GUI for melody generation."""
 
@@ -127,6 +129,15 @@ class MelodyGeneratorGUI:
         widget.bind("<Enter>", show)
         widget.bind("<Leave>", hide)
 
+    def _update_chord_list(self) -> None:
+        """Refresh the chord list based on the selected key."""
+
+        chords = diatonic_chords(self.key_var.get())
+        self.chord_listbox.delete(0, tk.END)
+        self.sorted_chords = sorted(chords)
+        for chord in self.sorted_chords:
+            self.chord_listbox.insert(tk.END, chord)
+
     def _build_widgets(self) -> None:
         """Create all GUI widgets and arrange them on the window."""
         frame = ttk.Frame(self.root, padding=(10, 10))
@@ -140,14 +151,12 @@ class MelodyGeneratorGUI:
         )
         key_combobox.grid(row=0, column=1)
         key_combobox.current(0)
+        key_combobox.bind("<<ComboboxSelected>>", lambda _e: self._update_chord_list())
 
         # Chord progression listbox
         ttk.Label(frame, text="Chord Progression (Select multiple):").grid(row=1, column=0, sticky="w")
         self.chord_listbox = tk.Listbox(frame, selectmode=tk.MULTIPLE, height=10, bg="white")
-        self.sorted_chords = sorted(self.chords.keys())
-        for chord in self.sorted_chords:
-            # Populate the list box with every available chord
-            self.chord_listbox.insert(tk.END, chord)
+        self._update_chord_list()
         self.chord_listbox.grid(row=1, column=1)
 
         # BPM slider
@@ -459,6 +468,7 @@ class MelodyGeneratorGUI:
         if "harmony_lines" in settings:
             self.harmony_lines.delete(0, tk.END)
             self.harmony_lines.insert(0, str(settings["harmony_lines"]))
+        self._update_chord_list()
         chords = settings.get("chords")
         if chords:
             self.chord_listbox.selection_clear(0, tk.END)
