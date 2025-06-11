@@ -46,15 +46,25 @@ def load_module():
     return module, gui_module, DummyMidiFile
 
 
-def test_random_helpers():
+def test_random_helpers(monkeypatch):
     mod, _, _ = load_module()
     chords = mod.generate_random_chord_progression("C", 4)
     assert len(chords) == 4
     for chord in chords:
         assert chord in mod.CHORDS
+
+    orig_choice = mod.random.choice
+
+    def choice(seq):
+        if seq and isinstance(seq[0], list):
+            return [0.25, 0, 0.25]
+        return orig_choice(seq)
+
+    monkeypatch.setattr(mod.random, "choice", choice)
     pattern = mod.generate_random_rhythm_pattern(6)
-    allowed = {0.25, 0.5, 0.75, 0.125, 0.0625}
+    allowed = {0.25, 0.5, 0.75, 0.125, 0.0625, 0}
     assert len(pattern) == 6 and all(p in allowed for p in pattern)
+    assert 0 in pattern
     # Ensure a motif is repeated at least once in the returned pattern.
     repeated = any(
         pattern[:i] == pattern[i : 2 * i]

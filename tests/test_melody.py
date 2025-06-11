@@ -100,6 +100,24 @@ def test_extra_tracks_shorter_line(tmp_path):
     assert len(mid.tracks[2]) == 2 * len(cp)
 
 
+def test_rest_values_in_pattern(tmp_path):
+    chords = ["C", "G", "Am", "F"]
+    melody = generate_melody("C", 4, chords, motif_length=4)
+    out = tmp_path / "rest.mid"
+    create_midi_file(
+        melody,
+        120,
+        (4, 4),
+        str(out),
+        harmony=False,
+        pattern=[0.25, 0],
+    )
+    mid = DummyMidiFile.last_instance
+    assert mid is not None
+    # Two meta messages plus one pair of events for each non-rest note
+    assert len(mid.tracks[0]) == 6
+
+
 def test_progression_chords_exist():
     for key in ["F", "Ab"]:
         prog = melody_generator.generate_random_chord_progression(key, 4)

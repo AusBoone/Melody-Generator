@@ -315,7 +315,7 @@ def generate_random_rhythm_pattern(length: int = 3) -> List[float]:
     one value with an eighth note (``0.125``).
     """
 
-    allowed = [0.25, 0.5, 0.75, 0.125, 0.0625]
+    allowed = [0.25, 0.5, 0.75, 0.125, 0.0625, 0]
     motifs = [
         [0.25, 0.25],
         [0.25, 0.5],
@@ -323,6 +323,7 @@ def generate_random_rhythm_pattern(length: int = 3) -> List[float]:
         [0.125, 0.125, 0.25],
         [0.75, 0.25],
         [0.5, 0.5],
+        [0.25, 0, 0.25],
     ]
 
     motif = random.choice(motifs)
@@ -572,6 +573,9 @@ def generate_melody(
                 new_off = max(-1, min(1, octave_offset + random.choice([-1, 1])))
                 diff = new_off - octave_offset
                 octave_offset = new_off
+            elif direction < 0 and octave_offset > 0:
+                octave_offset = 0
+                diff = -1
 
             base = melody[i - motif_length]
             name, octave = base[:-1], int(base[-1])
@@ -585,7 +589,12 @@ def generate_melody(
                 octave += 1
             allowed_min = base_octave + octave_offset
             allowed_max = allowed_min + 1
-            octave = max(allowed_min, min(allowed_max, octave + diff))
+            if diff > 0:
+                octave = allowed_max
+            elif diff < 0:
+                octave = allowed_min
+            else:
+                octave = max(allowed_min, min(allowed_max, octave))
             new_name = notes_in_key[new_idx]
             chord = chord_progression[i % len(chord_progression)]
             chord_notes = get_chord_notes(chord)
@@ -787,44 +796,63 @@ def create_midi_file(
         # for a given melody length.
         pattern = random.choice(PATTERNS)
     whole_note_ticks = ticks_per_beat * 4
+    beat_fraction = 1 / time_signature[1]
+    beat_ticks = int(beat_fraction * whole_note_ticks)
+    beats_per_segment = time_signature[0] * 4
+    beats_elapsed = 0
+    rest_ticks = 0
+    last_note = None
+    last_velocity = 64
 
     # Generate MIDI events for each note using the rhythmic pattern cyclically.
     for i, note in enumerate(melody):
         # Determine how long this note should last based on the pattern
         duration_fraction = pattern[i % len(pattern)]
-        note_duration = int(duration_fraction * whole_note_ticks)
-        # Convert note name to MIDI number for writing events
-        midi_note = note_to_midi(note)
-
-        # Vary velocity over time to give the melody more expression. The value
-        # gradually increases so the phrase has a natural swell instead of a
-        # static mechanical feel. The range oscillates roughly between 50 and 90.
         velocity = int(50 + 40 * (i / max(len(melody) - 1, 1)))
 
-        note_on = Message('note_on', note=midi_note, velocity=velocity, time=0)
+        if duration_fraction == 0:
+            # Treat ``0`` as a rest equal to one beat.
+            rest_ticks += beat_ticks
+            beats_elapsed += 1
+            continue
+
+        note_duration = int(duration_fraction * whole_note_ticks)
+        midi_note = note_to_midi(note)
+
+        note_on = Message('note_on', note=midi_note, velocity=velocity, time=rest_ticks)
         note_off = Message('note_off', note=midi_note, velocity=velocity, time=note_duration)
         track.append(note_on)
         track.append(note_off)
         if harmony_track is not None:
-            # Simple parallel harmony a major/minor third above
             harmony_note = min(midi_note + 4, 127)
-            h_on = Message('note_on', note=harmony_note, velocity=max(velocity - 10, 40), time=0)
+            h_on = Message('note_on', note=harmony_note, velocity=max(velocity - 10, 40), time=rest_ticks)
             h_off = Message('note_off', note=harmony_note, velocity=max(velocity - 10, 40), time=note_duration)
             harmony_track.append(h_on)
             harmony_track.append(h_off)
-        # Iterate over any additional melody lines alongside their target tracks
         for line, t in zip(extra_tracks or [], extra_midi_tracks):
-            # Write corresponding notes for any extra melody lines.  Some lines
-            # may be shorter than ``melody`` so guard against ``IndexError`` by
-            # skipping notes that do not exist.  This allows callers to supply
-            # partial tracks without needing to manually pad them out.
             if i >= len(line):
                 continue
             m = note_to_midi(line[i])
-            x_on = Message('note_on', note=m, velocity=velocity, time=0)
+            x_on = Message('note_on', note=m, velocity=velocity, time=rest_ticks)
             x_off = Message('note_off', note=m, velocity=velocity, time=note_duration)
             t.append(x_on)
             t.append(x_off)
+
+        rest_ticks = 0
+        beats_elapsed += duration_fraction / beat_fraction
+        last_note = midi_note
+        last_velocity = velocity
+
+        if beats_elapsed >= beats_per_segment:
+            if last_note is not None and random.random() < 0.5:
+                extra_fraction = random.choice([0.5, 1.0])
+                extra_ticks = int(extra_fraction * whole_note_ticks)
+                on = Message('note_on', note=last_note, velocity=last_velocity, time=0)
+                off = Message('note_off', note=last_note, velocity=last_velocity, time=extra_ticks)
+                track.append(on)
+                track.append(off)
+                rest_ticks = beat_ticks
+            beats_elapsed = 0
 
     # Write all tracks to disk
     mid.save(output_file)
