@@ -5,6 +5,9 @@ addopts = "-vv"
 requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools.packages.find]
+exclude = ["tests*"]
+
 [project]
 name = "melody-generator"
 version = "0.1.0"
