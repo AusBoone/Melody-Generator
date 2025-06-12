@@ -671,6 +671,11 @@ def generate_melody(
         ]
         if directional:
             candidates = directional
+        elif direction < 0 and candidates:
+            # When moving downward and no candidate continues the descent,
+            # use the lowest pitch available to avoid upward motion skewing
+            # the overall trend of the phrase.
+            candidates = [min(candidates, key=note_to_midi)]
 
         next_note = random.choice(candidates)
         melody.append(next_note)
