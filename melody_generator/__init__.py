@@ -461,14 +461,16 @@ def generate_melody(
     1.  Build a short motif using :func:`generate_motif`.
     2.  Repeat that motif throughout the phrase, shifting it slightly so it does
         not sound overly mechanical.
-    3.  For each new note, examine the current chord and pick pitches that are
+    3.  When an octave shift occurs, the first note after the change is forced
+        into the new register so the transition is audible.
+    4.  For each new note, examine the current chord and pick pitches that are
         close to the previous note.  Preference is given to notes within one
         semitone of the best interval found.
-    4.  If no suitable candidate exists, choose a random note from the key as a
+    5.  If no suitable candidate exists, choose a random note from the key as a
         safe fallback.
-    5.  Large leaps are tracked so the following note can "correct" the motion
+    6.  Large leaps are tracked so the following note can "correct" the motion
         by moving back toward the starting pitch.
-    6.  Strong beats (determined from ``pattern`` and ``time_signature``) are
+    7.  Strong beats (determined from ``pattern`` and ``time_signature``) are
         restricted to chord tones while weaker beats may use any scale note.
 
     Parameters
@@ -589,6 +591,7 @@ def generate_melody(
                 octave += 1
             allowed_min = base_octave + octave_offset
             allowed_max = allowed_min + 1
+            octave += diff
             if diff > 0:
                 octave = allowed_max
             elif diff < 0:
