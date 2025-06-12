@@ -55,6 +55,7 @@ def test_invalid_timesig_flash():
             "timesig": "4",  # invalid
             "notes": "8",
             "motif_length": "4",
+            "base_octave": "4",
         },
     )
     assert b"Time signature must be" in resp.data
@@ -71,6 +72,7 @@ def test_invalid_numerator_flash():
             "timesig": "0/4",
             "notes": "8",
             "motif_length": "4",
+            "base_octave": "4",
         },
     )
     assert b"Time signature must be" in resp.data
@@ -87,6 +89,7 @@ def test_negative_numerator_flash():
             "timesig": "-3/4",
             "notes": "8",
             "motif_length": "4",
+            "base_octave": "4",
         },
     )
     assert b"Time signature must be" in resp.data
@@ -103,6 +106,7 @@ def test_invalid_key_flash():
             "timesig": "4/4",
             "notes": "8",
             "motif_length": "4",
+            "base_octave": "4",
         },
     )
     assert resp.status_code == 200
@@ -120,6 +124,7 @@ def test_motif_exceeds_notes_flash():
             "timesig": "4/4",
             "notes": "2",
             "motif_length": "4",
+            "base_octave": "4",
         },
     )
     assert b"Motif length cannot exceed" in resp.data
@@ -136,6 +141,7 @@ def test_invalid_chord_flash():
             "timesig": "4/4",
             "notes": "8",
             "motif_length": "4",
+            "base_octave": "4",
         },
     )
     assert resp.status_code == 200

@@ -125,6 +125,8 @@ def test_cli_subprocess_creates_file(tmp_path):
             "4/4",
             "--notes",
             "8",
+            "--base-octave",
+            "4",
             "--output",
             str(output),
         ],
@@ -139,7 +141,8 @@ def test_generate_button_click(tmp_path, monkeypatch):
     out = tmp_path / "gui.mid"
     calls = {}
 
-    def gen_mel(key, notes, chords, motif_length=4):
+    def gen_mel(key, notes, chords, motif_length=4, base_octave=4):
+        calls["oct"] = base_octave
         return ["C4"] * notes
 
     def create(mel, bpm, ts, path, harmony=False, pattern=None, extra_tracks=None):
@@ -165,6 +168,7 @@ def test_generate_button_click(tmp_path, monkeypatch):
     gui.timesig_var = types.SimpleNamespace(get=lambda: "4/4")
     gui.notes_var = types.SimpleNamespace(get=lambda: 4)
     gui.motif_entry = types.SimpleNamespace(get=lambda: "2")
+    gui.base_octave_var = types.SimpleNamespace(get=lambda: 5)
     gui.harmony_var = types.SimpleNamespace(get=lambda: True)
     gui.counterpoint_var = types.SimpleNamespace(get=lambda: True)
     gui.harmony_lines = types.SimpleNamespace(get=lambda: "1")
@@ -209,6 +213,7 @@ def test_generate_button_click(tmp_path, monkeypatch):
     assert infos
     assert calls["args"][3] == str(out)
     assert len(calls["args"][6]) == 2
+    assert calls["oct"] == 5
 
 
 def test_generate_button_click_non_positive(tmp_path, monkeypatch):
@@ -225,6 +230,7 @@ def test_generate_button_click_non_positive(tmp_path, monkeypatch):
     gui.timesig_var = types.SimpleNamespace(get=lambda: "4/4")
     gui.notes_var = types.SimpleNamespace(get=lambda: -1)
     gui.motif_entry = types.SimpleNamespace(get=lambda: "0")
+    gui.base_octave_var = types.SimpleNamespace(get=lambda: 4)
     gui.harmony_var = types.SimpleNamespace(get=lambda: False)
     gui.counterpoint_var = types.SimpleNamespace(get=lambda: False)
     gui.harmony_lines = types.SimpleNamespace(get=lambda: "0")
@@ -254,6 +260,7 @@ def test_generate_button_click_invalid_denominator(tmp_path, monkeypatch):
     gui.timesig_var = types.SimpleNamespace(get=lambda: "4/0")
     gui.notes_var = types.SimpleNamespace(get=lambda: 4)
     gui.motif_entry = types.SimpleNamespace(get=lambda: "2")
+    gui.base_octave_var = types.SimpleNamespace(get=lambda: 4)
     gui.harmony_var = types.SimpleNamespace(get=lambda: False)
     gui.counterpoint_var = types.SimpleNamespace(get=lambda: False)
     gui.harmony_lines = types.SimpleNamespace(get=lambda: "0")
@@ -290,6 +297,7 @@ def test_generate_button_click_invalid_numerator(tmp_path, monkeypatch):
     gui.timesig_var = types.SimpleNamespace(get=lambda: "0/4")
     gui.notes_var = types.SimpleNamespace(get=lambda: 4)
     gui.motif_entry = types.SimpleNamespace(get=lambda: "2")
+    gui.base_octave_var = types.SimpleNamespace(get=lambda: 4)
     gui.harmony_var = types.SimpleNamespace(get=lambda: False)
     gui.counterpoint_var = types.SimpleNamespace(get=lambda: False)
     gui.harmony_lines = types.SimpleNamespace(get=lambda: "0")
@@ -326,6 +334,7 @@ def test_generate_button_click_motif_exceeds_notes(tmp_path, monkeypatch):
     gui.timesig_var = types.SimpleNamespace(get=lambda: "4/4")
     gui.notes_var = types.SimpleNamespace(get=lambda: 2)
     gui.motif_entry = types.SimpleNamespace(get=lambda: "4")
+    gui.base_octave_var = types.SimpleNamespace(get=lambda: 4)
     gui.harmony_var = types.SimpleNamespace(get=lambda: False)
     gui.counterpoint_var = types.SimpleNamespace(get=lambda: False)
     gui.harmony_lines = types.SimpleNamespace(get=lambda: "0")
@@ -363,6 +372,8 @@ def test_cli_invalid_timesig_exits(tmp_path):
         "4",  # missing denominator
         "--notes",
         "8",
+        "--base-octave",
+        "4",
         "--output",
         str(out),
     ]
@@ -388,6 +399,8 @@ def test_cli_invalid_numerator_exits(tmp_path):
         "0/4",
         "--notes",
         "8",
+        "--base-octave",
+        "4",
         "--output",
         str(out),
     ]
@@ -415,6 +428,8 @@ def test_cli_non_positive_values_exit(tmp_path):
         "-1",
         "--motif_length",
         "0",
+        "--base-octave",
+        "4",
         "--output",
         str(out),
     ]
@@ -441,6 +456,8 @@ def test_cli_motif_exceeds_notes_exit(tmp_path):
         "--notes",
         "2",
         "--motif_length",
+        "4",
+        "--base-octave",
         "4",
         "--output",
         str(out),

@@ -22,7 +22,7 @@ class MelodyGeneratorGUI:
 
     def __init__(
         self,
-        generate_melody: Callable[[str, int, List[str], int], List[str]],
+        generate_melody: Callable[[str, int, List[str], int, int], List[str]],
         create_midi_file: Callable[[List[str], int, Tuple[int, int], str, bool, Optional[List[float]]], None],
         scale: Dict[str, List[str]],
         chords: Dict[str, List[str]],
@@ -137,6 +137,10 @@ class MelodyGeneratorGUI:
         """Display the current number of notes next to the slider."""
         self.notes_label.config(text=str(int(float(value))))
 
+    def _update_octave_label(self, value: str | int) -> None:
+        """Display the base octave next to its slider."""
+        self.octave_label.config(text=str(int(float(value))))
+
     def _update_chord_list(self) -> None:
         """Refresh the chord list based on the selected key."""
 
@@ -212,10 +216,26 @@ class MelodyGeneratorGUI:
         self.notes_label.grid(row=4, column=2, padx=(5, 0))
         self._update_notes_label(self.notes_var.get())
 
+        # Base octave slider and label
+        ttk.Label(frame, text="Base Octave:").grid(row=5, column=0, sticky="w")
+        self.base_octave_var = tk.IntVar(value=4)
+        octave_scale = ttk.Scale(
+            frame,
+            from_=1,
+            to=7,
+            orient=tk.HORIZONTAL,
+            variable=self.base_octave_var,
+            command=self._update_octave_label,
+        )
+        octave_scale.grid(row=5, column=1)
+        self.octave_label = ttk.Label(frame, text=str(self.base_octave_var.get()))
+        self.octave_label.grid(row=5, column=2, padx=(5, 0))
+        self._update_octave_label(self.base_octave_var.get())
+
         # Motif length entry
-        ttk.Label(frame, text="Motif Length:").grid(row=5, column=0, sticky="w")
+        ttk.Label(frame, text="Motif Length:").grid(row=6, column=0, sticky="w")
         self.motif_entry = ttk.Entry(frame)
-        self.motif_entry.grid(row=5, column=1)
+        self.motif_entry.grid(row=6, column=1)
         self._create_tooltip(self.motif_entry, "Length of repeating motif")
         self.motif_entry.insert(0, "4")
 
@@ -225,50 +245,50 @@ class MelodyGeneratorGUI:
             frame,
             text="Add Harmony",
             variable=self.harmony_var,
-        ).grid(row=6, column=0, columnspan=2)
+        ).grid(row=7, column=0, columnspan=2)
 
         self.counterpoint_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(
             frame,
             text="Add Counterpoint",
             variable=self.counterpoint_var,
-        ).grid(row=7, column=0, columnspan=2)
+        ).grid(row=8, column=0, columnspan=2)
 
-        ttk.Label(frame, text="Harmony Lines:").grid(row=8, column=0, sticky="w")
+        ttk.Label(frame, text="Harmony Lines:").grid(row=9, column=0, sticky="w")
         self.harmony_lines = tk.Entry(frame)
         self.harmony_lines.insert(0, "0")
-        self.harmony_lines.grid(row=8, column=1)
+        self.harmony_lines.grid(row=9, column=1)
 
         # Randomize buttons
         ttk.Button(
             frame,
             text="Randomize Chords",
             command=self._randomize_chords,
-        ).grid(row=9, column=0, columnspan=2, pady=(5, 0))
+        ).grid(row=10, column=0, columnspan=2, pady=(5, 0))
         ttk.Button(
             frame,
             text="Randomize Rhythm",
             command=self._randomize_rhythm,
-        ).grid(row=10, column=0, columnspan=2, pady=(5, 0))
+        ).grid(row=11, column=0, columnspan=2, pady=(5, 0))
 
         ttk.Button(
             frame,
             text="Load Preferences",
             command=self._load_preferences,
-        ).grid(row=11, column=0, columnspan=2, pady=(5, 0))
+        ).grid(row=12, column=0, columnspan=2, pady=(5, 0))
 
         ttk.Button(
             frame,
             text="Preview Melody",
             command=self._preview_button_click,
-        ).grid(row=12, column=0, columnspan=2, pady=(5, 0))
+        ).grid(row=13, column=0, columnspan=2, pady=(5, 0))
 
         # Generate button
         ttk.Button(
             frame,
             text="Generate Melody",
             command=self._generate_button_click,
-        ).grid(row=13, column=0, columnspan=2, pady=10)
+        ).grid(row=14, column=0, columnspan=2, pady=10)
 
         self.theme_var = tk.BooleanVar(value=self.dark_mode)
         ttk.Checkbutton(
@@ -276,7 +296,7 @@ class MelodyGeneratorGUI:
             text="Toggle Dark Mode",
             command=self._toggle_theme,
             variable=self.theme_var,
-        ).grid(row=14, column=0, columnspan=2, pady=(5, 0))
+        ).grid(row=15, column=0, columnspan=2, pady=(5, 0))
 
         # Apply persisted settings if available
         if self.load_settings is not None:
@@ -320,7 +340,13 @@ class MelodyGeneratorGUI:
 
         output_file = filedialog.asksaveasfilename(defaultextension=".mid", filetypes=[("MIDI files", "*.mid")])
         if output_file:
-            melody = self.generate_melody(key, notes_count, chord_progression, motif_length=motif_length)
+            melody = self.generate_melody(
+                key,
+                notes_count,
+                chord_progression,
+                motif_length=motif_length,
+                base_octave=self.base_octave_var.get(),
+            )
             extra: List[List[str]] = []
             if self.harmony_line_fn is not None:
                 try:
@@ -383,7 +409,13 @@ class MelodyGeneratorGUI:
             )
             return
 
-        melody = self.generate_melody(key, notes_count, chords, motif_length=motif_length)
+        melody = self.generate_melody(
+            key,
+            notes_count,
+            chords,
+            motif_length=motif_length,
+            base_octave=self.base_octave_var.get(),
+        )
         extra: List[List[str]] = []
         if self.harmony_line_fn is not None:
             try:
@@ -463,6 +495,7 @@ class MelodyGeneratorGUI:
             "bpm": self.bpm_var.get(),
             "timesig": self.timesig_var.get(),
             "notes": self.notes_var.get(),
+            "base_octave": self.base_octave_var.get(),
             "motif_length": int(self.motif_entry.get() or 0),
             "harmony": self.harmony_var.get(),
             "counterpoint": self.counterpoint_var.get(),
@@ -482,6 +515,8 @@ class MelodyGeneratorGUI:
             self.timesig_var.set(settings["timesig"])
         if "notes" in settings:
             self.notes_var.set(settings["notes"])
+        if "base_octave" in settings:
+            self.base_octave_var.set(settings["base_octave"])
         if "motif_length" in settings:
             self.motif_entry.delete(0, tk.END)
             self.motif_entry.insert(0, str(settings["motif_length"]))
@@ -504,3 +539,4 @@ class MelodyGeneratorGUI:
         # Refresh slider labels after applying new settings
         self._update_bpm_label(self.bpm_var.get())
         self._update_notes_label(self.notes_var.get())
+        self._update_octave_label(self.base_octave_var.get())

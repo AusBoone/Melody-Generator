@@ -75,6 +75,7 @@ def index():
         timesig = request.form.get('timesig') or '4/4'
         notes = int(request.form.get('notes') or 16)
         motif_length = int(request.form.get('motif_length') or 4)
+        base_octave = int(request.form.get('base_octave') or 4)
         harmony = bool(request.form.get('harmony'))
         random_rhythm = bool(request.form.get('random_rhythm'))
         counterpoint = bool(request.form.get('counterpoint'))
@@ -111,7 +112,13 @@ def index():
         if motif_length > notes:
             flash("Motif length cannot exceed the number of notes.")
             return render_template('index.html', scale=sorted(SCALE.keys()))
-        melody = generate_melody(key, notes, chords, motif_length=motif_length)
+        melody = generate_melody(
+            key,
+            notes,
+            chords,
+            motif_length=motif_length,
+            base_octave=base_octave,
+        )
         rhythm = generate_random_rhythm_pattern() if random_rhythm else None
         extra: List[List[str]] = []
         for _ in range(max(0, harmony_lines)):
