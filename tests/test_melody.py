@@ -65,6 +65,25 @@ def test_generate_melody_invalid_denominator():
         generate_melody('C', 4, chords, motif_length=4, time_signature=(4, 0))
 
 
+def test_generate_melody_invalid_numerator_and_negative_denominator():
+    chords = ['C', 'G']
+    with pytest.raises(ValueError):
+        generate_melody('C', 4, chords, motif_length=4, time_signature=(0, 4))
+    with pytest.raises(ValueError):
+        generate_melody('C', 4, chords, motif_length=4, time_signature=(4, -1))
+
+
+def test_create_midi_file_invalid_time_signature(tmp_path):
+    melody = ['C4'] * 4
+    out = tmp_path / 'bad.mid'
+    with pytest.raises(ValueError):
+        create_midi_file(melody, 120, (0, 4), str(out))
+    with pytest.raises(ValueError):
+        create_midi_file(melody, 120, (4, 0), str(out))
+    with pytest.raises(ValueError):
+        create_midi_file(melody, 120, (4, -3), str(out))
+
+
 def test_extra_tracks_created(tmp_path):
     chords = ['C', 'G', 'Am', 'F']
     melody = generate_melody('C', 8, chords, motif_length=4)
