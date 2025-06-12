@@ -127,6 +127,7 @@ def test_cli_subprocess_creates_file(tmp_path):
             "8",
             "--base-octave",
             "4",
+            "--include-chords",
             "--output",
             str(output),
         ],
@@ -145,7 +146,7 @@ def test_generate_button_click(tmp_path, monkeypatch):
         calls["oct"] = base_octave
         return ["C4"] * notes
 
-    def create(mel, bpm, ts, path, harmony=False, pattern=None, extra_tracks=None):
+    def create(mel, bpm, ts, path, harmony=False, pattern=None, extra_tracks=None, **kw):
         calls["args"] = (mel, bpm, ts, path, harmony, pattern, extra_tracks)
         with open(path, "w", encoding="utf-8") as fh:
             fh.write("midi")
@@ -172,6 +173,8 @@ def test_generate_button_click(tmp_path, monkeypatch):
     gui.harmony_var = types.SimpleNamespace(get=lambda: True)
     gui.counterpoint_var = types.SimpleNamespace(get=lambda: True)
     gui.harmony_lines = types.SimpleNamespace(get=lambda: "1")
+    gui.include_chords_var = types.SimpleNamespace(get=lambda: True)
+    gui.chords_same_var = types.SimpleNamespace(get=lambda: False)
     lb = types.SimpleNamespace(
         curselection=lambda: (0, 1),
         get=lambda idx: ["C", "G"][idx],
@@ -234,6 +237,8 @@ def test_generate_button_click_non_positive(tmp_path, monkeypatch):
     gui.harmony_var = types.SimpleNamespace(get=lambda: False)
     gui.counterpoint_var = types.SimpleNamespace(get=lambda: False)
     gui.harmony_lines = types.SimpleNamespace(get=lambda: "0")
+    gui.include_chords_var = types.SimpleNamespace(get=lambda: False)
+    gui.chords_same_var = types.SimpleNamespace(get=lambda: False)
     lb = types.SimpleNamespace(curselection=lambda: (0,), get=lambda idx: "C")
     gui.chord_listbox = lb
 

@@ -25,6 +25,7 @@ import json
 from pathlib import Path
 from typing import List, Tuple, Optional
 import os
+import math
 
 # Default path for storing user preferences
 # The file lives in the user's home directory so settings persist
@@ -757,25 +758,26 @@ def create_midi_file(
     harmony: bool = False,
     pattern: Optional[List[float]] = None,
     extra_tracks: Optional[List[List[str]]] = None,
+    chord_progression: Optional[List[str]] = None,
+    chords_separate: bool = True,
 ) -> None:
-    """
-    Create a MIDI file for the given melody.
+    """Create a MIDI file for the given melody and optional chord progression.
 
-    The function converts the list of note strings into MIDI events using
-    ``mido``.  A rhythmic ``pattern`` can be supplied to control note lengths
-    and a basic harmony track can be toggled with ``harmony``.  Additional
-    melodies may be provided in ``extra_tracks`` which are written to their own
-    tracks in the output file.
+    ``chord_progression`` may be supplied to render the underlying harmony
+    either on a separate track (default) or on the melody track when
+    ``chords_separate`` is ``False``.
 
     Args:
-        melody (List[str]): List of note names.
-        bpm (int): Beats per minute.
-        time_signature (Tuple[int, int]): Time signature (numerator, denominator).
-        output_file (str): Path for saving the MIDI file.
-        harmony (bool, optional): Whether to include a parallel harmony line.
-        pattern (List[float], optional): Rhythmic pattern as fractions of a whole note.
-        extra_tracks (List[List[str]], optional): Additional melodies to write
-            on separate tracks.
+        melody: Sequence of note names representing the melody line.
+        bpm: Beats per minute.
+        time_signature: ``(numerator, denominator)`` pair.
+        output_file: Destination file path.
+        harmony: Include a simple harmony line.
+        pattern: Optional rhythmic pattern in fractions of a whole note.
+        extra_tracks: Additional melody lines written to their own tracks.
+        chord_progression: Chords to render as sustained blocks.
+        chords_separate: When ``True`` chords are written to a new track,
+            otherwise they are merged with the melody track.
     """
     ticks_per_beat = 480
     mid = MidiFile(ticks_per_beat=ticks_per_beat)
@@ -792,6 +794,12 @@ def create_midi_file(
             t = MidiTrack()
             mid.tracks.append(t)
             extra_midi_tracks.append(t)
+
+    chord_track = None
+    if chord_progression:
+        chord_track = track if not chords_separate else MidiTrack()
+        if chords_separate:
+            mid.tracks.append(chord_track)
 
     # Set tempo and time signature.
     track.append(mido.MetaMessage('set_tempo', tempo=mido.bpm2tempo(bpm)))
@@ -811,6 +819,8 @@ def create_midi_file(
     rest_ticks = 0
     last_note = None
     last_velocity = 64
+
+    total_beats = 0.0
 
     # Generate MIDI events for each note using the rhythmic pattern cyclically.
     for i, note in enumerate(melody):
@@ -847,7 +857,9 @@ def create_midi_file(
             t.append(x_off)
 
         rest_ticks = 0
-        beats_elapsed += duration_fraction / beat_fraction
+        beat_len = duration_fraction / beat_fraction
+        beats_elapsed += beat_len
+        total_beats += beat_len
         last_note = midi_note
         last_velocity = velocity
 
@@ -861,6 +873,26 @@ def create_midi_file(
                 track.append(off)
                 rest_ticks = beat_ticks
             beats_elapsed = 0
+
+    if chord_track is not None:
+        ticks_per_chord = time_signature[0] * ticks_per_beat
+        total_ticks = int(total_beats * ticks_per_beat)
+        num_chords = max(1, math.ceil(total_ticks / ticks_per_chord))
+        current_time = 0
+        for i in range(num_chords):
+            chord = chord_progression[i % len(chord_progression)]
+            notes = CHORDS.get(chord, [])
+            delta = 0 if i == 0 else ticks_per_chord
+            for idx, n in enumerate(notes):
+                note_num = note_to_midi(n + "3")
+                chord_track.append(Message('note_on', note=note_num, velocity=60, time=delta if idx == 0 else 0))
+                delta = 0
+            delta = ticks_per_chord
+            for idx, n in enumerate(notes):
+                note_num = note_to_midi(n + "3")
+                chord_track.append(Message('note_off', note=note_num, velocity=60, time=delta if idx == 0 else 0))
+                delta = 0
+            current_time += ticks_per_chord
 
     # Write all tracks to disk
     mid.save(output_file)
@@ -894,6 +926,10 @@ def run_cli() -> None:
                         help="Number of harmony lines to add in parallel")
     parser.add_argument('--base-octave', type=int, default=4,
                         help="Starting octave for the melody (default: 4).")
+    parser.add_argument('--include-chords', action='store_true',
+                        help='Add the chord progression to the MIDI output')
+    parser.add_argument('--chords-same-track', action='store_true',
+                        help='Write chords on the melody track instead of a new one')
     # Parse the provided CLI arguments
     args = parser.parse_args()
 
@@ -967,6 +1003,8 @@ def run_cli() -> None:
         harmony=args.harmony,
         pattern=rhythm,
         extra_tracks=extra,
+        chord_progression=chord_progression if args.include_chords else None,
+        chords_separate=not args.chords_same_track,
     )
     logging.info("Melody generation complete.")
 
