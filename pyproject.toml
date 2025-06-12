@@ -14,8 +14,7 @@ version = "0.1.0"
 description = "Random melody generator with CLI and GUI"
 authors = [{name = "Austin Boone"}]
 readme = "README.md"
-license = {file = "LICENSE"}
-license-files = ["LICENSE"]
+license = "MIT"
 requires-python = ">=3.8"
 classifiers = [
     "Programming Language :: Python",
