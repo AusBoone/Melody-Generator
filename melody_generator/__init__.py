@@ -510,8 +510,8 @@ def generate_melody(
     if pattern is None:
         pattern = random.choice(PATTERNS)
 
-    if time_signature[1] <= 0:
-        raise ValueError("time_signature denominator must be greater than 0")
+    if time_signature[0] <= 0 or time_signature[1] <= 0:
+        raise ValueError("time_signature elements must be greater than 0")
     beat_unit = 1 / time_signature[1]
     start_beat = 0.0
 
@@ -781,6 +781,8 @@ def create_midi_file(
         chords_separate: When ``True`` chords are written to a new track,
             otherwise they are merged with the melody track.
     """
+    if time_signature[0] <= 0 or time_signature[1] <= 0:
+        raise ValueError("time_signature elements must be greater than 0")
     ticks_per_beat = 480
     mid = MidiFile(ticks_per_beat=ticks_per_beat)
     track = MidiTrack()
