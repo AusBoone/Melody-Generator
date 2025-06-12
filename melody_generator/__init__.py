@@ -510,6 +510,8 @@ def generate_melody(
     if pattern is None:
         pattern = random.choice(PATTERNS)
 
+    if time_signature[1] <= 0:
+        raise ValueError("time_signature denominator must be greater than 0")
     beat_unit = 1 / time_signature[1]
     start_beat = 0.0
 
