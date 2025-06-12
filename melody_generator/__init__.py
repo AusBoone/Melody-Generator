@@ -880,7 +880,6 @@ def create_midi_file(
         ticks_per_chord = time_signature[0] * ticks_per_beat
         total_ticks = int(total_beats * ticks_per_beat)
         num_chords = max(1, math.ceil(total_ticks / ticks_per_chord))
-        current_time = 0
         for i in range(num_chords):
             chord = chord_progression[i % len(chord_progression)]
             notes = CHORDS.get(chord, [])
@@ -894,7 +893,6 @@ def create_midi_file(
                 note_num = note_to_midi(n + "3")
                 chord_track.append(Message('note_off', note=note_num, velocity=60, time=delta if idx == 0 else 0))
                 delta = 0
-            current_time += ticks_per_chord
 
     # Write all tracks to disk
     mid.save(output_file)
