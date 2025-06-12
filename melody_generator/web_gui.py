@@ -80,6 +80,8 @@ def index():
         random_rhythm = bool(request.form.get('random_rhythm'))
         counterpoint = bool(request.form.get('counterpoint'))
         harmony_lines = int(request.form.get('harmony_lines') or 0)
+        include_chords = bool(request.form.get('include_chords'))
+        chords_same = bool(request.form.get('chords_same'))
 
         # Determine the chord progression. The user may provide one
         # manually or tick the "random" box to generate it.
@@ -148,6 +150,8 @@ def index():
             harmony=harmony,
             pattern=rhythm,
             extra_tracks=extra,
+            chord_progression=chords if include_chords else None,
+            chords_separate=not chords_same,
         )
 
         # Read the generated MIDI data back into memory then delete the

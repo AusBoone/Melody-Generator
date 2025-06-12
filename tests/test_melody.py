@@ -3,6 +3,7 @@ from pathlib import Path
 import types
 import importlib
 import pytest
+import random
 
 # Provide a minimal stub for the 'mido' module so the import succeeds
 stub_mido = types.ModuleType("mido")
@@ -100,6 +101,43 @@ def test_extra_tracks_shorter_line(tmp_path):
     assert len(mid.tracks[2]) == 2 * len(cp)
 
 
+def test_chord_track_added(tmp_path):
+    chords = ["C", "G"]
+    melody = generate_melody("C", 4, chords, motif_length=4)
+    out = tmp_path / "ch.mid"
+    create_midi_file(
+        melody,
+        120,
+        (4, 4),
+        str(out),
+        harmony=False,
+        pattern=[0.25],
+        chord_progression=chords,
+    )
+    mid = DummyMidiFile.last_instance
+    assert mid is not None
+    assert len(mid.tracks) == 2
+
+
+def test_chords_on_same_track(tmp_path):
+    chords = ["C", "G"]
+    melody = generate_melody("C", 4, chords, motif_length=4)
+    out = tmp_path / "merge.mid"
+    create_midi_file(
+        melody,
+        120,
+        (4, 4),
+        str(out),
+        harmony=False,
+        pattern=[0.25],
+        chord_progression=chords,
+        chords_separate=False,
+    )
+    mid = DummyMidiFile.last_instance
+    assert mid is not None
+    assert len(mid.tracks) == 1
+
+
 def test_rest_values_in_pattern(tmp_path):
     chords = ["C", "G", "Am", "F"]
     melody = generate_melody("C", 4, chords, motif_length=4)
@@ -134,6 +172,7 @@ def test_diatonic_chords_major_minor():
 
 def test_melody_trends_up_then_down():
     chords = ["C", "G", "Am", "F"]
+    random.seed(0)
     mel = generate_melody("C", 12, chords, motif_length=4)
     midi_vals = [note_to_midi(n) for n in mel]
     mid = len(midi_vals) // 2
