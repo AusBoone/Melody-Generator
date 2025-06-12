@@ -107,7 +107,8 @@ and use the web interface without installing Python locally.
 - **Number of notes**: Set how many notes to generate with the slider.
 - **Harmony**: Tick this option to add a simple harmony line.
 - **Counterpoint**: Generates an additional melody that moves against the main line.
-- **Base Octave**: Starting octave for the melody. Notes typically stay
+- **Base Octave**: Starting octave for the melody. Use the slider or
+  `--base-octave` flag to shift the register. Notes typically stay
   between this octave and the next higher one with rare octave shifts at
   phrase boundaries.
 
@@ -118,6 +119,7 @@ When running from the command line you can supply optional flags:
 - `--harmony` adds a parallel harmony track.
 - `--harmony-lines N` creates `N` additional harmony parts.
 - `--counterpoint` generates a contrapuntal line based on the melody.
+- `--base-octave N` sets the starting octave of the melody (default: 4).
 
 ## Development
 

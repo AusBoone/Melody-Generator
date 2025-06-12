@@ -887,6 +887,8 @@ def run_cli() -> None:
     parser.add_argument('--counterpoint', action='store_true', help="Generate a counterpoint line.")
     parser.add_argument('--harmony-lines', type=int, default=0, metavar='N',
                         help="Number of harmony lines to add in parallel")
+    parser.add_argument('--base-octave', type=int, default=4,
+                        help="Starting octave for the melody (default: 4).")
     # Parse the provided CLI arguments
     args = parser.parse_args()
 
@@ -937,7 +939,13 @@ def run_cli() -> None:
         )
         sys.exit(1)
 
-    melody = generate_melody(args.key, args.notes, chord_progression, motif_length=args.motif_length)
+    melody = generate_melody(
+        args.key,
+        args.notes,
+        chord_progression,
+        motif_length=args.motif_length,
+        base_octave=args.base_octave,
+    )
     rhythm = generate_random_rhythm_pattern() if args.random_rhythm else None
     # Collect additional harmony tracks requested on the command line
     extra: List[List[str]] = []
