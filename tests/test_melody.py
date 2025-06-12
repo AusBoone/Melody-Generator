@@ -59,6 +59,12 @@ def test_generate_melody_length_and_error():
         generate_melody('C', 3, chords, motif_length=4)
 
 
+def test_generate_melody_invalid_denominator():
+    chords = ['C', 'G']
+    with pytest.raises(ValueError):
+        generate_melody('C', 4, chords, motif_length=4, time_signature=(4, 0))
+
+
 def test_extra_tracks_created(tmp_path):
     chords = ['C', 'G', 'Am', 'F']
     melody = generate_melody('C', 8, chords, motif_length=4)
