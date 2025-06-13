@@ -126,6 +126,15 @@ def test_harmony_and_counterpoint_intervals_and_tracks(tmp_path):
     assert mid is not None and len(mid.tracks) == 1 + 1 + 2
 
 
+def test_negative_interval_harmony():
+    """Harmony lines with negative intervals drop below the melody."""
+    mod, _, _ = load_module()
+    melody = ["G4", "A4", "B4"]
+    harmony = mod.generate_harmony_line(melody, interval=-3)
+    for m, h in zip(melody, harmony):
+        assert mod.note_to_midi(h) - mod.note_to_midi(m) == -3
+
+
 def test_cli_subprocess_creates_file(tmp_path):
     """Run the CLI entry point in a real subprocess.
 
