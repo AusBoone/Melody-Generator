@@ -1,3 +1,8 @@
+"""Simple version check for the package.
+
+Verifies that the ``__version__`` attribute matches the expected release
+string."""
+
 import sys
 import types
 import importlib
@@ -28,4 +33,5 @@ melody_generator = importlib.import_module("melody_generator")
 
 
 def test_version_matches():
+    """Ensure ``melody_generator.__version__`` exposes the release version."""
     assert melody_generator.__version__ == "0.1.0"
