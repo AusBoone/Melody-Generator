@@ -1,3 +1,9 @@
+"""Tests for the Flask based web GUI.
+
+The web interface exposes the same melody generation functionality as the
+desktop application. These tests post various form values to the Flask app and
+verify that invalid input is rejected and valid input renders correctly."""
+
 import importlib
 import sys
 import types
@@ -38,6 +44,7 @@ app = web_gui.app
 
 
 def test_index_route():
+    """Verify that the index page renders successfully."""
     client = app.test_client()
     resp = client.get("/")
     assert resp.status_code == 200
@@ -45,6 +52,7 @@ def test_index_route():
 
 
 def test_invalid_timesig_flash():
+    """Submitting an invalid time signature triggers a flash message."""
     client = app.test_client()
     resp = client.post(
         "/",
@@ -62,6 +70,7 @@ def test_invalid_timesig_flash():
 
 
 def test_invalid_numerator_flash():
+    """Numerator outside the valid range triggers an error flash."""
     client = app.test_client()
     resp = client.post(
         "/",
@@ -79,6 +88,7 @@ def test_invalid_numerator_flash():
 
 
 def test_negative_numerator_flash():
+    """Negative numerators result in an error flash."""
     client = app.test_client()
     resp = client.post(
         "/",
@@ -96,6 +106,7 @@ def test_negative_numerator_flash():
 
 
 def test_invalid_key_flash():
+    """Posting an unknown musical key returns an error message."""
     client = app.test_client()
     resp = client.post(
         "/",
@@ -114,6 +125,7 @@ def test_invalid_key_flash():
 
 
 def test_motif_exceeds_notes_flash():
+    """Motif lengths longer than the note count flash an error."""
     client = app.test_client()
     resp = client.post(
         "/",
@@ -131,6 +143,7 @@ def test_motif_exceeds_notes_flash():
 
 
 def test_invalid_chord_flash():
+    """Unknown chords in the form post return an error flash."""
     client = app.test_client()
     resp = client.post(
         "/",
@@ -149,6 +162,7 @@ def test_invalid_chord_flash():
 
 
 def test_include_chords_flag():
+    """Setting the ``include_chords`` checkbox should be accepted."""
     client = app.test_client()
     resp = client.post(
         "/",

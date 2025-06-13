@@ -1,3 +1,8 @@
+"""Unit tests for the ``note_to_midi`` helper.
+
+The helper converts note names such as ``C#4`` or ``Db4`` into MIDI numbers.
+These tests confirm that enharmonic spellings map to the same value."""
+
 import sys
 from pathlib import Path
 import types
@@ -31,8 +36,10 @@ note_to_midi = melody_generator.note_to_midi
 
 
 def test_sharp_conversion():
+    """Sharp notes convert to their expected MIDI numbers."""
     assert note_to_midi('C#4') == 61
 
 
 def test_flat_conversion():
+    """Flat notes produce the same value as their enharmonic sharps."""
     assert note_to_midi('Db4') == 61

@@ -1,3 +1,12 @@
+"""Integration tests for the CLI and desktop GUI.
+
+These tests exercise the package end to end while avoiding heavy optional
+dependencies. ``mido`` and ``tkinter`` are replaced with lightweight stubs so
+the CLI and GUI entry points can be imported without installing those
+libraries. The tests then ensure that both user interfaces drive the core
+melody generation code correctly and that any produced MIDI files have the
+expected structure."""
+
 import importlib
 import os
 import subprocess
@@ -7,9 +16,15 @@ import types
 import pytest
 
 def load_module():
-    """Load melody-generator with stubbed dependencies."""
-    # Create minimal replacements for optional packages so the tests
-    # can run without installing them.
+    """Import ``melody_generator`` with dummy stand-ins for external modules.
+
+    The package optionally depends on ``mido`` for MIDI writing and ``tkinter``
+    for the desktop GUI. These tests supply lightweight replacements for those
+    modules so that importing the package does not require the real
+    dependencies, allowing the integration logic to be tested in isolation.
+    """
+    # Create minimal replacements for optional packages so the tests can run
+    # without installing them.
     stub_mido = types.ModuleType("mido")
     class DummyMidiFile:
         last_instance = None
@@ -47,6 +62,12 @@ def load_module():
 
 
 def test_random_helpers(monkeypatch):
+    """Validate the random helper utilities used by the interfaces.
+
+    ``generate_random_chord_progression`` should return only chords known to the
+    library, while ``generate_random_rhythm_pattern`` must produce durations from
+    the allowed set. The patched ``random.choice`` forces a repeated motif so we
+    can also assert that some repetition logic is exercised."""
     mod, _, _ = load_module()
     chords = mod.generate_random_chord_progression("C", 4)
     assert len(chords) == 4
@@ -75,6 +96,13 @@ def test_random_helpers(monkeypatch):
 
 
 def test_harmony_and_counterpoint_intervals_and_tracks(tmp_path):
+    """Verify harmony/counterpoint generation and MIDI track creation.
+
+    The harmony line should maintain a fixed interval relative to the original
+    melody. Counterpoint notes are checked against a whitelist of consonant
+    intervals. Finally ``create_midi_file`` should place each extra line on its
+    own track so the resulting ``MidiFile`` ends up with the expected number of
+    tracks."""
     mod, _, DummyMidiFile = load_module()
     melody = ["C4", "D4", "E4", "F4"]
     harmony = mod.generate_harmony_line(melody, interval=4)
@@ -99,6 +127,12 @@ def test_harmony_and_counterpoint_intervals_and_tracks(tmp_path):
 
 
 def test_cli_subprocess_creates_file(tmp_path):
+    """Run the CLI entry point in a real subprocess.
+
+    The command is executed with stubbed modules on the ``PYTHONPATH`` so that
+    the ``melody_generator`` package can be imported without additional
+    dependencies. Successful completion should create a MIDI file at the
+    requested output path."""
     stub_dir = tmp_path / "stubs"
     stub_dir.mkdir()
     (stub_dir / "mido.py").write_text(
@@ -138,6 +172,12 @@ def test_cli_subprocess_creates_file(tmp_path):
 
 
 def test_generate_button_click(tmp_path, monkeypatch):
+    """Simulate a user clicking the "Generate" button in the GUI.
+
+    The test wires up a ``MelodyGeneratorGUI`` instance with stubbed callbacks
+    and uses ``filedialog``/``messagebox`` replacements to avoid real user
+    interaction. After invoking ``_generate_button_click`` a MIDI file should be
+    written and confirmation dialogs shown."""
     mod, gui_mod, _ = load_module()
     out = tmp_path / "gui.mid"
     calls = {}
@@ -220,6 +260,12 @@ def test_generate_button_click(tmp_path, monkeypatch):
 
 
 def test_generate_button_click_non_positive(tmp_path, monkeypatch):
+    """Reject negative or zero values entered in the GUI.
+
+    ``MelodyGeneratorGUI`` should validate that BPM, note count, motif length
+    and harmony line counts are all positive integers. When invalid values are
+    supplied the ``showerror`` dialog should be triggered instead of attempting
+    to generate a melody."""
     mod, gui_mod, _ = load_module()
     gui = gui_mod.MelodyGeneratorGUI.__new__(gui_mod.MelodyGeneratorGUI)
     gui.generate_melody = lambda *a, **k: []
@@ -252,6 +298,11 @@ def test_generate_button_click_non_positive(tmp_path, monkeypatch):
 
 
 def test_generate_button_click_invalid_denominator(tmp_path, monkeypatch):
+    """Validate denominator checks for time signatures entered in the GUI.
+
+    ``_generate_button_click`` should refuse to proceed when the denominator of
+    the time signature is anything other than 1, 2, 4, 8 or 16. The test
+    simulates user input of ``4/0`` and asserts that an error dialog appears."""
     mod, gui_mod, _ = load_module()
     gui = gui_mod.MelodyGeneratorGUI.__new__(gui_mod.MelodyGeneratorGUI)
     gui.generate_melody = lambda *a, **k: []
@@ -289,6 +340,11 @@ def test_generate_button_click_invalid_denominator(tmp_path, monkeypatch):
 
 
 def test_generate_button_click_invalid_numerator(tmp_path, monkeypatch):
+    """Reject numerator values outside the valid range in the GUI.
+
+    The numerator must be a positive integer. By submitting ``0/4`` the test
+    ensures ``_generate_button_click`` presents an error dialog instead of
+    producing a MIDI file."""
     mod, gui_mod, _ = load_module()
     gui = gui_mod.MelodyGeneratorGUI.__new__(gui_mod.MelodyGeneratorGUI)
     gui.generate_melody = lambda *a, **k: []
@@ -326,6 +382,11 @@ def test_generate_button_click_invalid_numerator(tmp_path, monkeypatch):
 
 
 def test_generate_button_click_motif_exceeds_notes(tmp_path, monkeypatch):
+    """Handle motif lengths longer than the overall note count.
+
+    ``_generate_button_click`` should reject user input when the motif length
+    exceeds the total notes requested. The error dialog indicates to the user
+    that the motif cannot be longer than the melody itself."""
     mod, gui_mod, _ = load_module()
     gui = gui_mod.MelodyGeneratorGUI.__new__(gui_mod.MelodyGeneratorGUI)
     gui.generate_melody = lambda *a, **k: []
@@ -363,6 +424,10 @@ def test_generate_button_click_motif_exceeds_notes(tmp_path, monkeypatch):
 
 
 def test_cli_invalid_timesig_exits(tmp_path):
+    """CLI should exit when the time signature is malformed.
+
+    The argument ``--timesig`` expects ``NUM/DEN``. Supplying ``4`` triggers the
+    parser's validation logic which exits with ``SystemExit``."""
     mod, _, _ = load_module()
     out = tmp_path / "bad.mid"
     argv = [
@@ -390,6 +455,10 @@ def test_cli_invalid_timesig_exits(tmp_path):
 
 
 def test_cli_invalid_numerator_exits(tmp_path):
+    """CLI exits when given an invalid time signature numerator.
+
+    A numerator of ``0`` is not allowed, so ``run_cli`` should raise
+    ``SystemExit`` during argument parsing."""
     mod, _, _ = load_module()
     out = tmp_path / "bad.mid"
     argv = [
@@ -417,6 +486,11 @@ def test_cli_invalid_numerator_exits(tmp_path):
 
 
 def test_cli_non_positive_values_exit(tmp_path):
+    """``run_cli`` rejects negative or zero numeric options.
+
+    Both ``--bpm`` and ``--notes`` must be positive integers. Providing ``0``
+    BPM and ``-1`` notes should cause the CLI to terminate with
+    ``SystemExit``."""
     mod, _, _ = load_module()
     out = tmp_path / "bad.mid"
     argv = [
@@ -446,6 +520,10 @@ def test_cli_non_positive_values_exit(tmp_path):
 
 
 def test_cli_motif_exceeds_notes_exit(tmp_path):
+    """Motif lengths longer than ``--notes`` should abort execution.
+
+    Specifying a motif length of ``4`` when only ``2`` notes are requested
+    should cause ``run_cli`` to raise ``SystemExit`` after argument validation."""
     mod, _, _ = load_module()
     out = tmp_path / "bad.mid"
     argv = [
