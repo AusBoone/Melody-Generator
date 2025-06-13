@@ -702,14 +702,14 @@ def generate_harmony_line(melody: List[str], interval: int = 4) -> List[str]:
     """
     harmony = []
     for note in melody:
-        # Shift each melody note by the specified interval while clamping the
-        # value so it stays within the valid MIDI range (0-127).  When the shift
-        # would exceed the range, move in the opposite direction to keep the
-        # harmony line usable.
         base = note_to_midi(note)
-        direction = -1 if base + interval > 120 else 1
-        midi_val = max(0, min(127, base + direction * interval))
-        harmony.append(midi_to_note(midi_val))
+        target = base + interval
+        # Reflect intervals that fall outside the MIDI range back toward
+        # the melody so the resulting notes stay valid.
+        if target < 0 or target > 127:
+            target = base - interval
+        target = max(0, min(127, target))
+        harmony.append(midi_to_note(target))
     return harmony
 
 
