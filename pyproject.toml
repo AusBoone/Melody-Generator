@@ -8,12 +8,16 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 exclude = ["tests*"]
 
+[tool.setuptools]
+license-files = ["LICENSE"]
+
 [project]
 name = "melody-generator"
 version = "0.1.0"
 description = "Random melody generator with CLI and GUI"
 authors = [{name = "Austin Boone"}]
 readme = "README.md"
+long_description_content_type = "text/markdown"
 license = "MIT"
 requires-python = ">=3.8"
 classifiers = [
@@ -21,11 +25,17 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
     "Framework :: Flask",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
 ]
 dependencies = [
     "mido==1.2.10",
     "Flask",
 ]
+
+[project.urls]
+Source = "https://example.com/source"
+Issues = "https://example.com/issues"
 
 [project.scripts]
 melody-generator = "melody_generator:main"
