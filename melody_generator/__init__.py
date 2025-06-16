@@ -38,7 +38,11 @@ else:
 
 
 def load_settings(path: Path = DEFAULT_SETTINGS_FILE) -> dict:
-    """Load saved user settings from ``path`` if it exists."""
+    """Load saved user settings from ``path`` if it exists.
+
+    @param path (Path): Location of the settings file.
+    @returns dict: Loaded settings or an empty dictionary when unavailable.
+    """
     # Prefer the user's saved options but fall back to an empty
     # dictionary when the settings file is missing or unreadable.
     if path.is_file():
@@ -51,7 +55,12 @@ def load_settings(path: Path = DEFAULT_SETTINGS_FILE) -> dict:
 
 
 def save_settings(settings: dict, path: Path = DEFAULT_SETTINGS_FILE) -> None:
-    """Save user ``settings`` to ``path`` as JSON."""
+    """Save user ``settings`` to ``path`` as JSON.
+
+    @param settings (dict): Options to be persisted.
+    @param path (Path): Destination file path.
+    @returns None: Function does not return a value.
+    """
     # Any IOError is logged but ignored so failing to save
     # preferences never prevents melody generation.
     try:
@@ -135,6 +144,10 @@ def _build_scale(root: str, pattern: List[int]) -> List[str]:
     ``pattern`` is a sequence of semitone offsets from the root note that
     defines the mode.  The function walks the pattern wrapping around the
     twelve-tone chromatic scale to create the resulting list of note names.
+
+    @param root (str): Root note of the scale.
+    @param pattern (List[int]): Sequence of semitone offsets defining the mode.
+    @returns List[str]: Computed scale as note names.
     """
     root_idx = NOTE_TO_SEMITONE[root]
     notes = []
@@ -221,6 +234,10 @@ def generate_random_chord_progression(key: str, length: int = 4) -> List[str]:
     The progression is chosen from a small set of common patterns in
     popular music.  Chords are derived from the selected key so the
     results fit naturally with generated melodies.
+
+    @param key (str): Musical key to base the chords on.
+    @param length (int): Number of chords to generate.
+    @returns List[str]: Chord names forming the progression.
     """
 
     # Roman numeral progressions for major and minor keys encoded as
@@ -282,6 +299,9 @@ def diatonic_chords(key: str) -> List[str]:
     The chords mirror the quality of each scale degree. Diminished
     chords fall back to their major spelling when an exact match is not
     present in :data:`CHORDS`.
+
+    @param key (str): Musical key whose triads are requested.
+    @returns List[str]: All unique chords found in the key.
     """
 
     is_minor = key.endswith('m')
@@ -314,6 +334,9 @@ def generate_random_rhythm_pattern(length: int = 3) -> List[float]:
     compatible with older callers.  To keep things from sounding too rigid, a
     small variation may be applied after the first full repetition by replacing
     one value with an eighth note (``0.125``).
+
+    @param length (int): Number of durations to produce.
+    @returns List[float]: Pattern of note lengths in fractions of a whole note.
     """
 
     allowed = [0.25, 0.5, 0.75, 0.125, 0.0625, 0]
@@ -339,15 +362,12 @@ def generate_random_rhythm_pattern(length: int = 3) -> List[float]:
     return pattern
 
 def note_to_midi(note: str) -> int:
-    """
-    Convert a note name (with octave) to a MIDI note number.
+    """Convert a note name (with octave) to a MIDI note number.
+
     Example: 'C#4' -> 61 (with C4 as MIDI note 60).
 
-    Args:
-        note (str): Note name (e.g., 'C#4').
-
-    Returns:
-        int: Corresponding MIDI note number.
+    @param note (str): Note name including octave (e.g., ``C#4``).
+    @returns int: Corresponding MIDI note number.
     """
     try:
         # MIDI octaves start at -1 so offset by +1 from the human-readable value
@@ -384,15 +404,8 @@ def note_to_midi(note: str) -> int:
 def midi_to_note(midi_note: int) -> str:
     """Convert a MIDI note number back to a note string.
 
-    Parameters
-    ----------
-    midi_note : int
-        MIDI note number (0-127).
-
-    Returns
-    -------
-    str
-        Note string using sharps (e.g. ``C#4``).
+    @param midi_note (int): MIDI note number ``0-127``.
+    @returns str: Note string using sharps (e.g. ``C#4``).
     """
     octave = midi_note // 12 - 1
     # Wrap around the NOTES list to get the pitch class
@@ -400,44 +413,30 @@ def midi_to_note(midi_note: int) -> str:
     return f"{name}{octave}"
 
 def get_interval(note1: str, note2: str) -> int:
-    """
-    Get the interval between two notes in semitones.
+    """Get the interval between two notes in semitones.
 
-    Args:
-        note1 (str): First note (e.g., 'C4').
-        note2 (str): Second note (e.g., 'E4').
-
-    Returns:
-        int: Interval in semitones.
+    @param note1 (str): First note (e.g., ``C4``).
+    @param note2 (str): Second note (e.g., ``E4``).
+    @returns int: Interval in semitones.
     """
     # Interval is the absolute difference in semitone numbers
     return abs(note_to_midi(note1) - note_to_midi(note2))
 
 def get_chord_notes(chord: str) -> List[str]:
-    """
-    Retrieve the notes that make up the given chord.
+    """Retrieve the notes that make up the given chord.
 
-    Args:
-        chord (str): Chord name (e.g., 'C', 'F#m').
-
-    Returns:
-        List[str]: List of note names in the chord.
+    @param chord (str): Chord name (e.g., ``C`` or ``F#m``).
+    @returns List[str]: Note names in the chord.
     """
     return CHORDS[chord]
 
 def generate_motif(length: int, key: str, base_octave: int = 4) -> List[str]:
-    """
-    Generate a motif (short, recurring musical idea) in the specified key.
+    """Generate a motif (short, recurring musical idea) in the specified key.
 
-    Args:
-        length (int): Number of notes in the motif.
-        key (str): Musical key.
-        base_octave (int, optional): Starting octave for the motif. Notes
-            primarily fall within ``base_octave`` and ``base_octave + 1``.
-            Defaults to ``4``.
-
-    Returns:
-        List[str]: List of note names forming the motif.
+    @param length (int): Number of notes in the motif.
+    @param key (str): Musical key for the motif.
+    @param base_octave (int): Starting octave, usually ``4``.
+    @returns List[str]: List of note names forming the motif.
     """
     notes_in_key = SCALE[key]
     # Choose random notes within the key and place them in the requested octave range
@@ -465,43 +464,20 @@ def generate_melody(
     3.  When an octave shift occurs, the first note after the change is forced
         into the new register so the transition is audible.
     4.  For each new note, examine the current chord and pick pitches that are
-        close to the previous note.  Preference is given to notes within one
-        semitone of the best interval found.
-    5.  If no suitable candidate exists, choose a random note from the key as a
-        safe fallback.
-    6.  Large leaps are tracked so the following note can "correct" the motion
-        by moving back toward the starting pitch.
-    7.  Strong beats (determined from ``pattern`` and ``time_signature``) are
-        restricted to chord tones while weaker beats may use any scale note.
+        close to the previous note.
+    5.  If no suitable candidate exists, choose a random note from the key.
+    6.  Large leaps are tracked so the following note can correct the motion.
+    7.  Strong beats are restricted to chord tones while weak beats may use any
+        scale note.
 
-    Parameters
-    ----------
-    key : str
-        Musical key for the melody.
-    num_notes : int
-        Total number of notes to generate.
-    chord_progression : List[str]
-        Progression to base note choices on.
-    motif_length : int, optional
-        Length of the initial motif, by default ``4``.
-    time_signature : Tuple[int, int], optional
-        ``(numerator, denominator)`` pair describing the meter. The
-        denominator determines the beat unit used when evaluating
-        strong versus weak beats. Defaults to ``(4, 4)``.
-    pattern : List[float], optional
-        Rhythmic pattern expressed as fractions of a whole note. When
-        provided it is used to calculate the start beat of each note so
-        downbeats can be aligned with chord tones. If ``None``, a random
-        pattern is chosen.
-    base_octave : int, optional
-        Preferred octave for the melody. Notes typically remain within
-        ``base_octave`` to ``base_octave + 1`` with rare octave shifts at
-        phrase boundaries. Defaults to ``4``.
-
-    Returns
-    -------
-    List[str]
-        Generated melody as a list of note strings.
+    @param key (str): Musical key for the melody.
+    @param num_notes (int): Total number of notes to generate.
+    @param chord_progression (List[str]): Chords guiding note choice.
+    @param motif_length (int): Length of the initial motif.
+    @param time_signature (Tuple[int, int]): Meter as ``(numerator, denominator)``.
+    @param pattern (List[float]|None): Optional rhythmic pattern.
+    @param base_octave (int): Preferred starting octave.
+    @returns List[str]: Generated melody as note strings.
     """
     if num_notes < motif_length:
         raise ValueError("num_notes must be greater than or equal to motif_length")
@@ -699,6 +675,10 @@ def generate_harmony_line(melody: List[str], interval: int = 4) -> List[str]:
 
     The resulting line mirrors the rhythm of ``melody`` while remaining
     within the valid MIDI range.
+
+    @param melody (List[str]): Base melody to harmonize.
+    @param interval (int): Interval offset in semitones.
+    @returns List[str]: Harmony melody line.
     """
     harmony = []
     for note in melody:
@@ -718,6 +698,10 @@ def generate_counterpoint_melody(melody: List[str], key: str) -> List[str]:
 
     The line favours contrary motion and consonant intervals such as thirds,
     sixths, fifths and octaves.
+
+    @param melody (List[str]): Base melody to accompany.
+    @param key (str): Musical key for scale context.
+    @returns List[str]: Generated counterpoint line.
     """
     scale_notes = SCALE[key]
     counter: List[str] = []
@@ -769,17 +753,16 @@ def create_midi_file(
     either on a separate track (default) or on the melody track when
     ``chords_separate`` is ``False``.
 
-    Args:
-        melody: Sequence of note names representing the melody line.
-        bpm: Beats per minute.
-        time_signature: ``(numerator, denominator)`` pair.
-        output_file: Destination file path.
-        harmony: Include a simple harmony line.
-        pattern: Optional rhythmic pattern in fractions of a whole note.
-        extra_tracks: Additional melody lines written to their own tracks.
-        chord_progression: Chords to render as sustained blocks.
-        chords_separate: When ``True`` chords are written to a new track,
-            otherwise they are merged with the melody track.
+    @param melody (List[str]): Sequence of note names representing the melody.
+    @param bpm (int): Beats per minute.
+    @param time_signature (Tuple[int, int]): ``(numerator, denominator)`` pair.
+    @param output_file (str): Destination file path.
+    @param harmony (bool): Include a simple harmony line.
+    @param pattern (List[float]|None): Optional rhythmic pattern.
+    @param extra_tracks (List[List[str]]|None): Additional melody lines.
+    @param chord_progression (List[str]|None): Chords rendered as blocks.
+    @param chords_separate (bool): Write chords to a new track when ``True``.
+    @returns None: MIDI data is written to ``output_file``.
     """
     if time_signature[0] <= 0 or time_signature[1] <= 0:
         raise ValueError("time_signature elements must be greater than 0")
@@ -906,9 +889,9 @@ def run_cli() -> None:
     This is a thin wrapper around the core library functions that mirrors
     the options available in the GUI. It validates the provided arguments,
     invokes :func:`generate_melody` and finally writes the resulting MIDI
-    file using :func:`create_midi_file`. Invalid parameters cause the
-    process to exit with ``sys.exit`` so the calling shell can detect
-    failures.
+    file using :func:`create_midi_file`.
+
+    @returns None: Exits via ``sys.exit`` on failure.
     """
     parser = argparse.ArgumentParser(
         description="Generate a random melody and save as a MIDI file."
@@ -1012,8 +995,12 @@ def run_cli() -> None:
 
 
 def main() -> None:
-    """
-    Main entry point. Runs the CLI if arguments are provided; otherwise, launches the GUI.
+    """Application entry point.
+
+    Runs the CLI when command line arguments are present or launches the
+    Tkinter GUI otherwise.
+
+    @returns None: This function does not return.
     """
     # Configure logging only when executing the application directly
     logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')

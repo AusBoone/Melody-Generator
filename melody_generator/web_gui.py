@@ -58,9 +58,10 @@ def index():
     """Render the form and handle submissions.
 
     On ``GET`` the function simply renders the input form so the user can
-    specify parameters for the melody generation.  When the form is
-    submitted via ``POST`` a MIDI file is generated in memory and returned
-    to the browser for immediate playback.
+    specify parameters for the melody generation. When submitted via ``POST``
+    a MIDI file is generated in memory and returned to the browser.
+
+    @returns Response: Rendered template or audio playback page.
     """
 
     if request.method == 'POST':

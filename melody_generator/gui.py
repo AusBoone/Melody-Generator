@@ -42,6 +42,18 @@ class MelodyGeneratorGUI:
         delegate work to them. Optional callbacks are used for loading
         and saving user preferences as well as generating random chords
         or rhythms.
+
+        @param generate_melody: Function to create melodies.
+        @param create_midi_file: Function to write MIDI files.
+        @param scale: Mapping of keys to scale notes.
+        @param chords: Mapping of chord names to notes.
+        @param load_settings: Optional loader for saved preferences.
+        @param save_settings: Optional saver for user preferences.
+        @param random_chords_fn: Optional callback to pick chords.
+        @param random_rhythm_fn: Optional callback for rhythm patterns.
+        @param harmony_line_fn: Optional harmony generator.
+        @param counterpoint_fn: Optional counterpoint generator.
+        @returns None: GUI is prepared for display.
         """
         self.generate_melody = generate_melody
         self.create_midi_file = create_midi_file
@@ -65,7 +77,10 @@ class MelodyGeneratorGUI:
         self._apply_theme()
 
     def _setup_theme(self) -> None:
-        """Configure ttk theme and basic colors."""
+        """Configure ttk theme and basic colors.
+
+        @returns None: Theme information is stored on the instance.
+        """
         self.style = ttk.Style(self.root)
         try:
             self.style.theme_use("clam")
@@ -78,7 +93,10 @@ class MelodyGeneratorGUI:
         self._apply_theme()
 
     def _apply_theme(self) -> None:
-        """Apply styling based on ``self.dark_mode``."""
+        """Apply styling based on ``self.dark_mode``.
+
+        @returns None: Widgets are updated in place.
+        """
         if self.dark_mode:
             self.bg_color = "#2E1A47"
             fg = "white"
@@ -100,16 +118,27 @@ class MelodyGeneratorGUI:
                 self.chord_listbox.configure(bg="white", fg="black")
 
     def _toggle_theme(self) -> None:
-        """Switch between dark and light color schemes."""
+        """Switch between dark and light color schemes.
+
+        @returns None: Triggers a theme update.
+        """
         self.dark_mode = bool(self.theme_var.get())
         self._apply_theme()
 
     def _create_tooltip(self, widget: tk.Widget, text: str) -> None:
-        """Attach a simple tooltip to ``widget``."""
+        """Attach a simple tooltip to ``widget``.
+
+        @param widget: Tkinter widget that displays the tooltip.
+        @param text: Tooltip text.
+        @returns None: Event bindings are registered.
+        """
         tooltip: Optional[tk.Toplevel] = None
 
         def show(_event: tk.Event) -> None:
-            """Display the tooltip window next to the widget."""
+            """Display the tooltip window next to the widget.
+
+            @returns None: Tooltip window is created if needed.
+            """
 
             nonlocal tooltip
             if tooltip is not None:
@@ -122,7 +151,10 @@ class MelodyGeneratorGUI:
             ttk.Label(tooltip, text=text, background="yellow").pack(ipadx=2)
 
         def hide(_event: tk.Event) -> None:
-            """Remove the tooltip when the pointer leaves the widget."""
+            """Remove the tooltip when the pointer leaves the widget.
+
+            @returns None: Tooltip window is destroyed.
+            """
 
             nonlocal tooltip
             if tooltip is not None:
@@ -133,19 +165,34 @@ class MelodyGeneratorGUI:
         widget.bind("<Leave>", hide)
 
     def _update_bpm_label(self, value: str | int) -> None:
-        """Display the current BPM next to the slider."""
+        """Display the current BPM next to the slider.
+
+        @param value: Slider value to display.
+        @returns None: BPM label text is updated.
+        """
         self.bpm_label.config(text=str(int(float(value))))
 
     def _update_notes_label(self, value: str | int) -> None:
-        """Display the current number of notes next to the slider."""
+        """Display the current number of notes next to the slider.
+
+        @param value: Slider value to display.
+        @returns None: Notes label text is updated.
+        """
         self.notes_label.config(text=str(int(float(value))))
 
     def _update_octave_label(self, value: str | int) -> None:
-        """Display the base octave next to its slider."""
+        """Display the base octave next to its slider.
+
+        @param value: Slider value to display.
+        @returns None: Octave label text is updated.
+        """
         self.octave_label.config(text=str(int(float(value))))
 
     def _update_chord_list(self) -> None:
-        """Refresh the chord list based on the selected key."""
+        """Refresh the chord list based on the selected key.
+
+        @returns None: Listbox contents are replaced.
+        """
 
         chords = diatonic_chords(self.key_var.get())
         self.chord_listbox.delete(0, tk.END)
@@ -154,7 +201,10 @@ class MelodyGeneratorGUI:
             self.chord_listbox.insert(tk.END, chord)
 
     def _build_widgets(self) -> None:
-        """Create all GUI widgets and arrange them on the window."""
+        """Create all GUI widgets and arrange them on the window.
+
+        @returns None: Widgets are added to the Tk container.
+        """
         frame = ttk.Frame(self.root, padding=(10, 10))
         frame.grid(row=0, column=0)
 
@@ -394,7 +444,10 @@ class MelodyGeneratorGUI:
                 self.save_settings(self._collect_settings())
 
     def _preview_button_click(self) -> None:
-        """Play the generated melody in the default MIDI player."""
+        """Play the generated melody in the default MIDI player.
+
+        @returns None: Temporary MIDI file is created and played.
+        """
         key = self.key_var.get()
         selected_indices = self.chord_listbox.curselection()
         if not selected_indices:
@@ -477,7 +530,10 @@ class MelodyGeneratorGUI:
             messagebox.showerror("Preview Error", f"Could not open MIDI file: {exc}")
 
     def _randomize_chords(self) -> None:
-        """Select a random chord progression and apply it to the list box."""
+        """Select a random chord progression and apply it to the list box.
+
+        @returns None: List selection is updated with new chords.
+        """
         if self.random_chords_fn is None:
             return
         progression = self.random_chords_fn(self.key_var.get(), 4)
@@ -489,26 +545,38 @@ class MelodyGeneratorGUI:
                 self.chord_listbox.selection_set(idx)
 
     def _randomize_rhythm(self) -> None:
-        """Create a random rhythm pattern and store it for generation."""
+        """Create a random rhythm pattern and store it for generation.
+
+        @returns None: Pattern stored in ``self.rhythm_pattern``.
+        """
         if self.random_rhythm_fn is None:
             return
         # Store the newly generated pattern for use during MIDI export
         self.rhythm_pattern = self.random_rhythm_fn()
 
     def _load_preferences(self) -> None:
-        """Reload settings from disk and apply them to the widgets."""
+        """Reload settings from disk and apply them to the widgets.
+
+        @returns None: Widgets reflect persisted values.
+        """
         if self.load_settings is None:
             return
         self._apply_settings(self.load_settings())
 
     def run(self) -> None:
-        """Start the Tk event loop to display the window."""
+        """Start the Tk event loop to display the window.
+
+        @returns None: This method blocks until the window closes.
+        """
         # Hand control over to Tkinter so the application becomes interactive.
         # This call blocks until the window is closed.
         self.root.mainloop()
 
     def _collect_settings(self) -> Dict:
-        """Gather current widget values into a dictionary."""
+        """Gather current widget values into a dictionary.
+
+        @returns Dict: Settings suitable for persistence.
+        """
         # Persist any chords currently selected in the listbox
         chords = [self.chord_listbox.get(i) for i in self.chord_listbox.curselection()]
         return {
@@ -527,7 +595,11 @@ class MelodyGeneratorGUI:
         }
 
     def _apply_settings(self, settings: Dict) -> None:
-        """Set widget values based on ``settings`` dictionary."""
+        """Set widget values based on ``settings`` dictionary.
+
+        @param settings: Mapping of names to saved values.
+        @returns None: Widgets are updated accordingly.
+        """
         # Ignore empty dictionaries to avoid resetting controls unnecessarily
         if not settings:
             return
