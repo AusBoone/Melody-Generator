@@ -107,6 +107,8 @@ class MelodyGeneratorGUI:
             btn_bg = "#E0E0E0"
 
         self.root.configure(bg=self.bg_color)
+        # Apply colours to a small set of common widget classes so every part
+        # of the interface adopts the selected theme.
         for name in ("TFrame", "TLabel", "TCheckbutton"):
             self.style.configure(name, background=self.bg_color, foreground=fg)
         self.style.configure("TButton", background=btn_bg, foreground=fg)
@@ -197,6 +199,8 @@ class MelodyGeneratorGUI:
         chords = diatonic_chords(self.key_var.get())
         self.chord_listbox.delete(0, tk.END)
         self.sorted_chords = sorted(chords)
+        # Populate the list box one chord at a time so the user can select the
+        # desired progression.
         for chord in self.sorted_chords:
             self.chord_listbox.insert(tk.END, chord)
 
