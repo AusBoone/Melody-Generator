@@ -479,13 +479,21 @@ def generate_melody(
     @param base_octave (int): Preferred starting octave.
     @returns List[str]: Generated melody as note strings.
     """
+    # ``motif_length`` represents the number of notes in the initial idea that
+    # will be repeated.  It cannot exceed the total number of notes requested or
+    # the function would be unable to fill the melody.
     if num_notes < motif_length:
         raise ValueError("num_notes must be greater than or equal to motif_length")
 
     notes_in_key = SCALE[key]
+
+    # Choose a rhythmic pattern when the caller does not supply one.  The
+    # pattern cycles throughout the melody to give it an underlying pulse.
     if pattern is None:
         pattern = random.choice(PATTERNS)
 
+    # Validate the provided time signature so subsequent calculations never
+    # divide by zero or produce negative beat counts.
     if time_signature[0] <= 0 or time_signature[1] <= 0:
         raise ValueError("time_signature elements must be greater than 0")
     beat_unit = 1 / time_signature[1]
@@ -532,10 +540,13 @@ def generate_melody(
                 melody[j] = closest + octv
         start_beat += pattern[j % len(pattern)] / beat_unit
 
-    # Track the direction of the previous large leap so the next note can
-    # compensate by moving in the opposite direction.
+    # Track the direction of any large melodic leaps.  This information guides
+    # the next note so the line moves back toward the centre after a big jump.
     leap_dir: Optional[int] = None
 
+    # The overall contour rises during the first half of the melody and falls
+    # during the second half. ``half_point`` marks the boundary between these
+    # two sections.
     half_point = num_notes // 2
 
     for i in range(motif_length, num_notes):
@@ -708,25 +719,32 @@ def generate_counterpoint_melody(melody: List[str], key: str) -> List[str]:
     prev_note = None
     prev_base = None
     consonant = {3, 4, 7, 8, 9, 12}
+    # Examine each note of the melody in turn to build the accompanying line.
     for base_note in melody:
         base_midi = note_to_midi(base_note)
         candidates: List[str] = []
         # Gather consonant pitches around the current melody note so any chosen
         # note forms a pleasant interval when played together with ``base_note``.
         for n in scale_notes:
+            # Test potential companion notes across a small octave range so the
+            # counterpoint does not stray too far from the melody.
             for octave in range(3, 7):
                 cand = f"{n}{octave}"
                 interval = abs(note_to_midi(cand) - base_midi)
                 if interval in consonant:
                     candidates.append(cand)
+        # It is possible no candidate fits the consonant set; in that case
+        # simply mirror the melody note so the line never stalls.
         if not candidates:
             candidates.append(base_note)
         choice = random.choice(candidates)
         if prev_note and prev_base:
+            # Compare the motion of the melody and the tentative counterpoint
+            # note.  When both move in the same direction we look for an
+            # alternative that moves the opposite way to emphasise contrary
+            # motion.
             base_int = note_to_midi(base_note) - note_to_midi(prev_base)
             cand_int = note_to_midi(choice) - note_to_midi(prev_note)
-            # Prefer contrary motion by flipping direction if the voices are
-            # moving the same way relative to their previous notes.
             if base_int * cand_int > 0:
                 opposite = [c for c in candidates if (note_to_midi(c) - note_to_midi(prev_note)) * base_int < 0]
                 if opposite:
@@ -776,7 +794,8 @@ def create_midi_file(
         mid.tracks.append(harmony_track)
     extra_midi_tracks: List[MidiTrack] = []
     if extra_tracks:
-        # Pre-create MIDI tracks to mirror any additional melody lines
+        # Pre-create one MIDI track per extra melody line so that each
+        # additional voice remains isolated in the final file.
         for _ in extra_tracks:
             t = MidiTrack()
             mid.tracks.append(t)
@@ -834,6 +853,8 @@ def create_midi_file(
             h_off = Message('note_off', note=harmony_note, velocity=max(velocity - 10, 40), time=note_duration)
             harmony_track.append(h_on)
             harmony_track.append(h_off)
+        # Write notes for any additional melody lines in lockstep with the main
+        # melody. ``zip`` pairs each line with its dedicated MIDI track.
         for line, t in zip(extra_tracks or [], extra_midi_tracks):
             if i >= len(line):
                 continue
@@ -865,6 +886,8 @@ def create_midi_file(
         ticks_per_chord = time_signature[0] * ticks_per_beat
         total_ticks = int(total_beats * ticks_per_beat)
         num_chords = max(1, math.ceil(total_ticks / ticks_per_chord))
+        # Step through the chord progression, repeating as necessary to cover
+        # the entire melody.
         for i in range(num_chords):
             chord = chord_progression[i % len(chord_progression)]
             notes = CHORDS.get(chord, [])
@@ -876,7 +899,14 @@ def create_midi_file(
             delta = ticks_per_chord
             for idx, n in enumerate(notes):
                 note_num = note_to_midi(n + "3")
-                chord_track.append(Message('note_off', note=note_num, velocity=60, time=delta if idx == 0 else 0))
+                chord_track.append(
+                    Message(
+                        'note_off',
+                        note=note_num,
+                        velocity=60,
+                        time=delta if idx == 0 else 0,
+                    )
+                )
                 delta = 0
 
     # Write all tracks to disk
