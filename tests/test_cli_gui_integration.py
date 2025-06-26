@@ -709,15 +709,18 @@ def test_cli_play_flag_invokes_playback(monkeypatch, tmp_path):
     ]
 
     calls = {}
-    stub_play = types.SimpleNamespace(play_midi=lambda p: calls.setdefault("play", p))
+    stub_play = types.SimpleNamespace(
+        play_midi=lambda p, **kw: calls.setdefault("play", (p, kw.get("soundfont")))
+    )
     monkeypatch.setitem(sys.modules, "melody_generator.playback", stub_play)
+    monkeypatch.setattr(mod, "playback", stub_play, raising=False)
 
     old = sys.argv
     sys.argv = argv
     mod.run_cli()
     sys.argv = old
 
-    assert calls.get("play") == str(out)
+    assert calls.get("play") == (str(out), None)
 
 
 def test_cli_play_flag_falls_back(monkeypatch, tmp_path):
@@ -751,6 +754,7 @@ def test_cli_play_flag_falls_back(monkeypatch, tmp_path):
 
     stub_play = types.SimpleNamespace(play_midi=raise_err)
     monkeypatch.setitem(sys.modules, "melody_generator.playback", stub_play)
+    monkeypatch.setattr(mod, "playback", stub_play, raising=False)
     calls = {}
     monkeypatch.setattr(mod, "_open_default_player", lambda p: calls.setdefault("fallback", p))
 
@@ -760,3 +764,83 @@ def test_cli_play_flag_falls_back(monkeypatch, tmp_path):
     sys.argv = old
 
     assert calls.get("fallback") == str(out)
+
+
+def test_cli_soundfont_forwarded(monkeypatch, tmp_path):
+    """``--soundfont`` should be passed to ``playback.play_midi``."""
+
+    mod, _, _ = load_module()
+    out = tmp_path / "sf.mid"
+    argv = [
+        "prog",
+        "--key",
+        "C",
+        "--chords",
+        "C,G",
+        "--bpm",
+        "120",
+        "--timesig",
+        "4/4",
+        "--notes",
+        "4",
+        "--base-octave",
+        "4",
+        "--output",
+        str(out),
+        "--play",
+        "--soundfont",
+        "custom.sf2",
+    ]
+
+    calls = {}
+    stub_play = types.SimpleNamespace(
+        play_midi=lambda p, soundfont=None: calls.setdefault("args", (p, soundfont))
+    )
+    monkeypatch.setitem(sys.modules, "melody_generator.playback", stub_play)
+    monkeypatch.setattr(mod, "playback", stub_play, raising=False)
+
+    old = sys.argv
+    sys.argv = argv
+    mod.run_cli()
+    sys.argv = old
+
+    assert calls.get("args") == (str(out), "custom.sf2")
+
+
+def test_cli_soundfont_without_play(monkeypatch, tmp_path):
+    """Providing ``--soundfont`` alone should not invoke playback."""
+
+    mod, _, _ = load_module()
+    out = tmp_path / "sf.mid"
+    argv = [
+        "prog",
+        "--key",
+        "C",
+        "--chords",
+        "C,G",
+        "--bpm",
+        "120",
+        "--timesig",
+        "4/4",
+        "--notes",
+        "4",
+        "--base-octave",
+        "4",
+        "--output",
+        str(out),
+        "--soundfont",
+        "custom.sf2",
+    ]
+
+    calls = {}
+    stub_play = types.SimpleNamespace(play_midi=lambda *a, **k: calls.setdefault("called", True))
+    monkeypatch.setitem(sys.modules, "melody_generator.playback", stub_play)
+    monkeypatch.setattr(mod, "playback", stub_play, raising=False)
+
+    old = sys.argv
+    sys.argv = argv
+    mod.run_cli()
+    sys.argv = old
+
+    assert "called" not in calls
+    assert out.exists()
