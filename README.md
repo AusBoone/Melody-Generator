@@ -14,6 +14,9 @@ set them up manually with:
 ```bash
 pip install -r requirements.txt
 ```
+PyFluidSynth wraps the FluidSynth library which must be installed separately.
+Install the system package with `apt-get install fluidsynth` on Debian-based Linux or `brew install fluid-synth` on macOS.
+Without FluidSynth the preview button and web playback will fail.
 
 The tests stub out `mido`, `Flask` and `tkinter`, so they are not required to
 run the test suite, but they are necessary for real use.
