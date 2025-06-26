@@ -598,3 +598,83 @@ def test_preview_button_uses_playback(monkeypatch, tmp_path):
     gui._preview_button_click()
 
     assert "path" in calls
+
+
+def test_cli_play_flag_invokes_playback(monkeypatch, tmp_path):
+    """Providing ``--play`` should call ``playback.play_midi``."""
+
+    mod, _, _ = load_module()
+    out = tmp_path / "x.mid"
+    argv = [
+        "prog",
+        "--key",
+        "C",
+        "--chords",
+        "C,G",
+        "--bpm",
+        "120",
+        "--timesig",
+        "4/4",
+        "--notes",
+        "4",
+        "--motif_length",
+        "4",
+        "--base-octave",
+        "4",
+        "--output",
+        str(out),
+        "--play",
+    ]
+
+    calls = {}
+    stub_play = types.SimpleNamespace(play_midi=lambda p: calls.setdefault("play", p))
+    monkeypatch.setitem(sys.modules, "melody_generator.playback", stub_play)
+
+    old = sys.argv
+    sys.argv = argv
+    mod.run_cli()
+    sys.argv = old
+
+    assert calls.get("play") == str(out)
+
+
+def test_cli_play_flag_falls_back(monkeypatch, tmp_path):
+    """Errors during playback should use the system default player."""
+
+    mod, _, _ = load_module()
+    out = tmp_path / "y.mid"
+    argv = [
+        "prog",
+        "--key",
+        "C",
+        "--chords",
+        "C,G",
+        "--bpm",
+        "120",
+        "--timesig",
+        "4/4",
+        "--notes",
+        "4",
+        "--motif_length",
+        "4",
+        "--base-octave",
+        "4",
+        "--output",
+        str(out),
+        "--play",
+    ]
+
+    def raise_err(_p):
+        raise RuntimeError("boom")
+
+    stub_play = types.SimpleNamespace(play_midi=raise_err)
+    monkeypatch.setitem(sys.modules, "melody_generator.playback", stub_play)
+    calls = {}
+    monkeypatch.setattr(mod, "_open_default_player", lambda p: calls.setdefault("fallback", p))
+
+    old = sys.argv
+    sys.argv = argv
+    mod.run_cli()
+    sys.argv = old
+
+    assert calls.get("fallback") == str(out)
