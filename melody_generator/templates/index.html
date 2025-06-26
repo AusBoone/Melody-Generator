@@ -30,6 +30,10 @@
     Time Signature: <input name="timesig" value="4/4"><br>
     Number of notes: <input type="number" name="notes" value="16"><br>
     Base octave: <input type="number" name="base_octave" value="4"><br>
+    Instrument:
+    <select name="instrument">
+      {% for name in instruments %}<option value="{{name}}">{{name}}</option>{% endfor %}
+    </select><br>
     Motif length: <input type="number" name="motif_length" value="4"><br>
     <label><input type="checkbox" name="harmony" value="1"> Harmony</label><br>
     Counterpoint: <input type="checkbox" name="counterpoint" value="1"><br>

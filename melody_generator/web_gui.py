@@ -37,6 +37,14 @@ generate_random_rhythm_pattern = melody_generator.generate_random_rhythm_pattern
 generate_harmony_line = melody_generator.generate_harmony_line
 generate_counterpoint_melody = melody_generator.generate_counterpoint_melody
 
+INSTRUMENTS = {
+    "Piano": 0,
+    "Guitar": 24,
+    "Bass": 32,
+    "Violin": 40,
+    "Flute": 73,
+}
+
 # Create the Flask application instance and register templates and static files.
 app = Flask(__name__, template_folder="templates", static_folder="static")
 
@@ -70,13 +78,14 @@ def index():
         key = request.form.get('key') or 'C'
         if key not in SCALE:
             flash("Invalid key selected. Please choose a valid key.")
-            return render_template('index.html', scale=sorted(SCALE.keys()))
+            return render_template('index.html', scale=sorted(SCALE.keys()), instruments=INSTRUMENTS.keys())
 
         bpm = int(request.form.get('bpm') or 120)
         timesig = request.form.get('timesig') or '4/4'
         notes = int(request.form.get('notes') or 16)
         motif_length = int(request.form.get('motif_length') or 4)
         base_octave = int(request.form.get('base_octave') or 4)
+        instrument = request.form.get('instrument') or 'Piano'
         harmony = bool(request.form.get('harmony'))
         random_rhythm = bool(request.form.get('random_rhythm'))
         counterpoint = bool(request.form.get('counterpoint'))
@@ -97,7 +106,7 @@ def index():
             for chord in chords:
                 if chord not in CHORDS:
                     flash(f"Unknown chord: {chord}")
-                    return render_template('index.html', scale=sorted(SCALE.keys()))
+                    return render_template('index.html', scale=sorted(SCALE.keys()), instruments=INSTRUMENTS.keys())
 
         try:
             parts = timesig.split('/')
@@ -110,11 +119,11 @@ def index():
             flash(
                 "Time signature must be two integers in the form 'numerator/denominator' with numerator > 0 and denominator > 0."
             )
-            return render_template('index.html', scale=sorted(SCALE.keys()))
+            return render_template('index.html', scale=sorted(SCALE.keys()), instruments=INSTRUMENTS.keys())
 
         if motif_length > notes:
             flash("Motif length cannot exceed the number of notes.")
-            return render_template('index.html', scale=sorted(SCALE.keys()))
+            return render_template('index.html', scale=sorted(SCALE.keys()), instruments=INSTRUMENTS.keys())
         melody = generate_melody(
             key,
             notes,
@@ -153,6 +162,7 @@ def index():
             extra_tracks=extra,
             chord_progression=chords if include_chords else None,
             chords_separate=not chords_same,
+            program=INSTRUMENTS.get(instrument, 0),
         )
 
         # Read the generated MIDI data back into memory then delete the
@@ -165,7 +175,7 @@ def index():
 
     # On a normal GET request simply render the form so the user can
     # enter their parameters.
-    return render_template('index.html', scale=sorted(SCALE.keys()))
+    return render_template('index.html', scale=sorted(SCALE.keys()), instruments=INSTRUMENTS.keys())
 
 # Allow the module to be run directly with ``python web_gui.py``.
 # ``pragma: no cover`` keeps test coverage tools from complaining when

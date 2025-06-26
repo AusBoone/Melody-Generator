@@ -13,21 +13,40 @@ import random
 
 # Provide a minimal stub for the 'mido' module so the import succeeds
 stub_mido = types.ModuleType("mido")
-stub_mido.Message = lambda *args, **kwargs: None
+class DummyMessage:
+    """Lightweight MIDI message holding only relevant attributes."""
+
+    def __init__(self, type: str, **kwargs) -> None:
+        self.type = type
+        self.time = kwargs.get("time", 0)
+        self.note = kwargs.get("note")
+        self.velocity = kwargs.get("velocity")
+        self.program = kwargs.get("program")
+
+
 class DummyMidiFile:
-    """Minimal MidiFile stub that records tracks and save calls."""
+    """Minimal ``MidiFile`` stub that records tracks and save calls."""
+
     last_instance = None
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         self.tracks = []
         DummyMidiFile.last_instance = self
 
-    def save(self, _path):
+    def save(self, _path: str) -> None:
+        """Pretend to write MIDI data to ``_path``."""
+
         pass
 
+
+class DummyMidiTrack(list):
+    """Simple list subclass used to collect MIDI messages."""
+
+
+stub_mido.Message = DummyMessage
 stub_mido.MidiFile = DummyMidiFile
-stub_mido.MidiTrack = lambda *args, **kwargs: []
-stub_mido.MetaMessage = lambda *args, **kwargs: None
+stub_mido.MidiTrack = DummyMidiTrack
+stub_mido.MetaMessage = lambda *args, **kwargs: DummyMessage("meta", **kwargs)
 stub_mido.bpm2tempo = lambda bpm: bpm
 sys.modules.setdefault("mido", stub_mido)
 
@@ -224,8 +243,8 @@ def test_rest_values_in_pattern(tmp_path):
     )
     mid = DummyMidiFile.last_instance
     assert mid is not None
-    # Two meta messages plus one pair of events for each non-rest note
-    assert len(mid.tracks[0]) == 6
+    # Tempo, time signature, program change and one pair per non-rest note
+    assert len(mid.tracks[0]) == 7
 
 
 def test_progression_chords_exist():
@@ -323,3 +342,31 @@ def test_octave_shift_occurs(monkeypatch):
     )
     octs = [int(n[-1]) for n in mel]
     assert any(o > 5 for o in octs)
+
+
+def test_chord_duration_respects_time_signature(tmp_path, monkeypatch):
+    """Chord lengths should honor the time signature denominator.
+
+    A 6/8 measure consists of six eighth notes, so with eight eighth-note
+    melody events the chord track must contain two measures. The first
+    ``note_off`` message for the chord should therefore occur after 1440
+    ticks when the ``ticks_per_beat`` constant is 480.
+    """
+
+    monkeypatch.setitem(sys.modules, "mido", stub_mido)
+
+    melody = ["C4"] * 8
+    out = tmp_path / "ts.mid"
+    melody_generator.create_midi_file(
+        melody,
+        120,
+        (6, 8),
+        str(out),
+        pattern=[0.125],
+        chord_progression=["C"],
+    )
+
+    mid = melody_generator.mido.MidiFile.last_instance
+    chord_track = mid.tracks[1]
+    off_times = [m.time for m in chord_track if m.type == "note_off"]
+    assert off_times and off_times[0] == 1440

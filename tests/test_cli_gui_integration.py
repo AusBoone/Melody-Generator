@@ -219,6 +219,7 @@ def test_generate_button_click(tmp_path, monkeypatch):
     gui.notes_var = types.SimpleNamespace(get=lambda: 4)
     gui.motif_entry = types.SimpleNamespace(get=lambda: "2")
     gui.base_octave_var = types.SimpleNamespace(get=lambda: 5)
+    gui.instrument_var = types.SimpleNamespace(get=lambda: "Piano")
     gui.harmony_var = types.SimpleNamespace(get=lambda: True)
     gui.counterpoint_var = types.SimpleNamespace(get=lambda: True)
     gui.harmony_lines = types.SimpleNamespace(get=lambda: "1")
