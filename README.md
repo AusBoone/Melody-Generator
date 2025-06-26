@@ -18,6 +18,10 @@ PyFluidSynth wraps the FluidSynth library which must be installed separately.
 Install the system package with `apt-get install fluidsynth` on Debian-based Linux or `brew install fluid-synth` on macOS.
 Without FluidSynth the preview button and web playback will fail.
 
+Tkinter powers the GUI and may need to be installed manually, e.g. `apt-get install python3-tk` on Debian-derived systems.
+For audio playback a General MIDI soundfont such as the optional `fluid-soundfont-gm` package is recommended.
+On platforms without a prebuilt PyFluidSynth wheel you might also need the Fluidsynth development headers: `apt-get install libfluidsynth-dev`.
+
 The tests stub out `mido`, `Flask` and `tkinter`, so they are not required to
 run the test suite, but they are necessary for real use.
 
