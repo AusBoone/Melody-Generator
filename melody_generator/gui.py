@@ -16,6 +16,10 @@ import sys
 from tempfile import NamedTemporaryFile
 
 from . import diatonic_chords
+# ``MidiPlaybackError`` signals that preview playback failed within the
+# ``playback`` helper module. Catching it allows the GUI to fall back to the
+# system default player without masking unrelated errors.
+from .playback import MidiPlaybackError
 
 # Mapping of display names to General MIDI program numbers used by the
 # instrument selector. Only a small subset is provided for demonstration
@@ -554,9 +558,10 @@ class MelodyGeneratorGUI:
         try:
             from . import playback
             playback.play_midi(tmp_path)
-        except Exception:
-            # Fall back to the system registered MIDI player when FluidSynth
-            # is unavailable or fails to initialize.
+        except MidiPlaybackError:
+            # Playback errors are expected when FluidSynth is missing or fails
+            # to initialize. In that case fall back to the user's default MIDI
+            # player so preview still works.
             self._open_default_player(tmp_path)
 
     def _open_default_player(self, path: str) -> None:
