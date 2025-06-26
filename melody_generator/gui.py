@@ -486,9 +486,14 @@ class MelodyGeneratorGUI:
                 self.save_settings(self._collect_settings())
 
     def _preview_button_click(self) -> None:
-        """Play the generated melody in the default MIDI player.
+        """Generate and play a melody preview then clean up.
 
-        @returns None: Temporary MIDI file is created and played.
+        A temporary MIDI file is written and passed to the playback helper
+        module. Regardless of whether playback succeeds or falls back to the
+        system default player, the temporary file is removed afterward so it
+        doesn't accumulate on disk.
+
+        @returns None: The preview is played and temporary resources removed.
         """
         key = self.key_var.get()
         selected_indices = self.chord_listbox.curselection()
@@ -557,12 +562,20 @@ class MelodyGeneratorGUI:
         )
         try:
             from . import playback
-            playback.play_midi(tmp_path)
-        except MidiPlaybackError:
-            # Playback errors are expected when FluidSynth is missing or fails
-            # to initialize. In that case fall back to the user's default MIDI
-            # player so preview still works.
-            self._open_default_player(tmp_path)
+            try:
+                playback.play_midi(tmp_path)
+            except MidiPlaybackError:
+                # Playback errors are expected when FluidSynth is missing or
+                # fails to initialize. In that case fall back to the user's
+                # default MIDI player so preview still works.
+                self._open_default_player(tmp_path)
+        finally:
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                # Deletion failures aren't critical for preview playback and
+                # are ignored silently.
+                pass
 
     def _open_default_player(self, path: str) -> None:
         """Launch ``path`` in the user's default MIDI player."""
