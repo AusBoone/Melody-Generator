@@ -7,6 +7,7 @@ verify that invalid input is rejected and valid input renders correctly."""
 import importlib
 import sys
 import types
+from pathlib import Path
 import pytest
 
 pytest.importorskip("flask")
@@ -179,4 +180,31 @@ def test_include_chords_flag():
         },
     )
     assert resp.status_code == 200
+
+
+def test_successful_post_returns_audio(monkeypatch):
+    """Valid form submissions embed a WAV audio preview."""
+
+    client = app.test_client()
+
+    monkeypatch.setattr(web_gui, "create_midi_file", lambda *a, **k: None)
+    monkeypatch.setattr(
+        web_gui.playback,
+        "render_midi_to_wav",
+        lambda mid, wav, soundfont=None: Path(wav).write_bytes(b"wav"),
+    )
+
+    resp = client.post(
+        "/",
+        data={
+            "key": "C",
+            "chords": "C",
+            "bpm": "120",
+            "timesig": "4/4",
+            "notes": "1",
+            "motif_length": "1",
+            "base_octave": "4",
+        },
+    )
+    assert b"audio/wav" in resp.data
 

@@ -30,6 +30,7 @@ classifiers = [
 dependencies = [
     "mido==1.2.10",
     "Flask",
+    "pyfluidsynth",
 ]
 
 [project.urls]
