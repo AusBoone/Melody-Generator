@@ -15,6 +15,7 @@ from tempfile import NamedTemporaryFile
 from typing import List
 
 from melody_generator import playback
+from melody_generator.playback import MidiPlaybackError
 
 from flask import Flask, render_template, request, flash
 import base64
@@ -177,7 +178,10 @@ def index():
 
         try:
             playback.render_midi_to_wav(tmp_path, wav_path)
-        except Exception:
+        except MidiPlaybackError:
+            # Rendering failures occur when FluidSynth or a compatible soundfont
+            # is unavailable. In that scenario the browser will receive the MIDI
+            # data without a WAV preview.
             wav_data = None
         else:
             with open(wav_path, 'rb') as fh:

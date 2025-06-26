@@ -600,6 +600,47 @@ def test_preview_button_uses_playback(monkeypatch, tmp_path):
     assert "path" in calls
 
 
+def test_preview_button_falls_back(monkeypatch, tmp_path):
+    """Playback errors should trigger the fallback player."""
+
+    mod, gui_mod, _ = load_module()
+
+    gui = gui_mod.MelodyGeneratorGUI.__new__(gui_mod.MelodyGeneratorGUI)
+    gui.generate_melody = lambda *a, **k: ["C4"] * 4
+    gui.create_midi_file = lambda *a, **k: Path(a[3]).write_text("midi")
+    gui.harmony_line_fn = None
+    gui.counterpoint_fn = None
+    gui.save_settings = None
+    gui.rhythm_pattern = None
+    gui.key_var = types.SimpleNamespace(get=lambda: "C")
+    gui.bpm_var = types.SimpleNamespace(get=lambda: 120)
+    gui.timesig_var = types.SimpleNamespace(get=lambda: "4/4")
+    gui.notes_var = types.SimpleNamespace(get=lambda: 4)
+    gui.motif_entry = types.SimpleNamespace(get=lambda: "2")
+    gui.base_octave_var = types.SimpleNamespace(get=lambda: 4)
+    gui.instrument_var = types.SimpleNamespace(get=lambda: "Piano")
+    gui.harmony_var = types.SimpleNamespace(get=lambda: False)
+    gui.counterpoint_var = types.SimpleNamespace(get=lambda: False)
+    gui.harmony_lines = types.SimpleNamespace(get=lambda: "0")
+    gui.include_chords_var = types.SimpleNamespace(get=lambda: False)
+    gui.chords_same_var = types.SimpleNamespace(get=lambda: False)
+    gui.chord_listbox = types.SimpleNamespace(
+        curselection=lambda: (0,), get=lambda idx: "C"
+    )
+
+    def raise_err(_p):
+        raise gui_mod.MidiPlaybackError("boom")
+
+    stub_play = types.SimpleNamespace(play_midi=raise_err)
+    monkeypatch.setitem(sys.modules, "melody_generator.playback", stub_play)
+    calls = {}
+    monkeypatch.setattr(gui, "_open_default_player", lambda p: calls.setdefault("fallback", p))
+
+    gui._preview_button_click()
+
+    assert "fallback" in calls
+
+
 def test_cli_play_flag_invokes_playback(monkeypatch, tmp_path):
     """Providing ``--play`` should call ``playback.play_midi``."""
 
