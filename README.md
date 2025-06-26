@@ -66,6 +66,7 @@ melody-generator \
 
 This command creates `song.mid` with one harmony line and an additional counterpoint track.
 The `--instrument` option selects the General MIDI program number used for the melody.
+Use `--play` to automatically preview the file once it is written.
 
 ### GUI
 
@@ -129,6 +130,8 @@ When running from the command line you can supply optional flags:
 - `--harmony-lines N` creates `N` additional harmony parts.
 - `--counterpoint` generates a contrapuntal line based on the melody.
 - `--base-octave N` sets the starting octave of the melody (default: 4).
+- `--play` previews the resulting MIDI file using FluidSynth when available and
+  falls back to the system player otherwise.
 
 ## Development
 

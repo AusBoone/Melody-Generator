@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import List, Tuple, Optional
 import os
 import math
+import subprocess
 
 # Default path for storing user preferences
 # The file lives in the user's home directory so settings persist
@@ -921,6 +922,27 @@ def create_midi_file(
     mid.save(output_file)
     logging.info(f"MIDI file saved to {output_file}")
 
+
+def _open_default_player(path: str) -> None:
+    """Launch ``path`` using the operating system's default MIDI player."""
+
+    try:
+        player = os.environ.get("MELODY_PLAYER")
+        if sys.platform.startswith("win"):
+            if player:
+                subprocess.Popen([player, path])
+            else:
+                os.startfile(path)  # type: ignore[attr-defined]
+        elif sys.platform == "darwin":
+            if player:
+                subprocess.Popen(["open", "-a", player, path])
+            else:
+                subprocess.Popen(["open", path])
+        else:
+            subprocess.Popen(["xdg-open", path])
+    except Exception as exc:  # pragma: no cover - platform dependent
+        logging.error("Could not open MIDI file: %s", exc)
+
 def run_cli() -> None:
     """Parse command line arguments and generate a melody.
 
@@ -955,6 +977,8 @@ def run_cli() -> None:
                         help='Write chords on the melody track instead of a new one')
     parser.add_argument('--instrument', type=int, default=0,
                         help='MIDI program number for the melody instrument')
+    parser.add_argument('--play', action='store_true',
+                        help='Play the MIDI file after it is created')
     # Parse the provided CLI arguments
     args = parser.parse_args()
 
@@ -1032,6 +1056,12 @@ def run_cli() -> None:
         chords_separate=not args.chords_same_track,
         program=args.instrument,
     )
+    if args.play:
+        try:
+            from . import playback
+            playback.play_midi(args.output)
+        except Exception:
+            _open_default_player(args.output)
     logging.info("Melody generation complete.")
 
 
