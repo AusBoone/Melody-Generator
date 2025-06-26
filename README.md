@@ -52,11 +52,13 @@ melody-generator \
   --bpm 120 \
   --timesig 4/4 \
   --notes 16 \
+  --instrument 0 \
   --output song.mid \
   --harmony --counterpoint --harmony-lines 1
 ```
 
 This command creates `song.mid` with one harmony line and an additional counterpoint track.
+The `--instrument` option selects the General MIDI program number used for the melody.
 
 ### GUI
 

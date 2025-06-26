@@ -764,6 +764,7 @@ def create_midi_file(
     extra_tracks: Optional[List[List[str]]] = None,
     chord_progression: Optional[List[str]] = None,
     chords_separate: bool = True,
+    program: int = 0,
 ) -> None:
     """Create a MIDI file for the given melody and optional chord progression.
 
@@ -780,6 +781,7 @@ def create_midi_file(
     @param extra_tracks (List[List[str]]|None): Additional melody lines.
     @param chord_progression (List[str]|None): Chords rendered as blocks.
     @param chords_separate (bool): Write chords to a new track when ``True``.
+    @param program (int): General MIDI instrument program for the melody.
     @returns None: MIDI data is written to ``output_file``.
     """
     if time_signature[0] <= 0 or time_signature[1] <= 0:
@@ -809,7 +811,12 @@ def create_midi_file(
 
     # Set tempo and time signature.
     track.append(mido.MetaMessage('set_tempo', tempo=mido.bpm2tempo(bpm)))
-    track.append(mido.MetaMessage('time_signature', numerator=time_signature[0], denominator=time_signature[1]))
+    track.append(
+        mido.MetaMessage(
+            'time_signature', numerator=time_signature[0], denominator=time_signature[1]
+        )
+    )
+    track.append(Message('program_change', program=program, time=0))
 
     # Select a rhythmic pattern and compute the duration of a whole note in ticks.
     if pattern is None:
@@ -820,7 +827,7 @@ def create_midi_file(
     whole_note_ticks = ticks_per_beat * 4
     beat_fraction = 1 / time_signature[1]
     beat_ticks = int(beat_fraction * whole_note_ticks)
-    beats_per_segment = time_signature[0] * 4
+    beats_per_segment = time_signature[0]
     beats_elapsed = 0
     rest_ticks = 0
     last_note = None
@@ -883,8 +890,9 @@ def create_midi_file(
             beats_elapsed = 0
 
     if chord_track is not None:
-        ticks_per_chord = time_signature[0] * ticks_per_beat
-        total_ticks = int(total_beats * ticks_per_beat)
+        ticks_per_measure = int(time_signature[0] * ticks_per_beat * (4 / time_signature[1]))
+        ticks_per_chord = ticks_per_measure
+        total_ticks = int(total_beats * ticks_per_beat * (4 / time_signature[1]))
         num_chords = max(1, math.ceil(total_ticks / ticks_per_chord))
         # Step through the chord progression, repeating as necessary to cover
         # the entire melody.
@@ -945,6 +953,8 @@ def run_cli() -> None:
                         help='Add the chord progression to the MIDI output')
     parser.add_argument('--chords-same-track', action='store_true',
                         help='Write chords on the melody track instead of a new one')
+    parser.add_argument('--instrument', type=int, default=0,
+                        help='MIDI program number for the melody instrument')
     # Parse the provided CLI arguments
     args = parser.parse_args()
 
@@ -1020,6 +1030,7 @@ def run_cli() -> None:
         extra_tracks=extra,
         chord_progression=chord_progression if args.include_chords else None,
         chords_separate=not args.chords_same_track,
+        program=args.instrument,
     )
     logging.info("Melody generation complete.")
 
