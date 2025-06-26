@@ -7,13 +7,13 @@
 </head>
 <body>
   <h1>Your Melody</h1>
-  <!-- Embedded player previews the generated MIDI file -->
+  <!-- Embedded player previews the generated audio file -->
   <audio controls autoplay>
-    <source src="data:audio/midi;base64,{{ data }}" type="audio/midi">
+    <source src="data:audio/wav;base64,{{ audio }}" type="audio/wav">
     Your browser does not support the audio tag.
   </audio>
   <!-- Download link for saving the MIDI file locally -->
-  <p><a download="melody.mid" href="data:audio/midi;base64,{{ data }}">Download MIDI</a></p>
+  <p><a download="melody.mid" href="data:audio/midi;base64,{{ midi }}">Download MIDI</a></p>
   <!-- Link back to the generator form -->
   <p><a href="/">Generate another</a></p>
 </body>

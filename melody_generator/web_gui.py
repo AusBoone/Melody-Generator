@@ -11,9 +11,10 @@ directly from their browser.
 from __future__ import annotations
 
 from importlib import import_module
-import io
 from tempfile import NamedTemporaryFile
 from typing import List
+
+from melody_generator import playback
 
 from flask import Flask, render_template, request, flash
 import base64
@@ -165,13 +166,32 @@ def index():
             program=INSTRUMENTS.get(instrument, 0),
         )
 
-        # Read the generated MIDI data back into memory then delete the
-        # temporary file.
+        # Render the MIDI file to WAV so browsers without native MIDI support
+        # can still play the result. The original MIDI is also offered as a
+        # download link.
+        wav_tmp = NamedTemporaryFile(suffix='.wav', delete=False)
+        try:
+            wav_path = wav_tmp.name
+        finally:
+            wav_tmp.close()
+
+        try:
+            playback.render_midi_to_wav(tmp_path, wav_path)
+        except Exception:
+            wav_data = None
+        else:
+            with open(wav_path, 'rb') as fh:
+                wav_data = fh.read()
+        finally:
+            if os.path.exists(wav_path):
+                os.remove(wav_path)
+
         with open(tmp_path, 'rb') as fh:
-            data = io.BytesIO(fh.read())
+            midi_bytes = fh.read()
         os.remove(tmp_path)
-        encoded = base64.b64encode(data.getvalue()).decode('ascii')
-        return render_template('play.html', data=encoded)
+        audio_encoded = base64.b64encode(wav_data).decode('ascii') if wav_data else ''
+        midi_encoded = base64.b64encode(midi_bytes).decode('ascii')
+        return render_template('play.html', audio=audio_encoded, midi=midi_encoded)
 
     # On a normal GET request simply render the form so the user can
     # enter their parameters.

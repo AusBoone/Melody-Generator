@@ -552,20 +552,31 @@ class MelodyGeneratorGUI:
             program=INSTRUMENTS.get(self.instrument_var.get(), 0),
         )
         try:
+            from . import playback
+            playback.play_midi(tmp_path)
+        except Exception:
+            # Fall back to the system registered MIDI player when FluidSynth
+            # is unavailable or fails to initialize.
+            self._open_default_player(tmp_path)
+
+    def _open_default_player(self, path: str) -> None:
+        """Launch ``path`` in the user's default MIDI player."""
+
+        try:
             player = os.environ.get("MELODY_PLAYER")
             if sys.platform.startswith("win"):
                 if player:
-                    subprocess.Popen([player, tmp_path])
+                    subprocess.Popen([player, path])
                 else:
-                    os.startfile(tmp_path)  # type: ignore[attr-defined]
+                    os.startfile(path)  # type: ignore[attr-defined]
             elif sys.platform == "darwin":
                 if player:
-                    subprocess.Popen(["open", "-a", player, tmp_path])
+                    subprocess.Popen(["open", "-a", player, path])
                 else:
-                    subprocess.Popen(["open", tmp_path])
+                    subprocess.Popen(["open", path])
             else:
-                subprocess.Popen(["xdg-open", tmp_path])
-        except Exception as exc:
+                subprocess.Popen(["xdg-open", path])
+        except Exception as exc:  # pragma: no cover - platform dependent
             messagebox.showerror("Preview Error", f"Could not open MIDI file: {exc}")
 
     def _randomize_chords(self) -> None:

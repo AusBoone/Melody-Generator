@@ -36,6 +36,10 @@ can choose to save your current selections after generating a melody.
 You can override the location by setting the `MELODY_SETTINGS_FILE` environment
 variable before starting the application.
 Set the `MELODY_PLAYER` environment variable to a MIDI-capable application if the default player cannot handle `.mid` files. For example, `export MELODY_PLAYER=Music` on macOS or `set MELODY_PLAYER="C:\\Program Files\\Windows Media Player\\wmplayer.exe"` on Windows. The GUI's preview feature will then open files in that player instead of the system default.
+Set `SOUND_FONT` to the path of a SoundFont file (``.sf2``) to enable the built-in
+FluidSynth playback used by the GUI and web interface. If not provided the
+application tries a common system location such as
+``/usr/share/sounds/sf2/TimGM6mb.sf2``.
 
 # Usage
 
@@ -159,7 +163,8 @@ alternative container runtime such as Podman.
 - Dynamic velocity in the MIDI output for a more natural sound.
 - GUI button to reload saved preferences at any time.
 - GUI can preview the generated melody before saving.
-- Web interface now previews the generated MIDI using an inline player.
+- Web interface now previews the generated melody using a WAV rendering
+  created with FluidSynth.
 - Harmony and counterpoint tracks for multi-line melodies.
 - Optional base octave parameter to constrain the melody's register with
   occasional octave shifts.
