@@ -951,6 +951,9 @@ def run_cli() -> None:
     invokes :func:`generate_melody` and finally writes the resulting MIDI
     file using :func:`create_midi_file`.
 
+    The ``--soundfont`` argument allows supplying a custom ``.sf2`` file
+    used when previewing the result via ``--play``.
+
     @returns None: Exits via ``sys.exit`` on failure.
     """
     parser = argparse.ArgumentParser(
@@ -977,6 +980,9 @@ def run_cli() -> None:
                         help='Write chords on the melody track instead of a new one')
     parser.add_argument('--instrument', type=int, default=0,
                         help='MIDI program number for the melody instrument')
+    parser.add_argument('--soundfont', type=str,
+                        help='Path to a SoundFont (.sf2) file used when '\
+                             'previewing with --play')
     parser.add_argument('--play', action='store_true',
                         help='Play the MIDI file after it is created')
     # Parse the provided CLI arguments
@@ -1059,7 +1065,7 @@ def run_cli() -> None:
     if args.play:
         try:
             from . import playback
-            playback.play_midi(args.output)
+            playback.play_midi(args.output, soundfont=args.soundfont)
         except Exception:
             _open_default_player(args.output)
     logging.info("Melody generation complete.")

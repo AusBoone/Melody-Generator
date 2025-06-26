@@ -64,6 +64,7 @@ melody-generator \
   --timesig 4/4 \
   --notes 16 \
   --instrument 0 \
+  --soundfont /path/to/font.sf2 \
   --output song.mid \
   --harmony --counterpoint --harmony-lines 1
 ```
@@ -136,6 +137,8 @@ When running from the command line you can supply optional flags:
 - `--base-octave N` sets the starting octave of the melody (default: 4).
 - `--play` previews the resulting MIDI file using FluidSynth when available and
   falls back to the system player otherwise.
+- `--soundfont PATH` uses the specified SoundFont when playing the file with
+  `--play`.
 
 ## Development
 
