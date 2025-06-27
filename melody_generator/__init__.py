@@ -14,6 +14,16 @@ Modified: February 15, 2025
 
 __version__ = "0.1.0"
 
+# ---------------------------------------------------------------
+# Modification Summary
+# ---------------------------------------------------------------
+# * Added ``_open_default_player`` thread-based implementation that waits
+#   for the system MIDI player before optionally deleting the file.
+#   This prevents race conditions when previewing MIDI files on platforms
+#   like macOS where the previous asynchronous approach removed the file
+#   too early.
+# ---------------------------------------------------------------
+
 import mido
 from mido import Message, MidiFile, MidiTrack
 import random
@@ -27,6 +37,7 @@ from typing import List, Tuple, Optional
 import os
 import math
 import subprocess
+import threading
 
 # Default path for storing user preferences
 # The file lives in the user's home directory so settings persist
@@ -923,25 +934,53 @@ def create_midi_file(
     logging.info(f"MIDI file saved to {output_file}")
 
 
-def _open_default_player(path: str) -> None:
-    """Launch ``path`` using the operating system's default MIDI player."""
+def _open_default_player(path: str, *, delete_after: bool = False) -> None:
+    """Open ``path`` with the OS default MIDI player.
 
-    try:
-        player = os.environ.get("MELODY_PLAYER")
-        if sys.platform.startswith("win"):
-            if player:
-                subprocess.Popen([player, path])
+    The command runs in a background thread so the caller does not block.
+    When ``delete_after`` is ``True`` the file is removed once the player
+    command has finished launching. This is useful for preview files that
+    should not persist on disk.
+    """
+
+    def runner() -> None:
+        """Execute the player command and optionally delete ``path``."""
+        try:
+            player = os.environ.get("MELODY_PLAYER")
+            if sys.platform.startswith("win"):
+                if player:
+                    cmd = [player, path]
+                    subprocess.run(cmd, check=False)
+                else:
+                    # ``start`` returns immediately unless ``/wait`` is used.
+                    subprocess.run([
+                        "cmd",
+                        "/c",
+                        "start",
+                        "/wait",
+                        "",
+                        path,
+                    ], check=False)
+            elif sys.platform == "darwin":
+                if player:
+                    subprocess.run(["open", "-W", "-a", player, path], check=False)
+                else:
+                    subprocess.run(["open", "-W", path], check=False)
             else:
-                os.startfile(path)  # type: ignore[attr-defined]
-        elif sys.platform == "darwin":
-            if player:
-                subprocess.Popen(["open", "-a", player, path])
-            else:
-                subprocess.Popen(["open", path])
-        else:
-            subprocess.Popen(["xdg-open", path])
-    except Exception as exc:  # pragma: no cover - platform dependent
-        logging.error("Could not open MIDI file: %s", exc)
+                if player:
+                    subprocess.run([player, path], check=False)
+                else:
+                    subprocess.run(["xdg-open", path], check=False)
+        except Exception as exc:  # pragma: no cover - platform dependent
+            logging.error("Could not open MIDI file: %s", exc)
+        finally:
+            if delete_after:
+                try:
+                    os.remove(path)
+                except OSError:
+                    pass
+
+    threading.Thread(target=runner, daemon=True).start()
 
 def run_cli() -> None:
     """Parse command line arguments and generate a melody.

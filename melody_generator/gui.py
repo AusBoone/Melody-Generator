@@ -5,6 +5,15 @@ core melody functions that exposes them through a simple Tkinter interface.
 All user interaction and validation logic lives here while the heavy lifting
 is delegated to :mod:`melody_generator`.
 """
+
+# ---------------------------------------------------------------
+# Modification Summary
+# ---------------------------------------------------------------
+# * ``_open_default_player`` now runs the system player via ``subprocess.run``
+#   inside a daemon thread and optionally removes the file when done.
+#   ``_preview_button_click`` was updated to rely on this logic, preventing
+#   premature deletion of the preview MIDI file when FluidSynth is missing.
+# ---------------------------------------------------------------
 from __future__ import annotations
 
 import tkinter as tk
@@ -13,6 +22,7 @@ from typing import Callable, List, Tuple, Dict, Optional
 import os
 import subprocess
 import sys
+import threading
 from tempfile import NamedTemporaryFile
 
 from . import diatonic_chords
@@ -578,42 +588,69 @@ class MelodyGeneratorGUI:
             chords_separate=not self.chords_same_var.get(),
             program=INSTRUMENTS.get(self.instrument_var.get(), 0),
         )
+        playback_succeeded = False
         try:
             from . import playback
             try:
                 playback.play_midi(tmp_path, soundfont=self.soundfont_var.get() or None)
+                playback_succeeded = True
             except MidiPlaybackError:
                 # Playback errors are expected when FluidSynth is missing or
                 # fails to initialize. In that case fall back to the user's
                 # default MIDI player so preview still works.
-                self._open_default_player(tmp_path)
+                self._open_default_player(tmp_path, delete_after=True)
         finally:
+            if playback_succeeded:
+                try:
+                    os.remove(tmp_path)
+                except OSError:
+                    # Deletion failures aren't critical for preview playback and
+                    # are ignored silently.
+                    pass
+
+    def _open_default_player(self, path: str, *, delete_after: bool = False) -> None:
+        """Launch ``path`` in the user's default MIDI player.
+
+        The player is executed in a daemon thread so the GUI stays responsive.
+        When ``delete_after`` is ``True`` the file is removed after the player
+        command exits. This is primarily used for temporary preview files.
+        """
+
+        def runner() -> None:
             try:
-                os.remove(tmp_path)
-            except OSError:
-                # Deletion failures aren't critical for preview playback and
-                # are ignored silently.
-                pass
-
-    def _open_default_player(self, path: str) -> None:
-        """Launch ``path`` in the user's default MIDI player."""
-
-        try:
-            player = os.environ.get("MELODY_PLAYER")
-            if sys.platform.startswith("win"):
-                if player:
-                    subprocess.Popen([player, path])
+                player = os.environ.get("MELODY_PLAYER")
+                if sys.platform.startswith("win"):
+                    if player:
+                        subprocess.run([player, path], check=False)
+                    else:
+                        subprocess.run([
+                            "cmd",
+                            "/c",
+                            "start",
+                            "/wait",
+                            "",
+                            path,
+                        ], check=False)
+                elif sys.platform == "darwin":
+                    if player:
+                        subprocess.run(["open", "-W", "-a", player, path], check=False)
+                    else:
+                        subprocess.run(["open", "-W", path], check=False)
                 else:
-                    os.startfile(path)  # type: ignore[attr-defined]
-            elif sys.platform == "darwin":
-                if player:
-                    subprocess.Popen(["open", "-a", player, path])
-                else:
-                    subprocess.Popen(["open", path])
-            else:
-                subprocess.Popen(["xdg-open", path])
-        except Exception as exc:  # pragma: no cover - platform dependent
-            messagebox.showerror("Preview Error", f"Could not open MIDI file: {exc}")
+                    if player:
+                        subprocess.run([player, path], check=False)
+                    else:
+                        subprocess.run(["xdg-open", path], check=False)
+            except Exception as exc:  # pragma: no cover - platform dependent
+                messagebox.showerror("Preview Error", f"Could not open MIDI file: {exc}")
+            finally:
+                if delete_after:
+                    try:
+                        os.remove(path)
+                    except OSError:
+                        pass
+
+        threading.Thread(target=runner, daemon=True).start()
 
     def _browse_soundfont(self) -> None:
         """Select a SoundFont ``.sf2`` file and store the path."""
