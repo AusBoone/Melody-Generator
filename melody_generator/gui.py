@@ -30,6 +30,7 @@ import threading
 from tempfile import NamedTemporaryFile
 
 from . import diatonic_chords
+
 # ``MidiPlaybackError`` signals that preview playback failed within the
 # ``playback`` helper module. Catching it allows the GUI to fall back to the
 # system default player without masking unrelated errors.
@@ -45,6 +46,7 @@ INSTRUMENTS = {
     "Violin": 40,
     "Flute": 73,
 }
+
 
 class MelodyGeneratorGUI:
     """Tkinter-based GUI for melody generation."""
@@ -255,11 +257,14 @@ class MelodyGeneratorGUI:
         """Indicate whether preview playback can function."""
         try:
             from . import playback
+
             playback._resolve_soundfont(self.soundfont_var.get() or None)
         except Exception:
             self.preview_available = False
             if hasattr(self, "preview_notice"):
-                self.preview_notice.config(text="Preview requires FluidSynth and a SoundFont")
+                self.preview_notice.config(
+                    text="Preview requires FluidSynth and a SoundFont"
+                )
         else:
             self.preview_available = True
             if hasattr(self, "preview_notice"):
@@ -277,15 +282,22 @@ class MelodyGeneratorGUI:
         ttk.Label(frame, text="Key:").grid(row=0, column=0, sticky="w")
         self.key_var = tk.StringVar()
         key_combobox = ttk.Combobox(
-            frame, textvariable=self.key_var, values=list(self.scale.keys()), state="readonly"
+            frame,
+            textvariable=self.key_var,
+            values=list(self.scale.keys()),
+            state="readonly",
         )
         key_combobox.grid(row=0, column=1)
         key_combobox.current(0)
         key_combobox.bind("<<ComboboxSelected>>", lambda _e: self._update_chord_list())
 
         # Chord progression listbox
-        ttk.Label(frame, text="Chord Progression (Select multiple):").grid(row=1, column=0, sticky="w")
-        self.chord_listbox = tk.Listbox(frame, selectmode=tk.MULTIPLE, height=10, bg="white")
+        ttk.Label(frame, text="Chord Progression (Select multiple):").grid(
+            row=1, column=0, sticky="w"
+        )
+        self.chord_listbox = tk.Listbox(
+            frame, selectmode=tk.MULTIPLE, height=10, bg="white"
+        )
         self._update_chord_list()
         self.chord_listbox.grid(row=1, column=1)
 
@@ -364,7 +376,9 @@ class MelodyGeneratorGUI:
         # SoundFont selection path used by FluidSynth
         ttk.Label(frame, text="SoundFont:").grid(row=7, column=0, sticky="w")
         self.soundfont_var = tk.StringVar(value=os.environ.get("SOUND_FONT", ""))
-        self.soundfont_entry = ttk.Entry(frame, textvariable=self.soundfont_var, width=25)
+        self.soundfont_entry = ttk.Entry(
+            frame, textvariable=self.soundfont_var, width=25
+        )
         self.soundfont_entry.grid(row=7, column=1)
         ttk.Button(
             frame,
@@ -466,7 +480,9 @@ class MelodyGeneratorGUI:
         key = self.key_var.get()
         selected_indices = self.chord_listbox.curselection()
         if not selected_indices:
-            messagebox.showerror("Input Error", "Please select at least one chord for the progression.")
+            messagebox.showerror(
+                "Input Error", "Please select at least one chord for the progression."
+            )
             return
         # Build the chord progression from the selected listbox entries
         displays = [self.chord_listbox.get(i) for i in selected_indices]
@@ -481,24 +497,27 @@ class MelodyGeneratorGUI:
             if len(ts_parts) != 2:
                 raise ValueError
             numerator, denominator = map(int, ts_parts)
-            if numerator <= 0 or denominator <= 0:
+            if numerator <= 0 or denominator not in {1, 2, 4, 8, 16}:
                 raise ValueError
         except ValueError:
             # Show one error message for any invalid numeric input
             messagebox.showerror(
                 "Input Error",
-                "Ensure BPM, Number of Notes, and Motif Length are integers and Time Signature is formatted as 'numerator/denominator'.",
+                "Ensure BPM, Number of Notes, and Motif Length are integers and "
+                "Time Signature is formatted as 'numerator/denominator' with "
+                "denominator one of 1, 2, 4, 8 or 16.",
             )
             return
 
         if motif_length > notes_count:
             messagebox.showerror(
-                "Input Error",
-                "Motif length cannot exceed the number of notes."
+                "Input Error", "Motif length cannot exceed the number of notes."
             )
             return
 
-        output_file = filedialog.asksaveasfilename(defaultextension=".mid", filetypes=[("MIDI files", "*.mid")])
+        output_file = filedialog.asksaveasfilename(
+            defaultextension=".mid", filetypes=[("MIDI files", "*.mid")]
+        )
         if output_file:
             melody = self.generate_melody(
                 key,
@@ -527,7 +546,9 @@ class MelodyGeneratorGUI:
                 harmony=self.harmony_var.get(),
                 pattern=self.rhythm_pattern,
                 extra_tracks=extra,
-                chord_progression=chord_progression if self.include_chords_var.get() else None,
+                chord_progression=(
+                    chord_progression if self.include_chords_var.get() else None
+                ),
                 chords_separate=not self.chords_same_var.get(),
                 program=INSTRUMENTS.get(self.instrument_var.get(), 0),
             )
@@ -566,12 +587,14 @@ class MelodyGeneratorGUI:
             if len(ts_parts) != 2:
                 raise ValueError
             numerator, denominator = map(int, ts_parts)
-            if numerator <= 0 or denominator <= 0:
+            if numerator <= 0 or denominator not in {1, 2, 4, 8, 16}:
                 raise ValueError
         except ValueError:
             messagebox.showerror(
                 "Input Error",
-                "Ensure BPM, Number of Notes, and Motif Length are integers and Time Signature is formatted as 'numerator/denominator'.",
+                "Ensure BPM, Number of Notes, and Motif Length are integers and "
+                "Time Signature is formatted as 'numerator/denominator' with "
+                "denominator one of 1, 2, 4, 8 or 16.",
             )
             return
 
@@ -616,6 +639,7 @@ class MelodyGeneratorGUI:
         playback_succeeded = False
         try:
             from . import playback
+
             try:
                 playback.play_midi(tmp_path, soundfont=self.soundfont_var.get() or None)
                 playback_succeeded = True
@@ -648,14 +672,17 @@ class MelodyGeneratorGUI:
                     if player:
                         subprocess.run([player, path], check=False)
                     else:
-                        subprocess.run([
-                            "cmd",
-                            "/c",
-                            "start",
-                            "/wait",
-                            "",
-                            path,
-                        ], check=False)
+                        subprocess.run(
+                            [
+                                "cmd",
+                                "/c",
+                                "start",
+                                "/wait",
+                                "",
+                                path,
+                            ],
+                            check=False,
+                        )
                 elif sys.platform == "darwin":
                     if player:
                         subprocess.run(["open", "-W", "-a", player, path], check=False)
@@ -667,7 +694,9 @@ class MelodyGeneratorGUI:
                     else:
                         subprocess.run(["xdg-open", path], check=False)
             except Exception as exc:  # pragma: no cover - platform dependent
-                messagebox.showerror("Preview Error", f"Could not open MIDI file: {exc}")
+                messagebox.showerror(
+                    "Preview Error", f"Could not open MIDI file: {exc}"
+                )
             finally:
                 if delete_after:
                     try:
