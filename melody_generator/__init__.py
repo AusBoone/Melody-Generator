@@ -791,6 +791,12 @@ def generate_counterpoint_melody(melody: List[str], key: str) -> List[str]:
     @param key (str): Musical key for scale context.
     @returns List[str]: Generated counterpoint line.
     """
+    # Validate the key before attempting to index into ``SCALE`` so callers
+    # receive a clear error rather than ``KeyError`` when an unknown key is
+    # supplied.
+    if key not in SCALE:
+        raise ValueError(f"Unknown key '{key}'")
+
     scale_notes = SCALE[key]
     counter: List[str] = []
     prev_note = None
