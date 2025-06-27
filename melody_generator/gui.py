@@ -13,6 +13,10 @@ is delegated to :mod:`melody_generator`.
 #   inside a daemon thread and optionally removes the file when done.
 #   ``_preview_button_click`` was updated to rely on this logic, preventing
 #   premature deletion of the preview MIDI file when FluidSynth is missing.
+# * Numeric entries for motif length and harmony lines now use ``ttk.Spinbox``
+#   with range validation.
+# * ``_check_preview_available`` displays a notice when FluidSynth or a
+#   SoundFont is unavailable for preview playback.
 # ---------------------------------------------------------------
 from __future__ import annotations
 
@@ -111,6 +115,7 @@ class MelodyGeneratorGUI:
         self._build_widgets()
         # Apply theme again so newly created widgets inherit colors
         self._apply_theme()
+        self._check_preview_available()
 
     def _setup_theme(self) -> None:
         """Configure ttk theme and basic colors.
@@ -246,6 +251,20 @@ class MelodyGeneratorGUI:
             self.display_map[display] = chord
             self.chord_listbox.insert(tk.END, display)
 
+    def _check_preview_available(self) -> None:
+        """Indicate whether preview playback can function."""
+        try:
+            from . import playback
+            playback._resolve_soundfont(self.soundfont_var.get() or None)
+        except Exception:
+            self.preview_available = False
+            if hasattr(self, "preview_notice"):
+                self.preview_notice.config(text="Preview requires FluidSynth and a SoundFont")
+        else:
+            self.preview_available = True
+            if hasattr(self, "preview_notice"):
+                self.preview_notice.config(text="")
+
     def _build_widgets(self) -> None:
         """Create all GUI widgets and arrange them on the window.
 
@@ -354,10 +373,10 @@ class MelodyGeneratorGUI:
         ).grid(row=7, column=2, padx=(5, 0))
         # Motif length entry
         ttk.Label(frame, text="Motif Length:").grid(row=8, column=0, sticky="w")
-        self.motif_entry = ttk.Entry(frame)
+        self.motif_entry = ttk.Spinbox(frame, from_=1, to=32, width=5)
         self.motif_entry.grid(row=8, column=1)
         self._create_tooltip(self.motif_entry, "Length of repeating motif")
-        self.motif_entry.insert(0, "4")
+        self.motif_entry.set(4)
 
         # Harmony checkbox
         self.harmony_var = tk.BooleanVar(value=False)
@@ -375,8 +394,8 @@ class MelodyGeneratorGUI:
         ).grid(row=10, column=0, columnspan=2)
 
         ttk.Label(frame, text="Harmony Lines:").grid(row=11, column=0, sticky="w")
-        self.harmony_lines = tk.Entry(frame)
-        self.harmony_lines.insert(0, "0")
+        self.harmony_lines = ttk.Spinbox(frame, from_=0, to=4, width=5)
+        self.harmony_lines.set(0)
         self.harmony_lines.grid(row=11, column=1)
 
         self.include_chords_var = tk.BooleanVar(value=False)
@@ -416,6 +435,12 @@ class MelodyGeneratorGUI:
             text="Preview Melody",
             command=self._preview_button_click,
         ).grid(row=17, column=0, columnspan=2, pady=(5, 0))
+        self.preview_notice = ttk.Label(
+            frame,
+            text="",
+            foreground="yellow",
+        )
+        self.preview_notice.grid(row=17, column=2, sticky="w")
 
         # Generate button
         ttk.Button(
@@ -661,6 +686,7 @@ class MelodyGeneratorGUI:
         )
         if path:
             self.soundfont_var.set(path)
+        self._check_preview_available()
 
     def _randomize_chords(self) -> None:
         """Select a random chord progression and apply it to the list box.
@@ -747,15 +773,13 @@ class MelodyGeneratorGUI:
         if "base_octave" in settings:
             self.base_octave_var.set(settings["base_octave"])
         if "motif_length" in settings:
-            self.motif_entry.delete(0, tk.END)
-            self.motif_entry.insert(0, str(settings["motif_length"]))
+            self.motif_entry.set(str(settings["motif_length"]))
         if "harmony" in settings:
             self.harmony_var.set(settings["harmony"])
         if "counterpoint" in settings:
             self.counterpoint_var.set(settings["counterpoint"])
         if "harmony_lines" in settings:
-            self.harmony_lines.delete(0, tk.END)
-            self.harmony_lines.insert(0, str(settings["harmony_lines"]))
+            self.harmony_lines.set(str(settings["harmony_lines"]))
         if "include_chords" in settings:
             self.include_chords_var.set(settings["include_chords"])
         if "chords_same" in settings:
@@ -764,6 +788,7 @@ class MelodyGeneratorGUI:
             self.instrument_var.set(settings["instrument"])
         if "soundfont" in settings:
             self.soundfont_var.set(settings["soundfont"])
+            self._check_preview_available()
         self._update_chord_list()
         chords = settings.get("chords")
         if chords:
