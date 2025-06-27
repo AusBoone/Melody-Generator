@@ -445,6 +445,42 @@ def test_generate_button_click_motif_exceeds_notes(tmp_path, monkeypatch):
     assert errs
 
 
+def test_generate_button_click_invalid_base_octave(tmp_path, monkeypatch):
+    """Out-of-range base octave values trigger an error dialog."""
+
+    mod, gui_mod, _ = load_module()
+    gui = gui_mod.MelodyGeneratorGUI.__new__(gui_mod.MelodyGeneratorGUI)
+    gui.generate_melody = lambda *a, **k: []
+    gui.create_midi_file = lambda *a, **k: None
+    gui.harmony_line_fn = None
+    gui.counterpoint_fn = None
+    gui.save_settings = None
+    gui.rhythm_pattern = None
+    gui.key_var = types.SimpleNamespace(get=lambda: "C")
+    gui.bpm_var = types.SimpleNamespace(get=lambda: 120)
+    gui.timesig_var = types.SimpleNamespace(get=lambda: "4/4")
+    gui.notes_var = types.SimpleNamespace(get=lambda: 4)
+    gui.motif_entry = types.SimpleNamespace(get=lambda: "2")
+    gui.base_octave_var = types.SimpleNamespace(get=lambda: 9)
+    gui.harmony_var = types.SimpleNamespace(get=lambda: False)
+    gui.counterpoint_var = types.SimpleNamespace(get=lambda: False)
+    gui.harmony_lines = types.SimpleNamespace(get=lambda: "0")
+    lb = types.SimpleNamespace(curselection=lambda: (0,), get=lambda idx: "C")
+    gui.chord_listbox = lb
+    gui.display_map = {"C": "C"}
+    gui.sorted_chords = ["C"]
+
+    monkeypatch.setattr(
+        gui_mod.filedialog, "asksaveasfilename", lambda **k: str(tmp_path / "x.mid"), raising=False
+    )
+    errs = []
+    monkeypatch.setattr(mod.gui.messagebox, "showerror", lambda *a, **k: errs.append(a), raising=False)
+
+    gui._generate_button_click()
+
+    assert errs
+
+
 def test_cli_invalid_timesig_exits(tmp_path):
     """CLI should exit when the time signature is malformed.
 
@@ -597,6 +633,35 @@ def test_cli_invalid_instrument_number_exit(tmp_path):
         str(out),
         "--instrument",
         "128",
+    ]
+    old = sys.argv
+    sys.argv = argv
+    with pytest.raises(SystemExit):
+        mod.run_cli()
+    sys.argv = old
+
+
+def test_cli_invalid_base_octave_exit(tmp_path):
+    """``run_cli`` should exit when ``--base-octave`` is outside 0-8."""
+
+    mod, _, _ = load_module()
+    out = tmp_path / "bad.mid"
+    argv = [
+        "prog",
+        "--key",
+        "C",
+        "--chords",
+        "C,G",
+        "--bpm",
+        "120",
+        "--timesig",
+        "4/4",
+        "--notes",
+        "4",
+        "--base-octave",
+        "9",
+        "--output",
+        str(out),
     ]
     old = sys.argv
     sys.argv = argv

@@ -143,6 +143,25 @@ def test_motif_exceeds_notes_flash():
     assert b"Motif length cannot exceed" in resp.data
 
 
+def test_invalid_base_octave_flash():
+    """Out-of-range ``base_octave`` values return an error flash."""
+
+    client = app.test_client()
+    resp = client.post(
+        "/",
+        data={
+            "key": "C",
+            "chords": "C",
+            "bpm": "120",
+            "timesig": "4/4",
+            "notes": "8",
+            "motif_length": "4",
+            "base_octave": "9",
+        },
+    )
+    assert b"Base octave must be" in resp.data
+
+
 def test_invalid_chord_flash():
     """Unknown chords in the form post return an error flash."""
     client = app.test_client()

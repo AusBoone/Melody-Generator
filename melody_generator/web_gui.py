@@ -7,6 +7,9 @@ by the :mod:`melody_generator` package. The goal is to expose the
 melody generation functions over HTTP so users can experiment
 directly from their browser.
 """
+# This revision introduces validation for the ``base_octave`` input so
+# out-of-range values (anything not between 0 and 8) trigger a flash
+# message instead of causing errors when generating the melody.
 # The original implementation attempted to render the generated MIDI to WAV
 # using FluidSynth so that browsers lacking MIDI support could preview the
 # melody. This update flashes an informative message when that rendering
@@ -131,6 +134,10 @@ def index():
 
         if motif_length > notes:
             flash("Motif length cannot exceed the number of notes.")
+            return render_template('index.html', scale=sorted(SCALE.keys()), instruments=INSTRUMENTS.keys())
+
+        if base_octave < 0 or base_octave > 8:
+            flash("Base octave must be between 0 and 8.")
             return render_template('index.html', scale=sorted(SCALE.keys()), instruments=INSTRUMENTS.keys())
         melody = generate_melody(
             key,
