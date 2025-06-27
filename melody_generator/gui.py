@@ -224,11 +224,17 @@ class MelodyGeneratorGUI:
 
         chords = diatonic_chords(self.key_var.get())
         self.chord_listbox.delete(0, tk.END)
-        self.sorted_chords = sorted(chords)
-        # Populate the list box one chord at a time so the user can select the
-        # desired progression.
-        for chord in self.sorted_chords:
-            self.chord_listbox.insert(tk.END, chord)
+        self.sorted_chords = chords  # preserve degree order
+        is_minor = self.key_var.get().endswith("m")
+        numerals_major = ["I", "ii", "iii", "IV", "V", "vi", "vii°"]
+        numerals_minor = ["i", "ii°", "III", "iv", "v", "VI", "VII"]
+        numerals = numerals_minor if is_minor else numerals_major
+        self.display_map = {}
+        for idx, chord in enumerate(self.sorted_chords):
+            numeral = numerals[idx % len(numerals)]
+            display = f"{numeral}: {chord}"
+            self.display_map[display] = chord
+            self.chord_listbox.insert(tk.END, display)
 
     def _build_widgets(self) -> None:
         """Create all GUI widgets and arrange them on the window.
@@ -326,10 +332,20 @@ class MelodyGeneratorGUI:
         )
         inst_box.grid(row=6, column=1)
 
+        # SoundFont selection path used by FluidSynth
+        ttk.Label(frame, text="SoundFont:").grid(row=7, column=0, sticky="w")
+        self.soundfont_var = tk.StringVar(value=os.environ.get("SOUND_FONT", ""))
+        self.soundfont_entry = ttk.Entry(frame, textvariable=self.soundfont_var, width=25)
+        self.soundfont_entry.grid(row=7, column=1)
+        ttk.Button(
+            frame,
+            text="Browse",
+            command=self._browse_soundfont,
+        ).grid(row=7, column=2, padx=(5, 0))
         # Motif length entry
-        ttk.Label(frame, text="Motif Length:").grid(row=7, column=0, sticky="w")
+        ttk.Label(frame, text="Motif Length:").grid(row=8, column=0, sticky="w")
         self.motif_entry = ttk.Entry(frame)
-        self.motif_entry.grid(row=7, column=1)
+        self.motif_entry.grid(row=8, column=1)
         self._create_tooltip(self.motif_entry, "Length of repeating motif")
         self.motif_entry.insert(0, "4")
 
@@ -339,64 +355,64 @@ class MelodyGeneratorGUI:
             frame,
             text="Add Harmony",
             variable=self.harmony_var,
-        ).grid(row=8, column=0, columnspan=2)
+        ).grid(row=9, column=0, columnspan=2)
 
         self.counterpoint_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(
             frame,
             text="Add Counterpoint",
             variable=self.counterpoint_var,
-        ).grid(row=9, column=0, columnspan=2)
+        ).grid(row=10, column=0, columnspan=2)
 
-        ttk.Label(frame, text="Harmony Lines:").grid(row=10, column=0, sticky="w")
+        ttk.Label(frame, text="Harmony Lines:").grid(row=11, column=0, sticky="w")
         self.harmony_lines = tk.Entry(frame)
         self.harmony_lines.insert(0, "0")
-        self.harmony_lines.grid(row=10, column=1)
+        self.harmony_lines.grid(row=11, column=1)
 
         self.include_chords_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(
             frame,
             text="Include Chords",
             variable=self.include_chords_var,
-        ).grid(row=11, column=0, columnspan=2)
+        ).grid(row=12, column=0, columnspan=2)
 
         self.chords_same_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(
             frame,
             text="Merge Chords With Melody",
             variable=self.chords_same_var,
-        ).grid(row=12, column=0, columnspan=2)
+        ).grid(row=13, column=0, columnspan=2)
 
         # Randomize buttons
         ttk.Button(
             frame,
             text="Randomize Chords",
             command=self._randomize_chords,
-        ).grid(row=13, column=0, columnspan=2, pady=(5, 0))
+        ).grid(row=14, column=0, columnspan=2, pady=(5, 0))
         ttk.Button(
             frame,
             text="Randomize Rhythm",
             command=self._randomize_rhythm,
-        ).grid(row=14, column=0, columnspan=2, pady=(5, 0))
+        ).grid(row=15, column=0, columnspan=2, pady=(5, 0))
 
         ttk.Button(
             frame,
             text="Load Preferences",
             command=self._load_preferences,
-        ).grid(row=15, column=0, columnspan=2, pady=(5, 0))
+        ).grid(row=16, column=0, columnspan=2, pady=(5, 0))
 
         ttk.Button(
             frame,
             text="Preview Melody",
             command=self._preview_button_click,
-        ).grid(row=16, column=0, columnspan=2, pady=(5, 0))
+        ).grid(row=17, column=0, columnspan=2, pady=(5, 0))
 
         # Generate button
         ttk.Button(
             frame,
             text="Generate Melody",
             command=self._generate_button_click,
-        ).grid(row=17, column=0, columnspan=2, pady=10)
+        ).grid(row=18, column=0, columnspan=2, pady=10)
 
         self.theme_var = tk.BooleanVar(value=self.dark_mode)
         ttk.Checkbutton(
@@ -404,7 +420,7 @@ class MelodyGeneratorGUI:
             text="Toggle Dark Mode",
             command=self._toggle_theme,
             variable=self.theme_var,
-        ).grid(row=18, column=0, columnspan=2, pady=(5, 0))
+        ).grid(row=19, column=0, columnspan=2, pady=(5, 0))
 
         # Apply persisted settings if available
         if self.load_settings is not None:
@@ -418,7 +434,8 @@ class MelodyGeneratorGUI:
             messagebox.showerror("Input Error", "Please select at least one chord for the progression.")
             return
         # Build the chord progression from the selected listbox entries
-        chord_progression = [self.chord_listbox.get(i) for i in selected_indices]
+        displays = [self.chord_listbox.get(i) for i in selected_indices]
+        chord_progression = [self.display_map.get(d, d) for d in displays]
         try:
             bpm = self.bpm_var.get()
             notes_count = self.notes_var.get()
@@ -502,7 +519,8 @@ class MelodyGeneratorGUI:
                 "Input Error", "Please select at least one chord for the progression."
             )
             return
-        chords = [self.chord_listbox.get(i) for i in selected_indices]
+        displays = [self.chord_listbox.get(i) for i in selected_indices]
+        chords = [self.display_map.get(d, d) for d in displays]
         try:
             bpm = self.bpm_var.get()
             notes_count = self.notes_var.get()
@@ -563,7 +581,7 @@ class MelodyGeneratorGUI:
         try:
             from . import playback
             try:
-                playback.play_midi(tmp_path)
+                playback.play_midi(tmp_path, soundfont=self.soundfont_var.get() or None)
             except MidiPlaybackError:
                 # Playback errors are expected when FluidSynth is missing or
                 # fails to initialize. In that case fall back to the user's
@@ -597,6 +615,16 @@ class MelodyGeneratorGUI:
         except Exception as exc:  # pragma: no cover - platform dependent
             messagebox.showerror("Preview Error", f"Could not open MIDI file: {exc}")
 
+    def _browse_soundfont(self) -> None:
+        """Select a SoundFont ``.sf2`` file and store the path."""
+
+        path = filedialog.askopenfilename(
+            title="Choose SoundFont",
+            filetypes=[("SoundFont", "*.sf2"), ("All files", "*")],
+        )
+        if path:
+            self.soundfont_var.set(path)
+
     def _randomize_chords(self) -> None:
         """Select a random chord progression and apply it to the list box.
 
@@ -609,7 +637,6 @@ class MelodyGeneratorGUI:
         for chord in progression:
             if chord in self.sorted_chords:
                 idx = self.sorted_chords.index(chord)
-                # Highlight each chord in the listbox
                 self.chord_listbox.selection_set(idx)
 
     def _randomize_rhythm(self) -> None:
@@ -661,6 +688,7 @@ class MelodyGeneratorGUI:
             "include_chords": self.include_chords_var.get(),
             "chords_same": self.chords_same_var.get(),
             "instrument": self.instrument_var.get(),
+            "soundfont": self.soundfont_var.get(),
         }
 
     def _apply_settings(self, settings: Dict) -> None:
@@ -697,6 +725,8 @@ class MelodyGeneratorGUI:
             self.chords_same_var.set(settings["chords_same"])
         if "instrument" in settings and settings["instrument"] in INSTRUMENTS:
             self.instrument_var.set(settings["instrument"])
+        if "soundfont" in settings:
+            self.soundfont_var.set(settings["soundfont"])
         self._update_chord_list()
         chords = settings.get("chords")
         if chords:

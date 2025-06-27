@@ -8,8 +8,14 @@ Python script that allows users to create a random melody in a specified key, wi
 - tkinter (for the GUI)
 
 ## Installing dependencies
-Running `pip install .` will install these packages automatically. You can also
-set them up manually with:
+Running `pip install .` will install these packages automatically. For
+development, an editable install is available:
+
+```bash
+pip install -e .
+```
+
+You can also set up the dependencies manually with:
 
 ```bash
 pip install -r requirements.txt
@@ -44,9 +50,12 @@ You can override the location by setting the `MELODY_SETTINGS_FILE` environment
 variable before starting the application.
 Set the `MELODY_PLAYER` environment variable to a MIDI-capable application if the default player cannot handle `.mid` files. For example, `export MELODY_PLAYER=Music` on macOS or `set MELODY_PLAYER="C:\\Program Files\\Windows Media Player\\wmplayer.exe"` on Windows. The GUI's preview feature will then open files in that player instead of the system default.
 Set `SOUND_FONT` to the path of a SoundFont file (``.sf2``) to enable the built-in
-FluidSynth playback used by the GUI and web interface. If not provided the
-application tries a common system location such as
-``/usr/share/sounds/sf2/TimGM6mb.sf2``.
+FluidSynth playback used by the GUI and web interface. The desktop GUI also
+provides a **SoundFont** field so you can browse to a file at runtime. If not
+provided the application tries a common system location such as
+``/usr/share/sounds/sf2/TimGM6mb.sf2``. When neither FluidSynth nor a usable
+soundfont is available the preview buttons fall back to your operating system's
+default MIDI player.
 
 # Usage
 
