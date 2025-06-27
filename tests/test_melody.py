@@ -13,6 +13,8 @@ import random
 
 # Provide a minimal stub for the 'mido' module so the import succeeds
 stub_mido = types.ModuleType("mido")
+
+
 class DummyMessage:
     """Lightweight MIDI message holding only relevant attributes."""
 
@@ -75,8 +77,8 @@ def test_note_to_midi_sharp_and_flat():
 
     ``C#4`` and ``Db4`` as well as ``F#5`` and ``Gb5`` should yield identical
     numbers when converted via ``note_to_midi``."""
-    assert note_to_midi('C#4') == note_to_midi('Db4')
-    assert note_to_midi('F#5') == note_to_midi('Gb5')
+    assert note_to_midi("C#4") == note_to_midi("Db4")
+    assert note_to_midi("F#5") == note_to_midi("Gb5")
 
 
 def test_generate_melody_length_and_error():
@@ -85,12 +87,12 @@ def test_generate_melody_length_and_error():
     A valid call with eight notes should produce exactly eight results.
     Requesting fewer notes than the motif length should raise
     ``ValueError``."""
-    chords = ['C', 'G', 'Am', 'F']
-    melody = generate_melody('C', 8, chords, motif_length=4)
+    chords = ["C", "G", "Am", "F"]
+    melody = generate_melody("C", 8, chords, motif_length=4)
     assert len(melody) == 8
 
     with pytest.raises(ValueError):
-        generate_melody('C', 3, chords, motif_length=4)
+        generate_melody("C", 3, chords, motif_length=4)
 
 
 def test_generate_melody_invalid_denominator():
@@ -98,9 +100,12 @@ def test_generate_melody_invalid_denominator():
 
     ``generate_melody`` should reject denominators other than ``1, 2, 4, 8`` or
     ``16``. Passing ``(4, 0)`` exercises this validation branch."""
-    chords = ['C', 'G']
+    chords = ["C", "G"]
     with pytest.raises(ValueError):
-        generate_melody('C', 4, chords, motif_length=4, time_signature=(4, 0))
+        generate_melody("C", 4, chords, motif_length=4, time_signature=(4, 0))
+    # Denominator values outside {1,2,4,8,16} should also be rejected
+    with pytest.raises(ValueError):
+        generate_melody("C", 4, chords, motif_length=4, time_signature=(4, 3))
 
 
 def test_generate_melody_invalid_numerator_and_negative_denominator():
@@ -108,11 +113,11 @@ def test_generate_melody_invalid_numerator_and_negative_denominator():
 
     Passing a numerator of ``0`` or a negative denominator should result in a
     ``ValueError`` to guard against nonsensical time signatures."""
-    chords = ['C', 'G']
+    chords = ["C", "G"]
     with pytest.raises(ValueError):
-        generate_melody('C', 4, chords, motif_length=4, time_signature=(0, 4))
+        generate_melody("C", 4, chords, motif_length=4, time_signature=(0, 4))
     with pytest.raises(ValueError):
-        generate_melody('C', 4, chords, motif_length=4, time_signature=(4, -1))
+        generate_melody("C", 4, chords, motif_length=4, time_signature=(4, -1))
 
 
 def test_generate_melody_empty_pattern():
@@ -121,9 +126,9 @@ def test_generate_melody_empty_pattern():
     The melody generation logic cycles through the pattern list, so an empty
     list would lead to divide-by-zero errors. Validate that the function
     proactively rejects this."""
-    chords = ['C', 'G']
+    chords = ["C", "G"]
     with pytest.raises(ValueError):
-        generate_melody('C', 4, chords, motif_length=4, pattern=[])
+        generate_melody("C", 4, chords, motif_length=4, pattern=[])
 
 
 def test_create_midi_file_invalid_time_signature(tmp_path):
@@ -131,14 +136,17 @@ def test_create_midi_file_invalid_time_signature(tmp_path):
 
     Each invalid signature should result in a ``ValueError`` before any file is
     written to disk."""
-    melody = ['C4'] * 4
-    out = tmp_path / 'bad.mid'
+    melody = ["C4"] * 4
+    out = tmp_path / "bad.mid"
     with pytest.raises(ValueError):
         create_midi_file(melody, 120, (0, 4), str(out))
     with pytest.raises(ValueError):
         create_midi_file(melody, 120, (4, 0), str(out))
     with pytest.raises(ValueError):
         create_midi_file(melody, 120, (4, -3), str(out))
+    # Non-standard denominators such as 5 should be rejected
+    with pytest.raises(ValueError):
+        create_midi_file(melody, 120, (4, 5), str(out))
 
 
 def test_create_midi_file_empty_pattern(tmp_path):
@@ -147,8 +155,8 @@ def test_create_midi_file_empty_pattern(tmp_path):
     ``create_midi_file`` cycles through the provided list when scheduling MIDI
     events. A zero-length list would result in ``ZeroDivisionError`` when
     indexing with ``i % len(pattern)``."""
-    melody = ['C4'] * 4
-    out = tmp_path / 'empty.mid'
+    melody = ["C4"] * 4
+    out = tmp_path / "empty.mid"
     with pytest.raises(ValueError):
         create_midi_file(melody, 120, (4, 4), str(out), pattern=[])
 
@@ -158,11 +166,11 @@ def test_extra_tracks_created(tmp_path):
 
     After calling the function with harmony and counterpoint lines the resulting
     ``MidiFile`` should contain one primary track plus two additional tracks."""
-    chords = ['C', 'G', 'Am', 'F']
-    melody = generate_melody('C', 8, chords, motif_length=4)
+    chords = ["C", "G", "Am", "F"]
+    melody = generate_melody("C", 8, chords, motif_length=4)
     harmony = generate_harmony_line(melody)
-    cp = generate_counterpoint_melody(melody, 'C')
-    out = tmp_path / 'm.mid'
+    cp = generate_counterpoint_melody(melody, "C")
+    out = tmp_path / "m.mid"
     create_midi_file(
         melody,
         120,
@@ -182,11 +190,11 @@ def test_extra_tracks_shorter_line(tmp_path):
 
     ``create_midi_file`` should not assume all tracks are equal length; truncated
     harmony or counterpoint lines must be padded appropriately."""
-    chords = ['C', 'G', 'Am', 'F']
-    melody = generate_melody('C', 6, chords, motif_length=4)
+    chords = ["C", "G", "Am", "F"]
+    melody = generate_melody("C", 6, chords, motif_length=4)
     harmony = generate_harmony_line(melody)[:3]
-    cp = generate_counterpoint_melody(melody, 'C')[:5]
-    out = tmp_path / 'short.mid'
+    cp = generate_counterpoint_melody(melody, "C")[:5]
+    out = tmp_path / "short.mid"
     create_midi_file(
         melody,
         120,
@@ -342,8 +350,12 @@ def test_melody_trends_up_then_down():
     first_half = midi_vals[:mid]
     second_half = midi_vals[mid:]
 
-    up_trend = sum(b - a for a, b in zip(first_half, first_half[1:])) / (len(first_half) - 1)
-    down_trend = sum(b - a for a, b in zip(second_half, second_half[1:])) / (len(second_half) - 1)
+    up_trend = sum(b - a for a, b in zip(first_half, first_half[1:])) / (
+        len(first_half) - 1
+    )
+    down_trend = sum(b - a for a, b in zip(second_half, second_half[1:])) / (
+        len(second_half) - 1
+    )
 
     assert up_trend >= 0
     assert down_trend <= 0
