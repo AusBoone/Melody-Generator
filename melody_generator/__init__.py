@@ -45,6 +45,7 @@ import os
 import math
 import subprocess
 import threading
+import re
 
 # Default path for storing user preferences
 # The file lives in the user's home directory so settings persist
@@ -389,22 +390,33 @@ def generate_random_rhythm_pattern(length: int = 3) -> List[float]:
     return pattern
 
 def note_to_midi(note: str) -> int:
-    """Convert a note name (with octave) to a MIDI note number.
+    """Convert ``note`` strings such as ``C#4`` into MIDI numbers.
 
-    Example: 'C#4' -> 61 (with C4 as MIDI note 60).
+    The octave may contain multiple digits (``C10``) or be negative. A
+    ``ValueError`` is raised for malformed notes.
 
-    @param note (str): Note name including octave (e.g., ``C#4``).
-    @returns int: Corresponding MIDI note number.
+    Example: ``C#4`` -> ``61`` when ``C4`` equals MIDI note ``60``.
+
+    @param note (str): Note name including octave.
+    @returns int: MIDI note number ``0-127``.
     """
-    try:
-        # MIDI octaves start at -1 so offset by +1 from the human-readable value
-        octave = int(note[-1]) + 1
-    except ValueError:
+    # Extract the note name and octave using a strict pattern.  The pattern
+    # ensures the note consists of a letter with an optional accidental
+    # followed by one or more digits (or a leading minus sign for negative
+    # octaves).
+    match = re.fullmatch(r"([A-Ga-g][#b]?)(-?\d+)", note)
+    if not match:
         logging.error(f"Invalid note format: {note}")
-        raise
+        raise ValueError(f"Invalid note format: {note}")
+
+    # Normalize case to match the mappings in ``NOTE_TO_SEMITONE`` and convert
+    # the octave to MIDI's numbering scheme (which starts at -1).
+    note_name, octave_str = match.groups()
+    octave = int(octave_str) + 1
+    note_name = note_name.capitalize()
 
     # Strip the octave number to get the pitch class
-    note_name = note[:-1]
+    # and convert flats to their enharmonic sharp equivalents.
 
     # Map flats to their enharmonic sharps before looking up the semitone index
     flat_to_sharp = {
