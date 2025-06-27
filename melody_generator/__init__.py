@@ -22,6 +22,9 @@ __version__ = "0.1.0"
 #   This prevents race conditions when previewing MIDI files on platforms
 #   like macOS where the previous asynchronous approach removed the file
 #   too early.
+# * ``create_midi_file`` now merges chord and melody events using absolute
+#   ticks when ``chords_separate`` is ``False`` so chords begin at measure
+#   boundaries instead of after the melody.
 # ---------------------------------------------------------------
 
 import mido
@@ -815,7 +818,7 @@ def create_midi_file(
             mid.tracks.append(t)
             extra_midi_tracks.append(t)
 
-    chord_track = None
+    chord_track: Optional[MidiTrack] = None
     if chord_progression:
         chord_track = track if not chords_separate else MidiTrack()
         if chords_separate:
@@ -902,32 +905,50 @@ def create_midi_file(
             beats_elapsed = 0
 
     if chord_track is not None:
+        # Compute when each chord should start and end using absolute ticks so
+        # merged chords align with the melody when ``chords_separate`` is False.
         ticks_per_measure = int(time_signature[0] * ticks_per_beat * (4 / time_signature[1]))
         ticks_per_chord = ticks_per_measure
         total_ticks = int(total_beats * ticks_per_beat * (4 / time_signature[1]))
         num_chords = max(1, math.ceil(total_ticks / ticks_per_chord))
-        # Step through the chord progression, repeating as necessary to cover
-        # the entire melody.
+
+        chord_events: List[Tuple[int, Message]] = []
         for i in range(num_chords):
+            start_tick = i * ticks_per_chord
             chord = chord_progression[i % len(chord_progression)]
             notes = CHORDS.get(chord, [])
-            delta = 0 if i == 0 else ticks_per_chord
-            for idx, n in enumerate(notes):
-                note_num = note_to_midi(n + "3")
-                chord_track.append(Message('note_on', note=note_num, velocity=60, time=delta if idx == 0 else 0))
-                delta = 0
-            delta = ticks_per_chord
-            for idx, n in enumerate(notes):
-                note_num = note_to_midi(n + "3")
-                chord_track.append(
-                    Message(
-                        'note_off',
-                        note=note_num,
-                        velocity=60,
-                        time=delta if idx == 0 else 0,
-                    )
-                )
-                delta = 0
+            for note in notes:
+                note_num = note_to_midi(note + "3")
+                chord_events.append((start_tick, Message('note_on', note=note_num, velocity=60, time=0)))
+                chord_events.append((start_tick + ticks_per_chord, Message('note_off', note=note_num, velocity=60, time=0)))
+
+        if chords_separate:
+            # Convert absolute times to delta times relative to the chord track.
+            chord_events.sort(key=lambda p: p[0])
+            last = 0
+            for tick, msg in chord_events:
+                msg.time = tick - last
+                chord_track.append(msg)
+                last = tick
+        else:
+            # Merge chord events with the melody track by sorting all events on
+            # their absolute time. First convert existing messages to absolute
+            # ticks so chords can be inserted at the start of the piece.
+            merged_events: List[Tuple[int, Message]] = []
+            current = 0
+            for msg in track:
+                current += msg.time
+                merged_events.append((current, msg))
+            merged_events.extend(chord_events)
+            merged_events.sort(key=lambda p: p[0])
+
+            # Rewrite the melody track with corrected delta times.
+            track.clear()
+            last = 0
+            for tick, msg in merged_events:
+                msg.time = tick - last
+                track.append(msg)
+                last = tick
 
     # Write all tracks to disk
     mid.save(output_file)

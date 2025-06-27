@@ -225,6 +225,35 @@ def test_chords_on_same_track(tmp_path):
     assert len(mid.tracks) == 1
 
 
+def test_merged_chords_start_at_zero(tmp_path):
+    """Merged chord events begin at the start of the track."""
+    chords = ["C", "G"]
+    melody = generate_melody("C", 4, chords, motif_length=4)
+    out = tmp_path / "start.mid"
+    create_midi_file(
+        melody,
+        120,
+        (4, 4),
+        str(out),
+        harmony=False,
+        pattern=[0.25],
+        chord_progression=chords,
+        chords_separate=False,
+    )
+    mid = DummyMidiFile.last_instance
+    assert mid is not None
+    track = mid.tracks[0]
+    abs_time = 0
+    chord_notes = {note_to_midi(n + "3") for n in melody_generator.CHORDS[chords[0]]}
+    first_chord_time = None
+    for msg in track:
+        abs_time += msg.time
+        if msg.type == "note_on" and msg.note in chord_notes:
+            first_chord_time = abs_time
+            break
+    assert first_chord_time == 0
+
+
 def test_rest_values_in_pattern(tmp_path):
     """Rhythm patterns may contain rests represented by ``0`` durations.
 
