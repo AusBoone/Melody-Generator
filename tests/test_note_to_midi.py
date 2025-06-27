@@ -43,3 +43,13 @@ def test_sharp_conversion():
 def test_flat_conversion():
     """Flat notes produce the same value as their enharmonic sharps."""
     assert note_to_midi('Db4') == 61
+
+
+def test_multi_digit_octaves():
+    """Octaves with multiple digits convert correctly.
+
+    This ensures ``note_to_midi`` handles values like ``C10`` or ``Gb11`` by
+    reading all trailing digits instead of only the last character.
+    """
+    assert note_to_midi('C10') == 132
+    assert note_to_midi('Gb11') == 150
