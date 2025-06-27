@@ -7,6 +7,16 @@
 </head>
 <body>
   <h1>Your Melody</h1>
+  <!-- Display any flash messages such as playback failures -->
+  {% with messages = get_flashed_messages() %}
+    {% if messages %}
+      <ul class="flashes">
+      {% for msg in messages %}
+        <li>{{ msg }}</li>
+      {% endfor %}
+      </ul>
+    {% endif %}
+  {% endwith %}
   <!-- Embedded player previews the generated audio file -->
   <audio controls autoplay>
     <source src="data:audio/wav;base64,{{ audio }}" type="audio/wav">

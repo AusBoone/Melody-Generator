@@ -208,3 +208,32 @@ def test_successful_post_returns_audio(monkeypatch):
     )
     assert b"audio/wav" in resp.data
 
+
+def test_playback_failure_flash(monkeypatch):
+    """Failed audio rendering notifies the user via flash message."""
+
+    client = app.test_client()
+
+    monkeypatch.setattr(web_gui, "create_midi_file", lambda *a, **k: None)
+
+    def raise_error(_mid, _wav, soundfont=None):
+        raise web_gui.MidiPlaybackError("no synth")
+
+    monkeypatch.setattr(web_gui.playback, "render_midi_to_wav", raise_error)
+
+    resp = client.post(
+        "/",
+        data={
+            "key": "C",
+            "chords": "C",
+            "bpm": "120",
+            "timesig": "4/4",
+            "notes": "1",
+            "motif_length": "1",
+            "base_octave": "4",
+        },
+    )
+
+    assert resp.status_code == 200
+    assert b"Preview audio could not be generated" in resp.data
+

@@ -7,6 +7,12 @@ by the :mod:`melody_generator` package. The goal is to expose the
 melody generation functions over HTTP so users can experiment
 directly from their browser.
 """
+# The original implementation attempted to render the generated MIDI to WAV
+# using FluidSynth so that browsers lacking MIDI support could preview the
+# melody. This update flashes an informative message when that rendering
+# fails because either FluidSynth itself or a compatible SoundFont is missing.
+# The play template now displays flash messages so users are aware that the
+# preview audio is unavailable.
 
 from __future__ import annotations
 
@@ -180,8 +186,12 @@ def index():
             playback.render_midi_to_wav(tmp_path, wav_path)
         except MidiPlaybackError:
             # Rendering failures occur when FluidSynth or a compatible soundfont
-            # is unavailable. In that scenario the browser will receive the MIDI
-            # data without a WAV preview.
+            # is unavailable. Inform the user and fall back to providing the raw
+            # MIDI file without an audio preview.
+            flash(
+                "Preview audio could not be generated because FluidSynth or a "
+                "soundfont is unavailable."
+            )
             wav_data = None
         else:
             with open(wav_path, 'rb') as fh:
