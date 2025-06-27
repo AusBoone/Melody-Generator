@@ -20,6 +20,19 @@ You can also set up the dependencies manually with:
 ```bash
 pip install -r requirements.txt
 ```
+### Quick setup on macOS
+
+Run the helper script to install Homebrew packages and Python
+dependencies. The script checks for an existing ``python3``
+installation and only installs a new version when the current one is
+older than 3.8. A virtual environment is created under ``./venv``.
+
+```bash
+./setup_mac.sh
+```
+
+After it completes activate the environment with
+`source venv/bin/activate` to start using ``melody-generator``.
 PyFluidSynth wraps the FluidSynth library which must be installed separately.
 Install the system package with `apt-get install fluidsynth` on Debian-based Linux or `brew install fluid-synth` on macOS.
 Without FluidSynth the preview button and web playback will fail.
