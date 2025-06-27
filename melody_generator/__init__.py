@@ -25,6 +25,8 @@ __version__ = "0.1.0"
 # * ``create_midi_file`` now merges chord and melody events using absolute
 #   ticks when ``chords_separate`` is ``False`` so chords begin at measure
 #   boundaries instead of after the melody.
+# * ``generate_melody`` and ``create_midi_file`` validate that supplied rhythm
+#   ``pattern`` lists are non-empty and raise ``ValueError`` when violated.
 # ---------------------------------------------------------------
 
 import mido
@@ -490,7 +492,9 @@ def generate_melody(
     @param chord_progression (List[str]): Chords guiding note choice.
     @param motif_length (int): Length of the initial motif.
     @param time_signature (Tuple[int, int]): Meter as ``(numerator, denominator)``.
-    @param pattern (List[float]|None): Optional rhythmic pattern.
+    @param pattern (List[float]|None): Optional rhythmic pattern. When provided,
+        it must contain at least one duration value otherwise a ``ValueError`` is
+        raised.
     @param base_octave (int): Preferred starting octave.
     @returns List[str]: Generated melody as note strings.
     """
@@ -506,6 +510,11 @@ def generate_melody(
     # pattern cycles throughout the melody to give it an underlying pulse.
     if pattern is None:
         pattern = random.choice(PATTERNS)
+    elif not pattern:
+        # An explicitly empty pattern would cause divide-by-zero errors when
+        # cycling through the list. Reject this early with a clear message so
+        # callers know the pattern must contain at least one duration value.
+        raise ValueError("pattern must not be empty")
 
     # Validate the provided time signature so subsequent calculations never
     # divide by zero or produce negative beat counts.
@@ -792,7 +801,9 @@ def create_midi_file(
     @param time_signature (Tuple[int, int]): ``(numerator, denominator)`` pair.
     @param output_file (str): Destination file path.
     @param harmony (bool): Include a simple harmony line.
-    @param pattern (List[float]|None): Optional rhythmic pattern.
+    @param pattern (List[float]|None): Optional rhythmic pattern. If provided it
+        must contain at least one duration; otherwise a ``ValueError`` is raised
+        to avoid division errors during MIDI event generation.
     @param extra_tracks (List[List[str]]|None): Additional melody lines.
     @param chord_progression (List[str]|None): Chords rendered as blocks.
     @param chords_separate (bool): Write chords to a new track when ``True``.
@@ -839,6 +850,10 @@ def create_midi_file(
         # pattern. This keeps the timing interesting while still deterministic
         # for a given melody length.
         pattern = random.choice(PATTERNS)
+    elif not pattern:
+        # Using an empty pattern would make ``pattern[i % len(pattern)]`` fail
+        # later in the function. Validate early and report a clear error.
+        raise ValueError("pattern must not be empty")
     whole_note_ticks = ticks_per_beat * 4
     beat_fraction = 1 / time_signature[1]
     beat_ticks = int(beat_fraction * whole_note_ticks)
