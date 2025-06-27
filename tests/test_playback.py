@@ -61,6 +61,20 @@ def test_resolve_soundfont_env_variable(tmp_path, monkeypatch):
     assert Path(result) == sf
 
 
+def test_resolve_soundfont_expands_user(tmp_path, monkeypatch):
+    """``_resolve_soundfont`` should expand ``~`` in paths."""
+
+    home = tmp_path / "home"
+    home.mkdir()
+    sf = home / "font.sf2"
+    sf.write_text("soundfont")
+    monkeypatch.setenv("HOME", str(home))
+
+    result = _resolve_soundfont("~/font.sf2")
+
+    assert Path(result) == sf
+
+
 def test_resolve_soundfont_missing_file(monkeypatch):
     """Missing SoundFonts raise ``MidiPlaybackError``.
 

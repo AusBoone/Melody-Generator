@@ -182,6 +182,45 @@ def test_cli_subprocess_creates_file(tmp_path):
     assert output.exists()
 
 
+def test_cli_accepts_lowercase(tmp_path):
+    """Lowercase key and chord names should be accepted by the CLI."""
+
+    stub_dir = tmp_path / "stubs"
+    stub_dir.mkdir()
+    (stub_dir / "mido.py").write_text(
+        """class MidiFile:\n    def __init__(self,*a,**k):\n        self.tracks=[]\n    def save(self,p):\n        open(p,'w').write('midi')\nclass MidiTrack(list):\n    pass\nclass Message:\n    def __init__(self,*a,**k):\n        pass\nclass MetaMessage:\n    def __init__(self,*a,**k):\n        pass\ndef bpm2tempo(bpm):\n    return bpm\n""",
+        encoding="utf-8",
+    )
+    env = os.environ.copy()
+    env["PYTHONPATH"] = f"{stub_dir}:{env.get('PYTHONPATH','')}"
+
+    output = tmp_path / "lower.mid"
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "melody_generator",
+            "--key",
+            "c",
+            "--chords",
+            "c,g,am,f",
+            "--bpm",
+            "120",
+            "--timesig",
+            "4/4",
+            "--notes",
+            "8",
+            "--base-octave",
+            "4",
+            "--output",
+            str(output),
+        ],
+        check=True,
+        env=env,
+    )
+    assert output.exists()
+
+
 def test_generate_button_click(tmp_path, monkeypatch):
     """Simulate a user clicking the "Generate" button in the GUI.
 
@@ -1026,3 +1065,40 @@ def test_cli_soundfont_without_play(monkeypatch, tmp_path):
 
     assert "called" not in calls
     assert out.exists()
+
+
+def test_open_default_player_error_threadsafe(monkeypatch):
+    """Errors opening the default player should invoke ``showerror`` via ``after``."""
+
+    mod, gui_mod, _ = load_module()
+    gui = gui_mod.MelodyGeneratorGUI.__new__(gui_mod.MelodyGeneratorGUI)
+
+    calls = []
+    gui.root = types.SimpleNamespace(after=lambda d, func, *a: calls.append((func, a)))
+
+    monkeypatch.setattr(gui_mod.subprocess, "run", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
+    monkeypatch.setattr(gui_mod.os, "environ", {})
+    monkeypatch.setattr(gui_mod.sys, "platform", "linux", raising=False)
+    errors = []
+    monkeypatch.setattr(
+        gui_mod.messagebox,
+        "showerror",
+        lambda *a, **k: errors.append(a),
+        raising=False,
+    )
+
+    class DummyThread:
+        def __init__(self, target, daemon=False):
+            self.target = target
+        def start(self):
+            self.target()
+
+    monkeypatch.setattr(gui_mod.threading, "Thread", DummyThread)
+
+    gui._open_default_player("foo.mid")
+
+    # Simulate Tkinter mainloop processing scheduled callbacks
+    for func, args in calls:
+        func(*args)
+
+    assert errors

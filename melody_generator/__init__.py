@@ -230,6 +230,62 @@ CHORDS = {
     "Dbm": ["Db", "E", "Ab"],
 }
 
+# Lookup tables mapping lowercase names to their canonical forms. These
+# mappings allow command line and GUI interfaces to accept musical keys
+# and chords regardless of the user's capitalization preferences.
+CANONICAL_KEYS = {name.lower(): name for name in SCALE}
+CANONICAL_CHORDS = {name.lower(): name for name in CHORDS}
+
+
+def canonical_key(name: str) -> str:
+    """Return the canonical capitalization for ``name``.
+
+    Parameters
+    ----------
+    name:
+        Musical key provided by the user. Case-insensitive.
+
+    Returns
+    -------
+    str
+        Key from :data:`SCALE` matching ``name``.
+
+    Raises
+    ------
+    ValueError
+        If ``name`` is not present in :data:`SCALE`.
+    """
+
+    key = CANONICAL_KEYS.get(name.strip().lower())
+    if key is None:
+        raise ValueError(f"Unknown key: {name}")
+    return key
+
+
+def canonical_chord(name: str) -> str:
+    """Return the canonical chord name for ``name``.
+
+    Parameters
+    ----------
+    name:
+        Chord name provided by the user. Case-insensitive.
+
+    Returns
+    -------
+    str
+        Matching chord name from :data:`CHORDS`.
+
+    Raises
+    ------
+    ValueError
+        If ``name`` does not correspond to a known chord.
+    """
+
+    chord = CANONICAL_CHORDS.get(name.strip().lower())
+    if chord is None:
+        raise ValueError(f"Unknown chord: {name}")
+    return chord
+
 # ``PATTERNS`` stores common rhythmic figures. Each inner list represents a
 # sequence of note durations (in fractions of a whole note) that repeat while
 # creating the MIDI file.
@@ -1252,8 +1308,12 @@ def run_cli() -> None:
         logging.error("Base octave must be between 0 and 8.")
         sys.exit(1)
 
-    # Validate key and chord progression.
-    if args.key not in SCALE:
+    # Validate key and chord progression in a case-insensitive manner so
+    # users can supply values like "c" or "am" without matching the exact
+    # capitalization used by :data:`SCALE` and :data:`CHORDS`.
+    try:
+        args.key = canonical_key(args.key)
+    except ValueError:
         logging.error("Invalid key provided.")
         sys.exit(1)
 
@@ -1266,10 +1326,12 @@ def run_cli() -> None:
         if not args.chords:
             logging.error("Chord progression required unless --random-chords is used.")
             sys.exit(1)
-        chord_progression = [chord.strip() for chord in args.chords.split(",")]
-        # Validate that every chord exists in the chord dictionary
-        for chord in chord_progression:
-            if chord not in CHORDS:
+        chord_names = [chord.strip() for chord in args.chords.split(",")]
+        chord_progression = []
+        for chord in chord_names:
+            try:
+                chord_progression.append(canonical_chord(chord))
+            except ValueError:
                 logging.error(f"Invalid chord in progression: {chord}")
                 sys.exit(1)
 
