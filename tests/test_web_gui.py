@@ -228,6 +228,34 @@ def test_successful_post_returns_audio(monkeypatch):
     assert b"audio/wav" in resp.data
 
 
+def test_lowercase_inputs(monkeypatch):
+    """Form values in lowercase should still be processed correctly."""
+
+    client = app.test_client()
+
+    monkeypatch.setattr(web_gui, "create_midi_file", lambda *a, **k: None)
+    monkeypatch.setattr(
+        web_gui.playback,
+        "render_midi_to_wav",
+        lambda mid, wav, soundfont=None: Path(wav).write_bytes(b"wav"),
+    )
+
+    resp = client.post(
+        "/",
+        data={
+            "key": "c",
+            "chords": "c,am",
+            "bpm": "120",
+            "timesig": "4/4",
+            "notes": "1",
+            "motif_length": "1",
+            "base_octave": "4",
+        },
+    )
+
+    assert resp.status_code == 200 and b"audio/wav" in resp.data
+
+
 def test_playback_failure_flash(monkeypatch):
     """Failed audio rendering notifies the user via flash message."""
 

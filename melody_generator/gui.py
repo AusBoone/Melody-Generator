@@ -706,8 +706,13 @@ class MelodyGeneratorGUI:
                     else:
                         subprocess.run(["xdg-open", path], check=False)
             except Exception as exc:  # pragma: no cover - platform dependent
-                messagebox.showerror(
-                    "Preview Error", f"Could not open MIDI file: {exc}"
+                # Tkinter widgets must be updated from the main thread. Use
+                # ``after`` to schedule the error dialog so it runs safely.
+                self.root.after(
+                    0,
+                    messagebox.showerror,
+                    "Preview Error",
+                    f"Could not open MIDI file: {exc}",
                 )
             finally:
                 if delete_after:

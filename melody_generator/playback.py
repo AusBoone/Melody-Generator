@@ -32,6 +32,9 @@ def _resolve_soundfont(sf: Optional[str]) -> str:
     """Return the path to the soundfont to use for synthesis."""
 
     candidate = sf or os.environ.get("SOUND_FONT") or "/usr/share/sounds/sf2/TimGM6mb.sf2"
+    # Expand ``~`` and environment variables so user-supplied paths work
+    # regardless of how they are specified.
+    candidate = os.path.expanduser(os.path.expandvars(candidate))
     if not os.path.isfile(candidate):
         raise MidiPlaybackError(
             "SoundFont not found. Provide path via argument or SOUND_FONT env var."

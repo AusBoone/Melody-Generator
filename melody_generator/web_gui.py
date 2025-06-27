@@ -43,6 +43,8 @@ generate_melody = melody_generator.generate_melody
 create_midi_file = melody_generator.create_midi_file
 SCALE = melody_generator.SCALE
 CHORDS = melody_generator.CHORDS
+canonical_key = melody_generator.canonical_key
+canonical_chord = melody_generator.canonical_chord
 generate_random_chord_progression = melody_generator.generate_random_chord_progression
 generate_random_rhythm_pattern = melody_generator.generate_random_rhythm_pattern
 generate_harmony_line = melody_generator.generate_harmony_line
@@ -87,7 +89,9 @@ def index():
         # Extract user selections, applying sensible defaults when
         # values are missing.
         key = request.form.get('key') or 'C'
-        if key not in SCALE:
+        try:
+            key = canonical_key(key)
+        except ValueError:
             flash("Invalid key selected. Please choose a valid key.")
             return render_template('index.html', scale=sorted(SCALE.keys()), instruments=INSTRUMENTS.keys())
 
@@ -110,14 +114,17 @@ def index():
             chords = generate_random_chord_progression(key)
         else:
             chords_str = request.form.get('chords', '')
-            chords = [c.strip() for c in chords_str.split(',') if c.strip()]
-            if not chords:
+            chord_names = [c.strip() for c in chords_str.split(',') if c.strip()]
+            if not chord_names:
                 chords = generate_random_chord_progression(key)
-            # Validate that each supplied chord exists in the dictionary
-            for chord in chords:
-                if chord not in CHORDS:
-                    flash(f"Unknown chord: {chord}")
-                    return render_template('index.html', scale=sorted(SCALE.keys()), instruments=INSTRUMENTS.keys())
+            else:
+                chords = []
+                for chord in chord_names:
+                    try:
+                        chords.append(canonical_chord(chord))
+                    except ValueError:
+                        flash(f"Unknown chord: {chord}")
+                        return render_template('index.html', scale=sorted(SCALE.keys()), instruments=INSTRUMENTS.keys())
 
         try:
             parts = timesig.split('/')
