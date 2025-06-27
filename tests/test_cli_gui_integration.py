@@ -230,6 +230,22 @@ def test_generate_button_click(tmp_path, monkeypatch):
         get=lambda idx: ["C", "G"][idx],
     )
     gui.chord_listbox = lb
+    gui.display_map = {"C": "C"}
+    gui.sorted_chords = ["C"]
+    gui.display_map = {"C": "C"}
+    gui.sorted_chords = ["C"]
+    gui.display_map = {"C": "C"}
+    gui.sorted_chords = ["C"]
+    gui.display_map = {"C": "C"}
+    gui.sorted_chords = ["C"]
+    gui.display_map = {"C": "C"}
+    gui.sorted_chords = ["C"]
+    gui.display_map = {"C": "C"}
+    gui.sorted_chords = ["C"]
+    gui.display_map = {"C": "C"}
+    gui.sorted_chords = ["C"]
+    gui.display_map = {"C": "C", "G": "G"}
+    gui.sorted_chords = ["C", "G"]
 
     monkeypatch.setattr(
         gui_mod.filedialog,
@@ -241,19 +257,19 @@ def test_generate_button_click(tmp_path, monkeypatch):
     errs = []
     infos = []
     monkeypatch.setattr(
-        gui_mod.messagebox,
+        mod.gui.messagebox,
         "showerror",
         lambda *a, **k: errs.append(a),
         raising=False,
     )
     monkeypatch.setattr(
-        gui_mod.messagebox,
+        mod.gui.messagebox,
         "showinfo",
         lambda *a, **k: infos.append(a),
         raising=False,
     )
     monkeypatch.setattr(
-        gui_mod.messagebox,
+        mod.gui.messagebox,
         "askyesno",
         lambda *a, **k: False,
         raising=False,
@@ -297,10 +313,24 @@ def test_generate_button_click_non_positive(tmp_path, monkeypatch):
     gui.chords_same_var = types.SimpleNamespace(get=lambda: False)
     lb = types.SimpleNamespace(curselection=lambda: (0,), get=lambda idx: "C")
     gui.chord_listbox = lb
+    gui.display_map = {"C": "C"}
+    gui.sorted_chords = ["C"]
+    gui.display_map = {"C": "C"}
+    gui.sorted_chords = ["C"]
+    gui.display_map = {"C": "C"}
+    gui.sorted_chords = ["C"]
+    gui.display_map = {"C": "C"}
+    gui.sorted_chords = ["C"]
+    gui.display_map = {"C": "C"}
+    gui.sorted_chords = ["C"]
+    gui.display_map = {"C": "C"}
+    gui.sorted_chords = ["C"]
+    gui.display_map = {"C": "C"}
+    gui.sorted_chords = ["C"]
 
     monkeypatch.setattr(gui_mod.filedialog, "asksaveasfilename", lambda **k: str(tmp_path / "x.mid"), raising=False)
     errs = []
-    monkeypatch.setattr(gui_mod.messagebox, "showerror", lambda *a, **k: errs.append(a), raising=False)
+    monkeypatch.setattr(mod.gui.messagebox, "showerror", lambda *a, **k: errs.append(a), raising=False)
 
     gui._generate_button_click()
 
@@ -332,6 +362,10 @@ def test_generate_button_click_invalid_denominator(tmp_path, monkeypatch):
     gui.harmony_lines = types.SimpleNamespace(get=lambda: "0")
     lb = types.SimpleNamespace(curselection=lambda: (0,), get=lambda idx: "C")
     gui.chord_listbox = lb
+    gui.display_map = {"C": "C"}
+    gui.sorted_chords = ["C"]
+    gui.display_map = {"C": "C"}
+    gui.sorted_chords = ["C"]
 
     monkeypatch.setattr(
         gui_mod.filedialog,
@@ -341,7 +375,7 @@ def test_generate_button_click_invalid_denominator(tmp_path, monkeypatch):
     )
     errs = []
     monkeypatch.setattr(
-        gui_mod.messagebox, "showerror", lambda *a, **k: errs.append(a), raising=False
+        mod.gui.messagebox, "showerror", lambda *a, **k: errs.append(a), raising=False
     )
 
     gui._generate_button_click()
@@ -374,6 +408,8 @@ def test_generate_button_click_invalid_numerator(tmp_path, monkeypatch):
     gui.harmony_lines = types.SimpleNamespace(get=lambda: "0")
     lb = types.SimpleNamespace(curselection=lambda: (0,), get=lambda idx: "C")
     gui.chord_listbox = lb
+    gui.display_map = {"C": "C"}
+    gui.sorted_chords = ["C"]
 
     monkeypatch.setattr(
         gui_mod.filedialog,
@@ -383,7 +419,7 @@ def test_generate_button_click_invalid_numerator(tmp_path, monkeypatch):
     )
     errs = []
     monkeypatch.setattr(
-        gui_mod.messagebox, "showerror", lambda *a, **k: errs.append(a), raising=False
+        mod.gui.messagebox, "showerror", lambda *a, **k: errs.append(a), raising=False
     )
 
     gui._generate_button_click()
@@ -416,6 +452,8 @@ def test_generate_button_click_motif_exceeds_notes(tmp_path, monkeypatch):
     gui.harmony_lines = types.SimpleNamespace(get=lambda: "0")
     lb = types.SimpleNamespace(curselection=lambda: (0,), get=lambda idx: "C")
     gui.chord_listbox = lb
+    gui.display_map = {"C": "C"}
+    gui.sorted_chords = ["C"]
 
     monkeypatch.setattr(
         gui_mod.filedialog,
@@ -425,7 +463,7 @@ def test_generate_button_click_motif_exceeds_notes(tmp_path, monkeypatch):
     )
     errs = []
     monkeypatch.setattr(
-        gui_mod.messagebox, "showerror", lambda *a, **k: errs.append(a), raising=False
+        mod.gui.messagebox, "showerror", lambda *a, **k: errs.append(a), raising=False
     )
 
     gui._generate_button_click()
@@ -589,11 +627,15 @@ def test_preview_button_uses_playback(monkeypatch, tmp_path):
     gui.chord_listbox = types.SimpleNamespace(
         curselection=lambda: (0,), get=lambda idx: "C"
     )
+    gui.display_map = {"C": "C"}
+    gui.sorted_chords = ["C"]
+    gui.soundfont_var = types.SimpleNamespace(get=lambda: "")
 
     calls = {}
 
-    stub_play = types.SimpleNamespace(play_midi=lambda path: calls.setdefault("path", path))
+    stub_play = types.SimpleNamespace(play_midi=lambda path, soundfont=None: calls.setdefault("path", path))
     monkeypatch.setitem(sys.modules, "melody_generator.playback", stub_play)
+    monkeypatch.setattr(mod.gui, "messagebox", types.SimpleNamespace(showerror=lambda *a, **k: None), raising=False)
 
     gui._preview_button_click()
 
@@ -627,12 +669,16 @@ def test_preview_button_falls_back(monkeypatch, tmp_path):
     gui.chord_listbox = types.SimpleNamespace(
         curselection=lambda: (0,), get=lambda idx: "C"
     )
+    gui.display_map = {"C": "C"}
+    gui.sorted_chords = ["C"]
+    gui.soundfont_var = types.SimpleNamespace(get=lambda: "")
 
-    def raise_err(_p):
+    def raise_err(_p, soundfont=None):
         raise gui_mod.MidiPlaybackError("boom")
 
     stub_play = types.SimpleNamespace(play_midi=raise_err)
     monkeypatch.setitem(sys.modules, "melody_generator.playback", stub_play)
+    monkeypatch.setattr(mod.gui.messagebox, "showerror", lambda *a, **k: None, raising=False)
     calls = {}
     monkeypatch.setattr(gui, "_open_default_player", lambda p: calls.setdefault("fallback", p))
 
@@ -668,12 +714,16 @@ def test_preview_file_removed(monkeypatch, tmp_path):
     gui.chord_listbox = types.SimpleNamespace(
         curselection=lambda: (0,), get=lambda idx: "C"
     )
+    gui.display_map = {"C": "C"}
+    gui.sorted_chords = ["C"]
+    gui.soundfont_var = types.SimpleNamespace(get=lambda: "")
 
     calls = {}
     stub_play = types.SimpleNamespace(
-        play_midi=lambda path: calls.setdefault("path", path)
+        play_midi=lambda path, soundfont=None: calls.setdefault("path", path)
     )
     monkeypatch.setitem(sys.modules, "melody_generator.playback", stub_play)
+    monkeypatch.setattr(mod.gui.messagebox, "showerror", lambda *a, **k: None, raising=False)
     monkeypatch.setattr(gui, "_open_default_player", lambda p: None)
 
     gui._preview_button_click()
@@ -713,6 +763,7 @@ def test_cli_play_flag_invokes_playback(monkeypatch, tmp_path):
         play_midi=lambda p, **kw: calls.setdefault("play", (p, kw.get("soundfont")))
     )
     monkeypatch.setitem(sys.modules, "melody_generator.playback", stub_play)
+    monkeypatch.setattr(mod.gui.messagebox, "showerror", lambda *a, **k: None, raising=False)
     monkeypatch.setattr(mod, "playback", stub_play, raising=False)
 
     old = sys.argv
@@ -754,6 +805,7 @@ def test_cli_play_flag_falls_back(monkeypatch, tmp_path):
 
     stub_play = types.SimpleNamespace(play_midi=raise_err)
     monkeypatch.setitem(sys.modules, "melody_generator.playback", stub_play)
+    monkeypatch.setattr(mod.gui.messagebox, "showerror", lambda *a, **k: None, raising=False)
     monkeypatch.setattr(mod, "playback", stub_play, raising=False)
     calls = {}
     monkeypatch.setattr(mod, "_open_default_player", lambda p: calls.setdefault("fallback", p))
@@ -797,6 +849,7 @@ def test_cli_soundfont_forwarded(monkeypatch, tmp_path):
         play_midi=lambda p, soundfont=None: calls.setdefault("args", (p, soundfont))
     )
     monkeypatch.setitem(sys.modules, "melody_generator.playback", stub_play)
+    monkeypatch.setattr(mod.gui.messagebox, "showerror", lambda *a, **k: None, raising=False)
     monkeypatch.setattr(mod, "playback", stub_play, raising=False)
 
     old = sys.argv
@@ -835,6 +888,7 @@ def test_cli_soundfont_without_play(monkeypatch, tmp_path):
     calls = {}
     stub_play = types.SimpleNamespace(play_midi=lambda *a, **k: calls.setdefault("called", True))
     monkeypatch.setitem(sys.modules, "melody_generator.playback", stub_play)
+    monkeypatch.setattr(mod.gui.messagebox, "showerror", lambda *a, **k: None, raising=False)
     monkeypatch.setattr(mod, "playback", stub_play, raising=False)
 
     old = sys.argv

@@ -17,11 +17,13 @@
       </ul>
     {% endif %}
   {% endwith %}
-  <!-- Embedded player previews the generated audio file -->
+  <!-- Embedded player previews the generated audio file when available -->
+  {% if audio %}
   <audio controls autoplay>
     <source src="data:audio/wav;base64,{{ audio }}" type="audio/wav">
     Your browser does not support the audio tag.
   </audio>
+  {% endif %}
   <!-- Download link for saving the MIDI file locally -->
   <p><a download="melody.mid" href="data:audio/midi;base64,{{ midi }}">Download MIDI</a></p>
   <!-- Link back to the generator form -->
