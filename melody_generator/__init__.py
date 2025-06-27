@@ -27,6 +27,8 @@ __version__ = "0.1.0"
 #   boundaries instead of after the melody.
 # * ``generate_melody`` and ``create_midi_file`` validate that supplied rhythm
 #   ``pattern`` lists are non-empty and raise ``ValueError`` when violated.
+# * ``generate_random_chord_progression`` and ``diatonic_chords`` now check
+#   for unknown ``key`` values and raise ``ValueError`` with a clear message.
 # ---------------------------------------------------------------
 
 import mido
@@ -252,7 +254,8 @@ def generate_random_chord_progression(key: str, length: int = 4) -> List[str]:
     popular music.  Chords are derived from the selected key so the
     results fit naturally with generated melodies.
 
-    @param key (str): Musical key to base the chords on.
+    @param key (str): Musical key to base the chords on. ``ValueError`` is
+        raised when the key is not defined in :data:`SCALE`.
     @param length (int): Number of chords to generate.
     @returns List[str]: Chord names forming the progression.
     """
@@ -262,6 +265,9 @@ def generate_random_chord_progression(key: str, length: int = 4) -> List[str]:
     # progressions and keep the harmony sounding familiar.
     major_patterns = [[0, 3, 4, 0], [0, 5, 3, 4], [0, 3, 0, 4]]
     minor_patterns = [[0, 3, 4, 0], [0, 5, 3, 4], [0, 5, 4, 0]]
+
+    if key not in SCALE:
+        raise ValueError(f"Unknown key '{key}'")
 
     is_minor = key.endswith('m')
     notes = SCALE[key]
@@ -317,9 +323,13 @@ def diatonic_chords(key: str) -> List[str]:
     chords fall back to their major spelling when an exact match is not
     present in :data:`CHORDS`.
 
-    @param key (str): Musical key whose triads are requested.
+    @param key (str): Musical key whose triads are requested. ``ValueError`` is
+        raised when the key is not defined in :data:`SCALE`.
     @returns List[str]: All unique chords found in the key.
     """
+
+    if key not in SCALE:
+        raise ValueError(f"Unknown key '{key}'")
 
     is_minor = key.endswith('m')
     notes = SCALE[key]

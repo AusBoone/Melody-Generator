@@ -318,6 +318,20 @@ def test_diatonic_chords_major_minor():
     assert minor == ["Am", "B", "C", "Dm", "Em", "F", "G"]
 
 
+def test_random_progression_invalid_key():
+    """Invalid keys should raise ``ValueError`` in progression helper."""
+
+    with pytest.raises(ValueError):
+        melody_generator.generate_random_chord_progression("H", 4)
+
+
+def test_diatonic_chords_invalid_key():
+    """``diatonic_chords`` rejects unknown keys with ``ValueError``."""
+
+    with pytest.raises(ValueError):
+        melody_generator.diatonic_chords("H")
+
+
 def test_melody_trends_up_then_down():
     """Seeded melodies exhibit an overall rise then fall contour."""
     chords = ["C", "G", "Am", "F"]
