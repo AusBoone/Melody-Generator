@@ -29,6 +29,8 @@ __version__ = "0.1.0"
 #   ``pattern`` lists are non-empty and raise ``ValueError`` when violated.
 # * ``generate_random_chord_progression`` and ``diatonic_chords`` now check
 #   for unknown ``key`` values and raise ``ValueError`` with a clear message.
+# * ``generate_melody`` rejects ``base_octave`` values outside the safe MIDI
+#   range (0-8) so melodies cannot reference invalid pitches.
 # ---------------------------------------------------------------
 
 import mido
@@ -530,7 +532,8 @@ def generate_melody(
     @param pattern (List[float]|None): Optional rhythmic pattern. When provided,
         it must contain at least one duration value otherwise a ``ValueError`` is
         raised.
-    @param base_octave (int): Preferred starting octave.
+    @param base_octave (int): Preferred starting octave. Must be between
+        ``0`` and ``8`` so all generated MIDI notes remain valid.
     @returns List[str]: Generated melody as note strings.
     """
     # ``motif_length`` represents the number of notes in the initial idea that
@@ -565,6 +568,11 @@ def generate_melody(
             "time_signature denominator must be one of 1, 2, 4, 8 or 16 and "
             "numerator must be > 0"
         )
+
+    # ``base_octave`` controls the register of the melody. Restrict it to a
+    # safe MIDI range so generated notes remain between 0 and 127.
+    if not 0 <= base_octave <= 8:
+        raise ValueError("base_octave must be between 0 and 8")
     beat_unit = 1 / time_signature[1]
     start_beat = 0.0
 
@@ -1190,7 +1198,7 @@ def run_cli() -> None:
         "--base-octave",
         type=int,
         default=4,
-        help="Starting octave for the melody (default: 4).",
+        help="Starting octave for the melody (0-8, default: 4).",
     )
     parser.add_argument(
         "--include-chords",
@@ -1236,6 +1244,12 @@ def run_cli() -> None:
     # Verify the instrument program falls within the General MIDI range.
     if not 0 <= args.instrument <= 127:
         logging.error("Instrument must be between 0 and 127.")
+        sys.exit(1)
+
+    # Ensure the base octave stays within a musically reasonable range so
+    # generated notes remain valid MIDI values.
+    if not 0 <= args.base_octave <= 8:
+        logging.error("Base octave must be between 0 and 8.")
         sys.exit(1)
 
     # Validate key and chord progression.

@@ -131,6 +131,20 @@ def test_generate_melody_empty_pattern():
         generate_melody("C", 4, chords, motif_length=4, pattern=[])
 
 
+def test_generate_melody_invalid_base_octave():
+    """Out-of-range ``base_octave`` values should raise ``ValueError``.
+
+    The melody generator clamps notes based on ``base_octave``. Supplying a
+    value below 0 or above 8 would result in MIDI numbers outside 0-127, so
+    the function rejects them.
+    """
+    chords = ["C", "G"]
+    with pytest.raises(ValueError):
+        generate_melody("C", 4, chords, motif_length=4, base_octave=-1)
+    with pytest.raises(ValueError):
+        generate_melody("C", 4, chords, motif_length=4, base_octave=9)
+
+
 def test_create_midi_file_invalid_time_signature(tmp_path):
     """``create_midi_file`` rejects malformed time signatures.
 

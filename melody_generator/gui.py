@@ -17,6 +17,8 @@ is delegated to :mod:`melody_generator`.
 #   with range validation.
 # * ``_check_preview_available`` displays a notice when FluidSynth or a
 #   SoundFont is unavailable for preview playback.
+# * ``_generate_button_click`` now validates ``base_octave`` to ensure it
+#   stays within the MIDI range 0-8 before generating a melody.
 # ---------------------------------------------------------------
 from __future__ import annotations
 
@@ -515,6 +517,16 @@ class MelodyGeneratorGUI:
             )
             return
 
+        # Reject octave selections outside the safe MIDI range. The GUI slider
+        # limits values to 1-7 but loading settings from disk may yield other
+        # numbers.
+        base_octave = self.base_octave_var.get()
+        if base_octave < 0 or base_octave > 8:
+            messagebox.showerror(
+                "Input Error", "Base octave must be between 0 and 8."
+            )
+            return
+
         output_file = filedialog.asksaveasfilename(
             defaultextension=".mid", filetypes=[("MIDI files", "*.mid")]
         )
@@ -524,7 +536,7 @@ class MelodyGeneratorGUI:
                 notes_count,
                 chord_progression,
                 motif_length=motif_length,
-                base_octave=self.base_octave_var.get(),
+                base_octave=base_octave,
             )
             extra: List[List[str]] = []
             if self.harmony_line_fn is not None:

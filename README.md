@@ -145,9 +145,10 @@ and use the web interface without installing Python locally.
 - **Harmony**: Tick this option to add a simple harmony line.
 - **Counterpoint**: Generates an additional melody that moves against the main line.
 - **Base Octave**: Starting octave for the melody. Use the slider or
-  `--base-octave` flag to shift the register. Notes typically stay
-  between this octave and the next higher one with rare octave shifts at
-  phrase boundaries.
+  `--base-octave` flag to shift the register. Allowed range is **0-8** so
+  all generated notes remain within the MIDI specification. Notes
+  typically stay between this octave and the next higher one with rare
+  octave shifts at phrase boundaries.
 
 ## CLI Flags
 When running from the command line you can supply optional flags:
@@ -156,7 +157,8 @@ When running from the command line you can supply optional flags:
 - `--harmony` adds a parallel harmony track.
 - `--harmony-lines N` creates `N` additional harmony parts.
 - `--counterpoint` generates a contrapuntal line based on the melody.
-- `--base-octave N` sets the starting octave of the melody (default: 4).
+- `--base-octave N` sets the starting octave of the melody (0-8,
+  default: 4).
 - `--play` previews the resulting MIDI file using FluidSynth when available and
   falls back to the system player otherwise.
 - `--soundfont PATH` uses the specified SoundFont when playing the file with
