@@ -232,20 +232,6 @@ def test_generate_button_click(tmp_path, monkeypatch):
         get=lambda idx: ["C", "G"][idx],
     )
     gui.chord_listbox = lb
-    gui.display_map = {"C": "C"}
-    gui.sorted_chords = ["C"]
-    gui.display_map = {"C": "C"}
-    gui.sorted_chords = ["C"]
-    gui.display_map = {"C": "C"}
-    gui.sorted_chords = ["C"]
-    gui.display_map = {"C": "C"}
-    gui.sorted_chords = ["C"]
-    gui.display_map = {"C": "C"}
-    gui.sorted_chords = ["C"]
-    gui.display_map = {"C": "C"}
-    gui.sorted_chords = ["C"]
-    gui.display_map = {"C": "C"}
-    gui.sorted_chords = ["C"]
     gui.display_map = {"C": "C", "G": "G"}
     gui.sorted_chords = ["C", "G"]
 
@@ -317,18 +303,6 @@ def test_generate_button_click_non_positive(tmp_path, monkeypatch):
     gui.chord_listbox = lb
     gui.display_map = {"C": "C"}
     gui.sorted_chords = ["C"]
-    gui.display_map = {"C": "C"}
-    gui.sorted_chords = ["C"]
-    gui.display_map = {"C": "C"}
-    gui.sorted_chords = ["C"]
-    gui.display_map = {"C": "C"}
-    gui.sorted_chords = ["C"]
-    gui.display_map = {"C": "C"}
-    gui.sorted_chords = ["C"]
-    gui.display_map = {"C": "C"}
-    gui.sorted_chords = ["C"]
-    gui.display_map = {"C": "C"}
-    gui.sorted_chords = ["C"]
 
     monkeypatch.setattr(gui_mod.filedialog, "asksaveasfilename", lambda **k: str(tmp_path / "x.mid"), raising=False)
     errs = []
@@ -364,8 +338,6 @@ def test_generate_button_click_invalid_denominator(tmp_path, monkeypatch):
     gui.harmony_lines = types.SimpleNamespace(get=lambda: "0")
     lb = types.SimpleNamespace(curselection=lambda: (0,), get=lambda idx: "C")
     gui.chord_listbox = lb
-    gui.display_map = {"C": "C"}
-    gui.sorted_chords = ["C"]
     gui.display_map = {"C": "C"}
     gui.sorted_chords = ["C"]
 
