@@ -574,6 +574,37 @@ def test_cli_motif_exceeds_notes_exit(tmp_path):
     sys.argv = old
 
 
+def test_cli_invalid_instrument_number_exit(tmp_path):
+    """Out-of-range instrument values should cause ``run_cli`` to exit."""
+
+    mod, _, _ = load_module()
+    out = tmp_path / "bad.mid"
+    argv = [
+        "prog",
+        "--key",
+        "C",
+        "--chords",
+        "C,G",
+        "--bpm",
+        "120",
+        "--timesig",
+        "4/4",
+        "--notes",
+        "4",
+        "--base-octave",
+        "4",
+        "--output",
+        str(out),
+        "--instrument",
+        "128",
+    ]
+    old = sys.argv
+    sys.argv = argv
+    with pytest.raises(SystemExit):
+        mod.run_cli()
+    sys.argv = old
+
+
 def test_preview_button_uses_playback(monkeypatch, tmp_path):
     """``_preview_button_click`` should invoke the playback module."""
 

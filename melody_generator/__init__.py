@@ -1087,6 +1087,11 @@ def run_cli() -> None:
         logging.error("Motif length cannot exceed the number of notes.")
         sys.exit(1)
 
+    # Verify the instrument program falls within the General MIDI range.
+    if not 0 <= args.instrument <= 127:
+        logging.error("Instrument must be between 0 and 127.")
+        sys.exit(1)
+
     # Validate key and chord progression.
     if args.key not in SCALE:
         logging.error("Invalid key provided.")
