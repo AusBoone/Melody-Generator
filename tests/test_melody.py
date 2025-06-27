@@ -145,6 +145,29 @@ def test_generate_melody_invalid_base_octave():
         generate_melody("C", 4, chords, motif_length=4, base_octave=9)
 
 
+def test_get_chord_notes_unknown():
+    """``get_chord_notes`` should raise ``ValueError`` for unknown chords."""
+
+    with pytest.raises(ValueError):
+        melody_generator.get_chord_notes("H")
+
+
+def test_generate_melody_empty_chord_progression():
+    """An empty ``chord_progression`` is invalid."""
+
+    with pytest.raises(ValueError):
+        generate_melody("C", 4, [], motif_length=4)
+
+
+def test_create_midi_file_empty_chord_progression(tmp_path):
+    """``create_midi_file`` should reject empty chord progressions."""
+
+    out = tmp_path / "empty.mid"
+    melody = ["C4"] * 4
+    with pytest.raises(ValueError):
+        create_midi_file(melody, 120, (4, 4), str(out), chord_progression=[])
+
+
 def test_create_midi_file_invalid_time_signature(tmp_path):
     """``create_midi_file`` rejects malformed time signatures.
 

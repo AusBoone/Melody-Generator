@@ -31,6 +31,8 @@ __version__ = "0.1.0"
 #   for unknown ``key`` values and raise ``ValueError`` with a clear message.
 # * ``generate_melody`` rejects ``base_octave`` values outside the safe MIDI
 #   range (0-8) so melodies cannot reference invalid pitches.
+# * ``_open_default_player`` uses ``xdg-open --wait`` on Linux so preview files
+#   remain until the external player closes.
 # ---------------------------------------------------------------
 
 import mido
@@ -534,6 +536,12 @@ def get_chord_notes(chord: str) -> List[str]:
     @param chord (str): Chord name (e.g., ``C`` or ``F#m``).
     @returns List[str]: Note names in the chord.
     """
+    # ``CHORDS`` acts as a lookup table for all supported triads. Accessing the
+    # dictionary directly would raise ``KeyError`` for an unknown chord which
+    # surfaces as an unhandled exception in calling code.  Validate the input so
+    # that consumers receive a clear ``ValueError`` describing the issue.
+    if chord not in CHORDS:
+        raise ValueError(f"Unknown chord: {chord}")
     return CHORDS[chord]
 
 
@@ -592,6 +600,11 @@ def generate_melody(
         ``0`` and ``8`` so all generated MIDI notes remain valid.
     @returns List[str]: Generated melody as note strings.
     """
+    # The chord progression provides harmonic context for each note. Reject an
+    # empty list so later indexing operations never fail when aligning notes to
+    # chords.
+    if not chord_progression:
+        raise ValueError("chord_progression must contain at least one chord")
     # ``motif_length`` represents the number of notes in the initial idea that
     # will be repeated.  It cannot exceed the total number of notes requested or
     # the function would be unable to fill the melody.
@@ -940,6 +953,11 @@ def create_midi_file(
     @param program (int): General MIDI instrument program for the melody.
     @returns None: MIDI data is written to ``output_file``.
     """
+    # ``chord_progression`` must contain at least one chord when provided.
+    # An empty list would lead to ``IndexError`` when aligning chord events
+    # with the melody, so validate early.
+    if chord_progression is not None and not chord_progression:
+        raise ValueError("chord_progression must contain at least one chord")
     valid_denoms = {1, 2, 4, 8, 16}
     if (
         time_signature[0] <= 0
@@ -1136,8 +1154,9 @@ def _open_default_player(path: str, *, delete_after: bool = False) -> None:
 
     The command runs in a background thread so the caller does not block.
     When ``delete_after`` is ``True`` the file is removed once the player
-    command has finished launching. This is useful for preview files that
-    should not persist on disk.
+    command has finished launching. On Linux the function attempts to use
+    ``xdg-open --wait`` so that temporary files persist until the external
+    player closes.
     """
 
     def runner() -> None:
@@ -1170,7 +1189,16 @@ def _open_default_player(path: str, *, delete_after: bool = False) -> None:
                 if player:
                     subprocess.run([player, path], check=False)
                 else:
-                    subprocess.run(["xdg-open", path], check=False)
+                    # On Linux ``xdg-open" typically returns immediately after
+                    # launching the associated application which leads to
+                    # premature deletion when ``delete_after`` is ``True``.
+                    # Modern versions support ``--wait`` so attempt to use it
+                    # and fall back to the standard behaviour on failure.
+                    proc = subprocess.run(
+                        ["xdg-open", "--wait", path], check=False
+                    )
+                    if proc.returncode != 0:
+                        subprocess.run(["xdg-open", path], check=False)
         except Exception as exc:  # pragma: no cover - platform dependent
             logging.error("Could not open MIDI file: %s", exc)
         finally:

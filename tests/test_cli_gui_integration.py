@@ -1102,3 +1102,28 @@ def test_open_default_player_error_threadsafe(monkeypatch):
         func(*args)
 
     assert errors
+
+
+def test_open_default_player_waits_linux(monkeypatch, tmp_path):
+    """File deletion should occur only after the player exits on Linux."""
+
+    mod, _, _ = load_module()
+    midi = tmp_path / "x.mid"
+    midi.write_text("data")
+
+    calls = []
+
+    def fake_run(cmd, check=False):
+        calls.append(cmd)
+        time.sleep(0.05)
+        return types.SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(mod.subprocess, "run", fake_run)
+    monkeypatch.setattr(mod.os, "environ", {})
+    monkeypatch.setattr(mod.sys, "platform", "linux", raising=False)
+
+    mod._open_default_player(str(midi), delete_after=True)
+    assert midi.exists()
+    time.sleep(0.06)
+    assert not midi.exists()
+    assert calls and "--wait" in calls[0]
