@@ -115,6 +115,17 @@ def test_generate_melody_invalid_numerator_and_negative_denominator():
         generate_melody('C', 4, chords, motif_length=4, time_signature=(4, -1))
 
 
+def test_generate_melody_empty_pattern():
+    """Supplying an empty rhythm pattern should raise ``ValueError``.
+
+    The melody generation logic cycles through the pattern list, so an empty
+    list would lead to divide-by-zero errors. Validate that the function
+    proactively rejects this."""
+    chords = ['C', 'G']
+    with pytest.raises(ValueError):
+        generate_melody('C', 4, chords, motif_length=4, pattern=[])
+
+
 def test_create_midi_file_invalid_time_signature(tmp_path):
     """``create_midi_file`` rejects malformed time signatures.
 
@@ -128,6 +139,18 @@ def test_create_midi_file_invalid_time_signature(tmp_path):
         create_midi_file(melody, 120, (4, 0), str(out))
     with pytest.raises(ValueError):
         create_midi_file(melody, 120, (4, -3), str(out))
+
+
+def test_create_midi_file_empty_pattern(tmp_path):
+    """An empty rhythm pattern should be rejected with ``ValueError``.
+
+    ``create_midi_file`` cycles through the provided list when scheduling MIDI
+    events. A zero-length list would result in ``ZeroDivisionError`` when
+    indexing with ``i % len(pattern)``."""
+    melody = ['C4'] * 4
+    out = tmp_path / 'empty.mid'
+    with pytest.raises(ValueError):
+        create_midi_file(melody, 120, (4, 4), str(out), pattern=[])
 
 
 def test_extra_tracks_created(tmp_path):
