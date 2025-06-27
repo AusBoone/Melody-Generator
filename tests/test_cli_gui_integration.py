@@ -13,6 +13,8 @@ import subprocess
 import sys
 from pathlib import Path
 import types
+import threading
+import time
 import pytest
 
 def load_module():
@@ -680,7 +682,7 @@ def test_preview_button_falls_back(monkeypatch, tmp_path):
     monkeypatch.setitem(sys.modules, "melody_generator.playback", stub_play)
     monkeypatch.setattr(mod.gui.messagebox, "showerror", lambda *a, **k: None, raising=False)
     calls = {}
-    monkeypatch.setattr(gui, "_open_default_player", lambda p: calls.setdefault("fallback", p))
+    monkeypatch.setattr(gui, "_open_default_player", lambda p, delete_after=False: calls.setdefault("fallback", p))
 
     gui._preview_button_click()
 
@@ -724,12 +726,70 @@ def test_preview_file_removed(monkeypatch, tmp_path):
     )
     monkeypatch.setitem(sys.modules, "melody_generator.playback", stub_play)
     monkeypatch.setattr(mod.gui.messagebox, "showerror", lambda *a, **k: None, raising=False)
-    monkeypatch.setattr(gui, "_open_default_player", lambda p: None)
+    monkeypatch.setattr(gui, "_open_default_player", lambda p, delete_after=False: Path(p).unlink())
 
     gui._preview_button_click()
 
     path = calls["path"]
     assert not os.path.exists(path)
+
+
+def test_preview_file_waits_for_player(monkeypatch):
+    """Preview file should remain until the player thread cleans up."""
+
+    mod, gui_mod, _ = load_module()
+
+    gui = gui_mod.MelodyGeneratorGUI.__new__(gui_mod.MelodyGeneratorGUI)
+    gui.generate_melody = lambda *a, **k: ["C4"] * 4
+    gui.create_midi_file = lambda *a, **k: Path(a[3]).write_text("midi")
+    gui.harmony_line_fn = None
+    gui.counterpoint_fn = None
+    gui.save_settings = None
+    gui.rhythm_pattern = None
+    gui.key_var = types.SimpleNamespace(get=lambda: "C")
+    gui.bpm_var = types.SimpleNamespace(get=lambda: 120)
+    gui.timesig_var = types.SimpleNamespace(get=lambda: "4/4")
+    gui.notes_var = types.SimpleNamespace(get=lambda: 4)
+    gui.motif_entry = types.SimpleNamespace(get=lambda: "2")
+    gui.base_octave_var = types.SimpleNamespace(get=lambda: 4)
+    gui.instrument_var = types.SimpleNamespace(get=lambda: "Piano")
+    gui.harmony_var = types.SimpleNamespace(get=lambda: False)
+    gui.counterpoint_var = types.SimpleNamespace(get=lambda: False)
+    gui.harmony_lines = types.SimpleNamespace(get=lambda: "0")
+    gui.include_chords_var = types.SimpleNamespace(get=lambda: False)
+    gui.chords_same_var = types.SimpleNamespace(get=lambda: False)
+    gui.chord_listbox = types.SimpleNamespace(
+        curselection=lambda: (0,), get=lambda idx: "C"
+    )
+    gui.display_map = {"C": "C"}
+    gui.sorted_chords = ["C"]
+    gui.soundfont_var = types.SimpleNamespace(get=lambda: "")
+
+    def raise_err(_p, soundfont=None):
+        raise gui_mod.MidiPlaybackError("boom")
+
+    stub_play = types.SimpleNamespace(play_midi=raise_err)
+    monkeypatch.setitem(sys.modules, "melody_generator.playback", stub_play)
+    monkeypatch.setattr(mod.gui.messagebox, "showerror", lambda *a, **k: None, raising=False)
+
+    calls = {}
+
+    def fake_player(path, delete_after=False):
+        calls["path"] = path
+        def worker():
+            time.sleep(0.05)
+            if delete_after:
+                Path(path).unlink()
+        threading.Thread(target=worker, daemon=True).start()
+
+    monkeypatch.setattr(gui, "_open_default_player", fake_player)
+
+    gui._preview_button_click()
+
+    tmp = Path(calls["path"])
+    assert tmp.exists()
+    time.sleep(0.06)
+    assert not tmp.exists()
 
 
 def test_cli_play_flag_invokes_playback(monkeypatch, tmp_path):
@@ -808,7 +868,7 @@ def test_cli_play_flag_falls_back(monkeypatch, tmp_path):
     monkeypatch.setattr(mod.gui.messagebox, "showerror", lambda *a, **k: None, raising=False)
     monkeypatch.setattr(mod, "playback", stub_play, raising=False)
     calls = {}
-    monkeypatch.setattr(mod, "_open_default_player", lambda p: calls.setdefault("fallback", p))
+    monkeypatch.setattr(mod, "_open_default_player", lambda p, delete_after=False: calls.setdefault("fallback", p))
 
     old = sys.argv
     sys.argv = argv
