@@ -340,6 +340,14 @@ def test_diatonic_chords_invalid_key():
         melody_generator.diatonic_chords("H")
 
 
+def test_counterpoint_invalid_key():
+    """``generate_counterpoint_melody`` should validate the key argument."""
+
+    melody = ["C4", "D4"]
+    with pytest.raises(ValueError):
+        generate_counterpoint_melody(melody, "H")
+
+
 def test_melody_trends_up_then_down():
     """Seeded melodies exhibit an overall rise then fall contour."""
     chords = ["C", "G", "Am", "F"]
