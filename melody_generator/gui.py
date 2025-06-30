@@ -1,9 +1,14 @@
-"""Tkinter GUI front-end for the Melody Generator application.
+"""Tkinter front-end for melody generation.
 
-This module contains :class:`MelodyGeneratorGUI`, a thin wrapper around the
-core melody functions that exposes them through a simple Tkinter interface.
-All user interaction and validation logic lives here while the heavy lifting
-is delegated to :mod:`melody_generator`.
+The :class:`MelodyGeneratorGUI` class wraps the core library functions with a
+minimal graphical interface that works on all platforms shipping Tkinter.  The
+interface exposes the same options as the CLI—key selection, chord
+progressions, tempo and so forth—while adding conveniences such as live
+preview via FluidSynth and persistent user settings.
+
+Only lightweight widgets are used so the application remains responsive even on
+systems with modest resources.  All heavy lifting such as MIDI file creation or
+counterpoint generation is delegated to :mod:`melody_generator`.
 """
 
 # ---------------------------------------------------------------

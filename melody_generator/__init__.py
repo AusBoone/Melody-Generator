@@ -1,13 +1,47 @@
 #!/usr/bin/env python3
-"""
-Melody Generator:
-A Python script that creates a random melody in a specified key with a given BPM and time signature.
+"""Melody Generator library.
+
+This package exposes utility functions and GUI helpers for creating
+short melodies.  A typical workflow is to call :func:`generate_melody`
+with a key, number of notes and chord progression, then feed the result
+into :func:`create_midi_file` to produce a MIDI track.  Both a Tkinter
+desktop interface and Flask web interface wrap these calls so end users
+can experiment without writing code.
+
+Underlying Algorithm
+--------------------
+The core algorithm repeats a small *motif* throughout the phrase. Each
+subsequent note is chosen from the current chord and biased toward small
+intervals from the previous pitch. Large leaps are tracked so the next
+note compensates by moving in the opposite direction. When no suitable
+candidate exists, a random pitch from the key acts as a safe fallback.
+Rhythm patterns are selected from a small library or generated randomly
+to keep results lively without requiring deep musical knowledge.
+
+Algorithm Pseudocode
+--------------------
+The following outlines the main loop executed by :func:`generate_melody`::
+
+    motif = generate_motif(motif_length, key)
+    pattern = pattern or random_choice(PATTERNS)
+    for i in range(num_notes):
+        chord = chord_progression[i % len(chord_progression)]
+        candidate_notes = filter_scale(key, chord)
+        next_note = choose_note(candidate_notes, prev_note, leap_correction)
+        melody.append(next_note)
+        update_leap_tracking()
+        advance_rhythm(pattern)
+
+This approach favours repetition with subtle variation so each phrase
+feels related to the previous one while still moving forward.
+
 Features include:
 - Integrated rhythmic patterns for note durations.
 - Enhanced melody generation with controlled randomness.
 - Robust fallback mechanisms for note selection.
-- Both GUI (tkinter) and CLI interfaces.
+- Both GUI (Tkinter) and CLI interfaces.
 - Detailed logging and improved documentation.
+
 Author: Austin Boone
 Modified: February 15, 2025
 """
