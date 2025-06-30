@@ -3,9 +3,14 @@
 
 This module provides a minimal web front-end that mirrors the
 functionality of the command line and Tkinter interfaces provided
-by the :mod:`melody_generator` package. The goal is to expose the
-melody generation functions over HTTP so users can experiment
-directly from their browser.
+by the :mod:`melody_generator` package.  Users can select a key,
+chord progression and tempo through a simple HTML form.  The server
+generates a temporary MIDI file which is returned for download and,
+when possible, rendered to WAV for immediate playback.
+
+The interface is intentionally lightweight and runs with Flask's
+development server so examples can be tried without additional
+infrastructure.
 """
 # This revision introduces validation for the ``base_octave`` input so
 # out-of-range values (anything not between 0 and 8) trigger a flash

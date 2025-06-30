@@ -12,7 +12,9 @@ Example usage
 
 The SoundFont path can be supplied via the ``soundfont`` parameter or the
 ``SOUND_FONT`` environment variable.  When neither is given a sensible
-default is attempted.
+default is attempted.  Setting ``SOUND_FONT`` globally allows both the GUI and
+CLI helpers to locate the same instrument bank without additional
+configuration.
 """
 
 from __future__ import annotations

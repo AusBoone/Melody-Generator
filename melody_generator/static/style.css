@@ -1,3 +1,10 @@
+/*
+ * Minimal styling used by the Flask web interface.
+ *
+ * The goal is to keep the layout clean and centred while avoiding any
+ * external CSS dependencies so the example can run from a single
+ * container image or plain Python environment.
+ */
 /* Center the main content and use a readable font */
 body {
     font-family: Arial, sans-serif;
