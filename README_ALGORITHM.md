@@ -1,8 +1,6 @@
 # Melody Generation Algorithm
 
-This document offers a scholarly explanation of the algorithm implemented in the
-`melody_generator` package. It expands upon the brief description in the main
-`README.md` and is aimed at readers interested in the musical and probabilistic
+This document is aimed at readers interested in the musical and probabilistic
 foundations of the generator.
 
 ## Overview
