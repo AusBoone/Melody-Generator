@@ -1,5 +1,8 @@
 # Melody-Generator
-Python script that allows users to create a random melody in a specified key, with a specific BPM (beats per minute) and time signature. The generated melody can be saved as a MIDI file.
+Melody-Generator is a research-oriented project that provides a simple yet versatile engine for
+generating melodies in any key, tempo and meter. The output can be rendered to a standard MIDI
+file for use in digital audio workstations. For a formal exposition of the algorithm see
+[README_ALGORITHM.md](README_ALGORITHM.md).
 
 # Requirements
 - Python 3.x
@@ -180,6 +183,9 @@ Lint the project using [ruff](https://github.com/astral-sh/ruff):
 ```bash
 ruff check .
 ```
+The linter is configured via `ruff.toml`, which enforces a 100 character
+line length and targets Python 3.8. Adjust this file if different rules
+are required.
 
 To build the Docker image locally run:
 
@@ -208,10 +214,13 @@ alternative container runtime such as Podman.
 
 ## Algorithm Overview
 
-The library creates melodies using a short motif that repeats
-throughout the phrase.  Each subsequent note is chosen from the current
-chord and biased toward small intervals from the previous pitch.  Large
-leaps are tracked so the next note compensates by moving in the
-opposite direction.  When no suitable candidate exists a random pitch
-from the key acts as a safe fallback.  Rhythm can either be selected
-from a library of common patterns or generated randomly.
+The generator begins with a short motif which is reiterated across the phrase in
+slightly varied form. Candidate notes for each position are drawn from the
+current chord and proximate scale degrees, forming a small search space that
+reflects traditional voice-leading practice. Intervals are weighted inversely by
+size so the melody favors stepwise motion. Large leaps are recorded and the next
+note is gently pulled toward the prior tessitura to avoid abrupt contours. When
+no candidate satisfies the constraints, the algorithm defaults to a uniform
+choice from the key, ensuring progress. Rhythm can be sampled from a corpus of
+common patterns or generated stochastically. A detailed exposition of these
+heuristics is available in [README_ALGORITHM.md](README_ALGORITHM.md).

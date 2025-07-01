@@ -1,0 +1,7 @@
+# Ruff configuration for Melody-Generator
+# Specifies base lint rules and interpreter version for style enforcement.
+# The line length is aligned with typical PEP8 recommendations while
+# targeting Python 3.8 compatibility for the codebase.
+
+line-length = 100
+target-version = "py38"

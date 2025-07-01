@@ -1,16 +1,20 @@
 # Melody Generation Algorithm
 
-This document describes the algorithm implemented in the `melody_generator` package.
-It expands upon the brief overview in the main `README.md` and is intended for
-contributors who want a deeper understanding of how melodies are produced.
+This document offers a scholarly explanation of the algorithm implemented in the
+`melody_generator` package. It expands upon the brief description in the main
+`README.md` and is aimed at readers interested in the musical and probabilistic
+foundations of the generator.
 
 ## Overview
 
-The generator builds a short motif of several notes and repeats it across the
-requested number of measures. During each repetition the motif is shifted or
-slightly altered so that the resulting phrase has forward momentum but still
-sounds cohesive. Harmony is supplied by a chord progression chosen either by the
-user or by the helper function `generate_random_chord_progression`.
+The generator constructs a concise motif and reiterates it over the requested
+number of measures. Each pass through the motif may transpose or mutate the
+original material, mirroring the variation techniques found in classical forms.
+Candidate notes are selected from the active chord and surrounding scale tones,
+yielding a small set that can be treated as a first-order Markov state. The
+resulting sequence balances repetition with stochastic choice. Harmony is
+specified either directly by the user or by the helper function
+`generate_random_chord_progression`.
 
 ## Step-by-Step Process
 
@@ -95,3 +99,7 @@ to maintain a focused register.
 These heuristics strike a balance between structured repetition and random
 variation, yielding phrases that are musically coherent without relying on
 complex theory.
+From a data science perspective the rules serve as priors that encode stylistic
+assumptions without the need for a large training corpus. Musicians can adjust
+the parameters to experiment with different harmonic idioms or rhythmic feels
+while keeping the algorithm efficient and deterministic.
