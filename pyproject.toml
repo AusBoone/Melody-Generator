@@ -33,8 +33,10 @@ dependencies = [
 ]
 
 [project.urls]
-Source = "https://example.com/source"
-Issues = "https://example.com/issues"
+# Link to the public repository hosting the package source code
+Source = "https://github.com/AusBoone/Melody-Generator"
+# Issue tracker for bug reports and feature requests
+Issues = "https://github.com/AusBoone/Melody-Generator/issues"
 
 [project.scripts]
 melody-generator = "melody_generator:main"
