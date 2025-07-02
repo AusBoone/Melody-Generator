@@ -13,8 +13,9 @@ development server so examples can be tried without additional
 infrastructure.
 """
 # This revision introduces validation for the ``base_octave`` input so
-# out-of-range values (anything not between 0 and 8) trigger a flash
-# message instead of causing errors when generating the melody.
+# out-of-range values (anything not between ``MIN_OCTAVE`` and
+# ``MAX_OCTAVE``) trigger a flash message instead of causing errors when
+# generating the melody.
 # The original implementation attempted to render the generated MIDI to WAV
 # using FluidSynth so that browsers lacking MIDI support could preview the
 # melody. This update flashes an informative message when that rendering
@@ -54,6 +55,8 @@ generate_random_chord_progression = melody_generator.generate_random_chord_progr
 generate_random_rhythm_pattern = melody_generator.generate_random_rhythm_pattern
 generate_harmony_line = melody_generator.generate_harmony_line
 generate_counterpoint_melody = melody_generator.generate_counterpoint_melody
+MIN_OCTAVE = melody_generator.MIN_OCTAVE
+MAX_OCTAVE = melody_generator.MAX_OCTAVE
 
 INSTRUMENTS = {
     "Piano": 0,
@@ -148,8 +151,10 @@ def index():
             flash("Motif length cannot exceed the number of notes.")
             return render_template('index.html', scale=sorted(SCALE.keys()), instruments=INSTRUMENTS.keys())
 
-        if base_octave < 0 or base_octave > 8:
-            flash("Base octave must be between 0 and 8.")
+        if not MIN_OCTAVE <= base_octave <= MAX_OCTAVE:
+            flash(
+                f"Base octave must be between {MIN_OCTAVE} and {MAX_OCTAVE}."
+            )
             return render_template('index.html', scale=sorted(SCALE.keys()), instruments=INSTRUMENTS.keys())
         melody = generate_melody(
             key,

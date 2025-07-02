@@ -70,6 +70,8 @@ generate_melody = melody_generator.generate_melody
 generate_harmony_line = melody_generator.generate_harmony_line
 generate_counterpoint_melody = melody_generator.generate_counterpoint_melody
 create_midi_file = melody_generator.create_midi_file
+MIN_OCTAVE = melody_generator.MIN_OCTAVE
+MAX_OCTAVE = melody_generator.MAX_OCTAVE
 
 
 def test_note_to_midi_sharp_and_flat():
@@ -150,9 +152,21 @@ def test_generate_melody_invalid_base_octave():
     """
     chords = ["C", "G"]
     with pytest.raises(ValueError):
-        generate_melody("C", 4, chords, motif_length=4, base_octave=-1)
+        generate_melody(
+            "C",
+            4,
+            chords,
+            motif_length=4,
+            base_octave=MIN_OCTAVE - 1,
+        )
     with pytest.raises(ValueError):
-        generate_melody("C", 4, chords, motif_length=4, base_octave=9)
+        generate_melody(
+            "C",
+            4,
+            chords,
+            motif_length=4,
+            base_octave=MAX_OCTAVE + 1,
+        )
 
 
 def test_get_chord_notes_unknown():
