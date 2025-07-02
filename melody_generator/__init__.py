@@ -64,7 +64,8 @@ __version__ = "0.1.0"
 # * ``generate_random_chord_progression`` and ``diatonic_chords`` now check
 #   for unknown ``key`` values and raise ``ValueError`` with a clear message.
 # * ``generate_melody`` rejects ``base_octave`` values outside the safe MIDI
-#   range (0-8) so melodies cannot reference invalid pitches.
+#   range (``MIN_OCTAVE``-``MAX_OCTAVE``) so melodies cannot reference invalid
+#   pitches.
 # * ``_open_default_player`` uses ``xdg-open --wait`` on Linux so preview files
 #   remain until the external player closes.
 # * Documentation moved to ``docs/README_ALGORITHM.md`` and ``README.md`` now
@@ -97,6 +98,13 @@ if env_path:
     DEFAULT_SETTINGS_FILE = Path(env_path).expanduser()
 else:
     DEFAULT_SETTINGS_FILE = Path.home() / ".melody_generator_settings.json"
+
+# ``MIN_OCTAVE`` and ``MAX_OCTAVE`` constrain the allowable octave range for
+# generated melodies. MIDI notes span from 0 to 127 which corresponds roughly
+# to C-1 through G9. Restricting the base octave to this subset keeps the
+# generated pitches well within the MIDI specification.
+MIN_OCTAVE = 0
+MAX_OCTAVE = 8
 
 
 def load_settings(path: Path = DEFAULT_SETTINGS_FILE) -> dict:
@@ -641,8 +649,9 @@ def generate_melody(
         it must contain at least one duration value and all values must be
         non-negative. Violations raise ``ValueError`` so invalid patterns are
         caught immediately.
-    @param base_octave (int): Preferred starting octave. Must be between
-        ``0`` and ``8`` so all generated MIDI notes remain valid.
+    @param base_octave (int): Preferred starting octave. Must fall within
+        ``MIN_OCTAVE`` and ``MAX_OCTAVE`` so all generated MIDI notes remain
+        valid.
     @returns List[str]: Generated melody as note strings.
     """
     # The chord progression provides harmonic context for each note. Reject an
@@ -691,8 +700,10 @@ def generate_melody(
 
     # ``base_octave`` controls the register of the melody. Restrict it to a
     # safe MIDI range so generated notes remain between 0 and 127.
-    if not 0 <= base_octave <= 8:
-        raise ValueError("base_octave must be between 0 and 8")
+    if not MIN_OCTAVE <= base_octave <= MAX_OCTAVE:
+        raise ValueError(
+            f"base_octave must be between {MIN_OCTAVE} and {MAX_OCTAVE}"
+        )
     beat_unit = 1 / time_signature[1]
     start_beat = 0.0
 
@@ -1280,8 +1291,28 @@ def run_cli() -> None:
 
     @returns None: Exits via ``sys.exit`` on failure.
     """
+    # Allow users to quickly inspect supported keys or chords without providing
+    # the rest of the required arguments. These flags are checked before the
+    # ``ArgumentParser`` is instantiated so that missing required options do not
+    # trigger an error when the sole intention is to list available values.
+    if "--list-keys" in sys.argv[1:]:
+        print("\n".join(sorted(SCALE.keys())))
+        return
+    if "--list-chords" in sys.argv[1:]:
+        print("\n".join(sorted(CHORDS.keys())))
+        return
     parser = argparse.ArgumentParser(
         description="Generate a random melody and save as a MIDI file."
+    )
+    parser.add_argument(
+        "--list-keys",
+        action="store_true",
+        help="List all supported keys and exit",
+    )
+    parser.add_argument(
+        "--list-chords",
+        action="store_true",
+        help="List all supported chords and exit",
     )
     parser.add_argument(
         "--key", type=str, required=True, help="Musical key (e.g., C, Dm, etc.)."
@@ -1338,7 +1369,10 @@ def run_cli() -> None:
         "--base-octave",
         type=int,
         default=4,
-        help="Starting octave for the melody (0-8, default: 4).",
+        help=(
+            f"Starting octave for the melody ({MIN_OCTAVE}-{MAX_OCTAVE}, "
+            "default: 4)."
+        ),
     )
     parser.add_argument(
         "--include-chords",
@@ -1388,8 +1422,10 @@ def run_cli() -> None:
 
     # Ensure the base octave stays within a musically reasonable range so
     # generated notes remain valid MIDI values.
-    if not 0 <= args.base_octave <= 8:
-        logging.error("Base octave must be between 0 and 8.")
+    if not MIN_OCTAVE <= args.base_octave <= MAX_OCTAVE:
+        logging.error(
+            f"Base octave must be between {MIN_OCTAVE} and {MAX_OCTAVE}."
+        )
         sys.exit(1)
 
     # Validate key and chord progression in a case-insensitive manner so

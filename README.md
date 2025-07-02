@@ -66,15 +66,18 @@ User preferences such as BPM and key are stored in a JSON file located at
 `~/.melody_generator_settings.json`. The GUI loads this file on startup and you
 can choose to save your current selections after generating a melody.
 You can override the location by setting the `MELODY_SETTINGS_FILE` environment
-variable before starting the application.
-Set the `MELODY_PLAYER` environment variable to a MIDI-capable application if the default player cannot handle `.mid` files. For example, `export MELODY_PLAYER=Music` on macOS or `set MELODY_PLAYER="C:\\Program Files\\Windows Media Player\\wmplayer.exe"` on Windows. The GUI's preview feature will then open files in that player instead of the system default.
-Set `SOUND_FONT` to the path of a SoundFont file (``.sf2``) to enable the built-in
-FluidSynth playback used by the GUI and web interface. The desktop GUI also
-provides a **SoundFont** field so you can browse to a file at runtime. If not
-provided the application tries a common system location such as
-``/usr/share/sounds/sf2/TimGM6mb.sf2``. When neither FluidSynth nor a usable
-soundfont is available the preview buttons fall back to your operating system's
-default MIDI player.
+variable before starting the application. Additional optional variables are
+summarized in the [Environment Variables](#environment-variables) section.
+
+## Environment Variables
+
+- `MELODY_SETTINGS_FILE` – Path to the JSON settings file used by the GUI and
+  CLI.
+- `MELODY_PLAYER` – Optional external MIDI player invoked when previewing
+  files.
+- `SOUND_FONT` – Location of a SoundFont (`.sf2`) used for FluidSynth playback.
+- `FLASK_SECRET` – Secret key for the web interface session. If omitted a
+  random key is generated each run.
 
 # Usage
 
@@ -165,6 +168,8 @@ When running from the command line you can supply optional flags:
 - `--counterpoint` generates a contrapuntal line based on the melody.
 - `--base-octave N` sets the starting octave of the melody (0-8,
   default: 4).
+- `--list-keys` prints all supported keys and exits.
+- `--list-chords` prints all supported chords and exits.
 - `--play` previews the resulting MIDI file using FluidSynth when available and
   falls back to the system player otherwise.
 - `--soundfont PATH` uses the specified SoundFont when playing the file with

@@ -22,8 +22,9 @@ counterpoint generation is delegated to :mod:`melody_generator`.
 #   with range validation.
 # * ``_check_preview_available`` displays a notice when FluidSynth or a
 #   SoundFont is unavailable for preview playback.
-# * ``_generate_button_click`` now validates ``base_octave`` to ensure it
-#   stays within the MIDI range 0-8 before generating a melody.
+# * ``_generate_button_click`` now validates ``base_octave`` against
+#   ``MIN_OCTAVE`` and ``MAX_OCTAVE`` so the register remains within the
+#   MIDI specification.
 # ---------------------------------------------------------------
 from __future__ import annotations
 
@@ -36,7 +37,7 @@ import sys
 import threading
 from tempfile import NamedTemporaryFile
 
-from . import diatonic_chords
+from . import diatonic_chords, MIN_OCTAVE, MAX_OCTAVE
 
 # ``MidiPlaybackError`` signals that preview playback failed within the
 # ``playback`` helper module. Catching it allows the GUI to fall back to the
@@ -526,9 +527,10 @@ class MelodyGeneratorGUI:
         # limits values to 1-7 but loading settings from disk may yield other
         # numbers.
         base_octave = self.base_octave_var.get()
-        if base_octave < 0 or base_octave > 8:
+        if not MIN_OCTAVE <= base_octave <= MAX_OCTAVE:
             messagebox.showerror(
-                "Input Error", "Base octave must be between 0 and 8."
+                "Input Error",
+                f"Base octave must be between {MIN_OCTAVE} and {MAX_OCTAVE}.",
             )
             return
 

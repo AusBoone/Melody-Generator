@@ -221,6 +221,32 @@ def test_cli_accepts_lowercase(tmp_path):
     assert output.exists()
 
 
+def test_cli_lists_keys_and_exits(capsys):
+    """``--list-keys`` should print the available keys and exit without errors."""
+    mod, _, _ = load_module()
+    argv = ["prog", "--list-keys"]
+    old = sys.argv
+    sys.argv = argv
+    mod.run_cli()
+    captured = capsys.readouterr()
+    sys.argv = old
+    keys = "\n".join(sorted(mod.SCALE.keys())) + "\n"
+    assert captured.out == keys
+
+
+def test_cli_lists_chords_and_exits(capsys):
+    """``--list-chords`` should print the available chords and exit."""
+    mod, _, _ = load_module()
+    argv = ["prog", "--list-chords"]
+    old = sys.argv
+    sys.argv = argv
+    mod.run_cli()
+    captured = capsys.readouterr()
+    sys.argv = old
+    chords = "\n".join(sorted(mod.CHORDS.keys())) + "\n"
+    assert captured.out == chords
+
+
 def test_generate_button_click(tmp_path, monkeypatch):
     """Simulate a user clicking the "Generate" button in the GUI.
 
