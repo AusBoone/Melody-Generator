@@ -2,7 +2,10 @@
 Melody-Generator is a research-oriented project that provides a simple yet versatile engine for
 generating melodies in any key, tempo and meter. The output can be rendered to a standard MIDI
 file for use in digital audio workstations. For a formal exposition of the algorithm see
-[README_ALGORITHM.md](README_ALGORITHM.md).
+[docs/README_ALGORITHM.md](docs/README_ALGORITHM.md).
+
+## Additional Documentation
+Extended guides live in the [docs/](docs/) directory.
 
 # Requirements
 - Python 3.x
@@ -223,4 +226,4 @@ note is gently pulled toward the prior tessitura to avoid abrupt contours. When
 no candidate satisfies the constraints, the algorithm defaults to a uniform
 choice from the key, ensuring progress. Rhythm can be sampled from a corpus of
 common patterns or generated stochastically. A detailed exposition of these
-heuristics is available in [README_ALGORITHM.md](README_ALGORITHM.md).
+heuristics is available in [docs/README_ALGORITHM.md](docs/README_ALGORITHM.md).
