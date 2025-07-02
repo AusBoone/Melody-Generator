@@ -67,6 +67,10 @@ __version__ = "0.1.0"
 #   range (0-8) so melodies cannot reference invalid pitches.
 # * ``_open_default_player`` uses ``xdg-open --wait`` on Linux so preview files
 #   remain until the external player closes.
+# * Documentation moved to ``docs/README_ALGORITHM.md`` and ``README.md`` now
+#   links to the new location so additional guides stay organized.
+# * `generate_motif` and `generate_melody` now validate unknown keys and raise `ValueError` when violated.
+# * `generate_melody` and `create_midi_file` reject negative durations in `pattern`.
 # ---------------------------------------------------------------
 
 import mido
@@ -583,10 +587,14 @@ def generate_motif(length: int, key: str, base_octave: int = 4) -> List[str]:
     """Generate a motif (short, recurring musical idea) in the specified key.
 
     @param length (int): Number of notes in the motif.
-    @param key (str): Musical key for the motif.
+    @param key (str): Musical key for the motif. A ``ValueError`` is raised if
+        ``key`` is not present in :data:`SCALE` so callers receive a clear error
+        instead of ``KeyError``.
     @param base_octave (int): Starting octave, usually ``4``.
     @returns List[str]: List of note names forming the motif.
     """
+    if key not in SCALE:
+        raise ValueError(f"Unknown key '{key}'")
     notes_in_key = SCALE[key]
     # Choose random notes within the key and place them in the requested octave range
     return [
@@ -620,7 +628,9 @@ def generate_melody(
     7.  Strong beats are restricted to chord tones while weak beats may use any
         scale note.
 
-    @param key (str): Musical key for the melody.
+    @param key (str): Musical key for the melody. ``ValueError`` is raised
+        when the key does not exist in :data:`SCALE` so that invalid input is
+        detected early.
     @param num_notes (int): Total number of notes to generate.
     @param chord_progression (List[str]): Chords guiding note choice.
     @param motif_length (int): Length of the initial motif.
@@ -628,8 +638,9 @@ def generate_melody(
         The denominator must be one of ``1, 2, 4, 8`` or ``16`` so note
         durations divide evenly into a whole note.
     @param pattern (List[float]|None): Optional rhythmic pattern. When provided,
-        it must contain at least one duration value otherwise a ``ValueError`` is
-        raised.
+        it must contain at least one duration value and all values must be
+        non-negative. Violations raise ``ValueError`` so invalid patterns are
+        caught immediately.
     @param base_octave (int): Preferred starting octave. Must be between
         ``0`` and ``8`` so all generated MIDI notes remain valid.
     @returns List[str]: Generated melody as note strings.
@@ -645,6 +656,8 @@ def generate_melody(
     if num_notes < motif_length:
         raise ValueError("num_notes must be greater than or equal to motif_length")
 
+    if key not in SCALE:
+        raise ValueError(f"Unknown key '{key}'")
     notes_in_key = SCALE[key]
 
     # Choose a rhythmic pattern when the caller does not supply one.  The
@@ -656,6 +669,10 @@ def generate_melody(
         # cycling through the list. Reject this early with a clear message so
         # callers know the pattern must contain at least one duration value.
         raise ValueError("pattern must not be empty")
+    elif any(p < 0 for p in pattern):
+        # Negative durations would generate invalid MIDI event timing. Validate
+        # that all entries are zero or positive to ensure deterministic output.
+        raise ValueError("pattern durations must be non-negative")
 
     # Validate the provided time signature so subsequent calculations never
     # divide by zero or produce negative beat counts. ``time_signature[1]``
@@ -979,8 +996,9 @@ def create_midi_file(
     @param output_file (str): Destination file path.
     @param harmony (bool): Include a simple harmony line.
     @param pattern (List[float]|None): Optional rhythmic pattern. If provided it
-        must contain at least one duration; otherwise a ``ValueError`` is raised
-        to avoid division errors during MIDI event generation.
+        must contain at least one duration and all values must be non-negative;
+        otherwise ``ValueError`` is raised to avoid invalid MIDI timing during
+        event generation.
     @param extra_tracks (List[List[str]]|None): Additional melody lines.
     @param chord_progression (List[str]|None): Chords rendered as blocks.
     @param chords_separate (bool): Write chords to a new track when ``True``.
@@ -1044,6 +1062,10 @@ def create_midi_file(
         # Using an empty pattern would make ``pattern[i % len(pattern)]`` fail
         # later in the function. Validate early and report a clear error.
         raise ValueError("pattern must not be empty")
+    elif any(p < 0 for p in pattern):
+        # Negative durations would create invalid delta times in the MIDI file,
+        # so reject them before processing.
+        raise ValueError("pattern durations must be non-negative")
     whole_note_ticks = ticks_per_beat * 4
     beat_fraction = 1 / time_signature[1]
     beat_ticks = int(beat_fraction * whole_note_ticks)

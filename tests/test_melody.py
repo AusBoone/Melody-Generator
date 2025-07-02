@@ -131,6 +131,16 @@ def test_generate_melody_empty_pattern():
         generate_melody("C", 4, chords, motif_length=4, pattern=[])
 
 
+def test_generate_melody_negative_pattern():
+    """Negative rhythm values should be rejected with ``ValueError``.
+
+    Durations correspond to fractions of a whole note. Negative numbers would
+    result in erroneous timing, so the generator validates against them."""
+    chords = ["C", "G"]
+    with pytest.raises(ValueError):
+        generate_melody("C", 4, chords, motif_length=4, pattern=[0.25, -0.5])
+
+
 def test_generate_melody_invalid_base_octave():
     """Out-of-range ``base_octave`` values should raise ``ValueError``.
 
@@ -196,6 +206,17 @@ def test_create_midi_file_empty_pattern(tmp_path):
     out = tmp_path / "empty.mid"
     with pytest.raises(ValueError):
         create_midi_file(melody, 120, (4, 4), str(out), pattern=[])
+
+
+def test_create_midi_file_negative_pattern(tmp_path):
+    """Negative durations should trigger ``ValueError`` in ``create_midi_file``.
+
+    A rhythm list with values below zero would yield nonsensical MIDI timing, so
+    the function validates and rejects such input."""
+    melody = ["C4"] * 4
+    out = tmp_path / "neg.mid"
+    with pytest.raises(ValueError):
+        create_midi_file(melody, 120, (4, 4), str(out), pattern=[0.25, -1.0])
 
 
 def test_extra_tracks_created(tmp_path):
@@ -383,6 +404,21 @@ def test_counterpoint_invalid_key():
     melody = ["C4", "D4"]
     with pytest.raises(ValueError):
         generate_counterpoint_melody(melody, "H")
+
+
+def test_generate_motif_invalid_key():
+    """``generate_motif`` should raise ``ValueError`` for unknown keys."""
+
+    with pytest.raises(ValueError):
+        melody_generator.generate_motif(4, "H")
+
+
+def test_generate_melody_invalid_key():
+    """``generate_melody`` should validate the ``key`` argument."""
+
+    chords = ["C", "G"]
+    with pytest.raises(ValueError):
+        generate_melody("H", 4, chords, motif_length=4)
 
 
 def test_melody_trends_up_then_down():
