@@ -14,4 +14,7 @@ available options along with basic installation tips.
 
 Once downloaded, set the `SOUND_FONT` environment variable to the path of
 your chosen file. The CLI and GUI will use it automatically when playing
-MIDI files through FluidSynth.
+MIDI files through FluidSynth. If `SOUND_FONT` is not set the code
+attempts to use `/usr/share/sounds/sf2/TimGM6mb.sf2` which is installed
+with the optional `fluid-soundfont-gm` package on many Linux
+distributions.

@@ -1153,3 +1153,30 @@ def test_open_default_player_waits_linux(monkeypatch, tmp_path):
     time.sleep(0.06)
     assert not midi.exists()
     assert calls and "--wait" in calls[0]
+
+
+def test_gui_open_default_player_waits_linux(monkeypatch, tmp_path):
+    """GUI preview should delay deletion until the player exits on Linux."""
+
+    _, gui_mod, _ = load_module()
+    midi = tmp_path / "x.mid"
+    midi.write_text("data")
+
+    calls = []
+
+    def fake_run(cmd, check=False):
+        calls.append(cmd)
+        time.sleep(0.05)
+        return types.SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(gui_mod.subprocess, "run", fake_run)
+    monkeypatch.setattr(gui_mod.os, "environ", {})
+    monkeypatch.setattr(gui_mod.sys, "platform", "linux", raising=False)
+
+    gui = gui_mod.MelodyGeneratorGUI.__new__(gui_mod.MelodyGeneratorGUI)
+    gui.root = types.SimpleNamespace()
+    gui._open_default_player(str(midi), delete_after=True)
+    assert midi.exists()
+    time.sleep(0.06)
+    assert not midi.exists()
+    assert calls and "--wait" in calls[0]

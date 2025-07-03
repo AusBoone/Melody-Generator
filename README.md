@@ -98,9 +98,11 @@ summarized in the [Environment Variables](#environment-variables) section.
 
 - `MELODY_SETTINGS_FILE` – Path to the JSON settings file used by the GUI and
   CLI.
-- `MELODY_PLAYER` – Optional external MIDI player invoked when previewing
-  files.
+- `MELODY_PLAYER` – Optional external MIDI player invoked when previewing files.
 - `SOUND_FONT` – Location of a SoundFont (`.sf2`) used for FluidSynth playback.
+  If unset the code falls back to `/usr/share/sounds/sf2/TimGM6mb.sf2` which is
+  provided by the optional `fluid-soundfont-gm` package on many Linux
+  distributions.
 - `FLASK_SECRET` – Secret key for the web interface session. If omitted a
   random key is generated each run.
 

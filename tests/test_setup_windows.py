@@ -8,12 +8,17 @@ still attempts to install FluidSynth packages.
 """
 
 import os
+import shutil
 import subprocess
 from pathlib import Path
+
+import pytest
 
 
 def test_skip_python_install(tmp_path):
     """Setup script should not install python when version >= 3.8."""
+    if shutil.which("pwsh") is None:
+        pytest.skip("pwsh not installed")
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     log_file = tmp_path / "log.txt"
