@@ -47,6 +47,30 @@ Tkinter powers the GUI and may need to be installed manually, e.g. `apt-get inst
 For audio playback a General MIDI soundfont such as the optional `fluid-soundfont-gm` package is recommended.
 On platforms without a prebuilt PyFluidSynth wheel you might also need the Fluidsynth development headers: `apt-get install libfluidsynth-dev`.
 
+### Quick setup on Linux
+
+Run the Linux helper script to install APT packages and create the
+virtual environment. This mirrors the macOS workflow but uses
+`apt-get` under the hood.
+
+```bash
+./setup_linux.sh
+```
+
+Activate the environment with `source venv/bin/activate` once the
+script completes.
+
+### Quick setup on Windows 10/11
+
+Open PowerShell and execute the Windows setup script. It relies on
+`winget` to fetch Python and Fluidsynth.
+
+```powershell
+./setup_windows.ps1
+```
+
+Afterwards run `./venv/Scripts/Activate.ps1` to enter the environment.
+
 The tests stub out `mido`, `Flask` and `tkinter`, so they are not required to
 run the test suite, but they are necessary for real use.
 
