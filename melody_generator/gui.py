@@ -711,7 +711,13 @@ class MelodyGeneratorGUI:
                     if player:
                         subprocess.run([player, path], check=False)
                     else:
-                        subprocess.run(["xdg-open", path], check=False)
+                        # ``xdg-open`` typically returns immediately which may
+                        # delete temporary files too early when ``delete_after``
+                        # is ``True``. Try ``--wait`` first and fall back on
+                        # failure for broader compatibility.
+                        proc = subprocess.run(["xdg-open", "--wait", path], check=False)
+                        if proc.returncode != 0:
+                            subprocess.run(["xdg-open", path], check=False)
             except Exception as exc:  # pragma: no cover - platform dependent
                 # Tkinter widgets must be updated from the main thread. Use
                 # ``after`` to schedule the error dialog so it runs safely.
