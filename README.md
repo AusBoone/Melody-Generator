@@ -5,6 +5,7 @@ file for use in digital audio workstations. For a formal exposition of the algor
 [docs/README_ALGORITHM.md](docs/README_ALGORITHM.md).
 
 ## Additional Documentation
+- [SoundFont Resources](docs/README_SOUND_FONTS.md)
 Extended guides live in the [docs/](docs/) directory.
 
 # Requirements
@@ -34,7 +35,7 @@ installation and only installs a new version when the current one is
 older than 3.8. A virtual environment is created under ``./venv``.
 
 ```bash
-./setup_mac.sh
+./scripts/setup_mac.sh
 ```
 
 After it completes activate the environment with
@@ -54,7 +55,7 @@ virtual environment. This mirrors the macOS workflow but uses
 `apt-get` under the hood.
 
 ```bash
-./setup_linux.sh
+./scripts/setup_linux.sh
 ```
 
 Activate the environment with `source venv/bin/activate` once the
@@ -66,7 +67,7 @@ Open PowerShell and execute the Windows setup script. It relies on
 `winget` to fetch Python and Fluidsynth.
 
 ```powershell
-./setup_windows.ps1
+./scripts/setup_windows.ps1
 ```
 
 Afterwards run `./venv/Scripts/Activate.ps1` to enter the environment.

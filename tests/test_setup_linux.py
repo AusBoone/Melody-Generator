@@ -1,4 +1,4 @@
-"""Tests for the Linux helper script ``setup_linux.sh``.
+"""Tests for the Linux helper script ``scripts/setup_linux.sh``.
 
 This module exercises the script in dry-run mode by stubbing ``apt-get`` and
 ``python3`` executables. The goal is to ensure Python installation is skipped
@@ -45,7 +45,7 @@ def test_skip_python_install(tmp_path):
     })
 
     result = subprocess.run(
-        ["bash", "setup_linux.sh"],
+        ["bash", "scripts/setup_linux.sh"],
         cwd=Path(__file__).resolve().parents[1],
         env=env,
         text=True,

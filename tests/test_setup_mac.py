@@ -1,4 +1,4 @@
-"""Tests for the macOS helper script ``setup_mac.sh``.
+"""Tests for the macOS helper script ``scripts/setup_mac.sh``.
 
 This module exercises the installation script in dry-run mode. It stubs out
 ``brew`` and ``python3`` binaries so that the script can be run without actually
@@ -47,7 +47,7 @@ def test_skip_python_install(tmp_path):
     })
 
     result = subprocess.run(
-        ["bash", "setup_mac.sh"],
+        ["bash", "scripts/setup_mac.sh"],
         cwd=Path(__file__).resolve().parents[1],
         env=env,
         text=True,
