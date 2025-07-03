@@ -2,11 +2,30 @@
 Melody-Generator is a research-oriented project that provides a simple yet versatile engine for
 generating melodies in any key, tempo and meter. The output can be rendered to a standard MIDI
 file for use in digital audio workstations. For a formal exposition of the algorithm see
-[docs/README_ALGORITHM.md](docs/README_ALGORITHM.md).
+[docs/README.md](docs/README.md).
 
-## Additional Documentation
-- [SoundFont Resources](docs/README_SOUND_FONTS.md)
-Extended guides live in the [docs/](docs/) directory.
+## Documentation
+
+The [docs/README.md](docs/README.md) index links to the algorithm description,
+setup guide, FluidSynth notes and soundfont resources.
+
+## Features
+
+- Additional modes like Dorian, Mixolydian and pentatonic scales.
+- Automatic chord progressions based on common pop patterns.
+- Cross-platform setup scripts now ship with executable permissions for one-step
+  installation.
+- Dynamic velocity in the MIDI output for a more natural sound.
+- Expanded rhythmic patterns including eighth- and sixteenth-note figures.
+- GUI button to reload saved preferences at any time.
+- GUI can preview the generated melody before saving.
+- Harmony and counterpoint tracks for multi-line melodies.
+- Melodic rules such as leap compensation to avoid jarring jumps.
+- Optional base octave parameter to constrain the melody's register with
+  occasional octave shifts.
+- Variations when motifs repeat so phrases remain interesting.
+- Web interface now previews the generated melody using a WAV rendering created
+  with FluidSynth.
 
 # Requirements
 - Python 3.x
@@ -25,55 +44,13 @@ pip install -e .
 You can also set up the dependencies manually with:
 
 ```bash
+
 pip install -r requirements.txt
 ```
-### Quick setup on macOS
 
-Run the helper script to install Homebrew packages and Python
-dependencies. The script checks for an existing ``python3``
-installation and only installs a new version when the current one is
-older than 3.8. A virtual environment is created under ``./venv``.
-
-```bash
-./scripts/setup_mac.sh
-```
-
-After it completes activate the environment with
-`source venv/bin/activate` to start using ``melody-generator``.
-PyFluidSynth wraps the FluidSynth library which must be installed separately.
-Install the system package with `apt-get install fluidsynth` on Debian-based Linux or `brew install fluid-synth` on macOS.
-Without FluidSynth the preview button and web playback will fail.
-
-Tkinter powers the GUI and may need to be installed manually, e.g. `apt-get install python3-tk` on Debian-derived systems.
-For audio playback a General MIDI soundfont such as the optional `fluid-soundfont-gm` package is recommended.
-On platforms without a prebuilt PyFluidSynth wheel you might also need the Fluidsynth development headers: `apt-get install libfluidsynth-dev`.
-
-### Quick setup on Linux
-
-Run the Linux helper script to install APT packages and create the
-virtual environment. This mirrors the macOS workflow but uses
-`apt-get` under the hood.
-
-```bash
-./scripts/setup_linux.sh
-```
-
-Activate the environment with `source venv/bin/activate` once the
-script completes.
-
-### Quick setup on Windows 10/11
-
-Open PowerShell and execute the Windows setup script. It relies on
-`winget` to fetch Python and Fluidsynth.
-
-```powershell
-./scripts/setup_windows.ps1
-```
-
-Afterwards run `./venv/Scripts/Activate.ps1` to enter the environment.
-
-The tests stub out `mido`, `Flask` and `tkinter`, so they are not required to
-run the test suite, but they are necessary for real use.
+Automated helper scripts for macOS, Linux and Windows are documented in
+[docs/README_SETUP.md](docs/README_SETUP.md). They install Python,
+create a virtual environment and set up the FluidSynth dependency.
 
 # Installation
 Install the package from source:
@@ -231,21 +208,6 @@ docker build -t melody-generator .
 If this command fails with `command not found`, install Docker or use an
 alternative container runtime such as Podman.
 
-# New Features
-
-- Automatic chord progressions based on common pop patterns.
-- Expanded rhythmic patterns including eighth- and sixteenth-note figures.
-- Melodic rules such as leap compensation to avoid jarring jumps.
-- Variations when motifs repeat so phrases remain interesting.
-- Additional modes like Dorian, Mixolydian and pentatonic scales.
-- Dynamic velocity in the MIDI output for a more natural sound.
-- GUI button to reload saved preferences at any time.
-- GUI can preview the generated melody before saving.
-- Web interface now previews the generated melody using a WAV rendering
-  created with FluidSynth.
-- Harmony and counterpoint tracks for multi-line melodies.
-- Optional base octave parameter to constrain the melody's register with
-  occasional octave shifts.
 
 ## Algorithm Overview
 
@@ -258,4 +220,4 @@ note is gently pulled toward the prior tessitura to avoid abrupt contours. When
 no candidate satisfies the constraints, the algorithm defaults to a uniform
 choice from the key, ensuring progress. Rhythm can be sampled from a corpus of
 common patterns or generated stochastically. A detailed exposition of these
-heuristics is available in [docs/README_ALGORITHM.md](docs/README_ALGORITHM.md).
+heuristics is available in [docs/README.md](docs/README.md).
