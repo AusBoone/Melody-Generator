@@ -4,7 +4,6 @@ import importlib
 import sys
 import types
 from pathlib import Path
-import pytest
 
 # Stub out optional dependencies so ``melody_generator`` imports cleanly.
 stub_mido = types.ModuleType("mido")

@@ -1,3 +1,12 @@
+"""Tests for the macOS helper script ``setup_mac.sh``.
+
+This module exercises the installation script in dry-run mode. It stubs out
+``brew`` and ``python3`` binaries so that the script can be run without actually
+installing packages. The purpose is to ensure that logic such as skipping the
+Python install when a modern version is present works correctly. Each stub logs
+invocations to ``log.txt`` allowing assertions on the generated commands.
+"""
+
 import os
 import subprocess
 from pathlib import Path
