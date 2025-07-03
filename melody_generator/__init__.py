@@ -68,8 +68,9 @@ __version__ = "0.1.0"
 #   pitches.
 # * ``_open_default_player`` uses ``xdg-open --wait`` on Linux so preview files
 #   remain until the external player closes.
-# * Documentation moved to ``docs/README_ALGORITHM.md`` and ``README.md`` now
-#   links to the new location so additional guides stay organized.
+# * Documentation consolidated under ``docs/README.md`` which links to the
+#   algorithm description, setup guide, FluidSynth notes and soundfont
+#   resources for easy navigation.
 # * `generate_motif` and `generate_melody` now validate unknown keys and raise `ValueError` when violated.
 # * `generate_melody` and `create_midi_file` reject negative durations in `pattern`.
 # ---------------------------------------------------------------

@@ -18,3 +18,5 @@ MIDI files through FluidSynth. If `SOUND_FONT` is not set the code
 attempts to use `/usr/share/sounds/sf2/TimGM6mb.sf2` which is installed
 with the optional `fluid-soundfont-gm` package on many Linux
 distributions.
+For instructions on installing the FluidSynth engine see
+[README_FLUIDSYNTH.md](README_FLUIDSYNTH.md).
