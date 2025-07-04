@@ -1202,13 +1202,14 @@ def generate_melody(
     final_root = get_chord_notes(final_chord)[0]
     last_oct = melody[-1][-1]
     # Always select the root of the final chord but choose the octave that
-    # yields the smallest leap from the previous note to preserve downward
-    # contour when possible.
+    # yields the smallest leap from the previous note. When the melody
+    # contains only a single note the previous pitch is reused so the
+    # cadence calculation does not fail.
     low_oct = max(plan_min_oct, int(last_oct) - 1)
     high_oct = min(plan_max_oct, int(last_oct))
     low = f"{final_root}{low_oct}"
     high = f"{final_root}{high_oct}"
-    prev_midi = note_to_midi(melody[-2])
+    prev_midi = note_to_midi(melody[-2]) if len(melody) >= 2 else note_to_midi(melody[-1])
     if note_to_midi(low) <= prev_midi:
         melody[-1] = low
     else:
