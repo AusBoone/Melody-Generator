@@ -284,3 +284,53 @@ def test_playback_failure_flash(monkeypatch):
     assert resp.status_code == 200
     assert b"Preview audio could not be generated" in resp.data
 
+
+
+def test_generation_dispatched_to_celery(monkeypatch):
+    """When Celery is available ``index`` should send work to a task."""
+    celery_mod = types.ModuleType("celery")
+    called = {}
+
+    class DummyTask:
+        def __init__(self, fn):
+            self.fn = fn
+
+        def delay(self, params):
+            called["params"] = params
+
+            class Res:
+                def get(self, timeout=None):
+                    return ("", "")
+
+            return Res()
+
+    class DummyCelery:
+        def __init__(self, *a, **k):
+            pass
+
+        def task(self, fn):
+            called["task"] = True
+            return DummyTask(fn)
+
+    celery_mod.Celery = DummyCelery
+    monkeypatch.setitem(sys.modules, "celery", celery_mod)
+
+    gui = importlib.reload(importlib.import_module("melody_generator.web_gui"))
+    client = gui.app.test_client()
+
+    monkeypatch.setattr(gui, "_generate_preview", lambda **kw: ("", ""))
+
+    client.post(
+        "/",
+        data={
+            "key": "C",
+            "chords": "C",
+            "bpm": "120",
+            "timesig": "4/4",
+            "notes": "1",
+            "motif_length": "1",
+            "base_octave": "4",
+        },
+    )
+
+    assert called.get("task") and called["params"]["key"] == "C"

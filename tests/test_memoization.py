@@ -45,3 +45,29 @@ def test_canonical_chord_cache_hits():
     mod.canonical_chord("Dm")
     info_after = mod.canonical_chord.cache_info()
     assert info_after.hits >= info_before.hits + 1
+
+
+def test_scale_for_chord_cache_hits():
+    """``scale_for_chord`` should memoize results via ``lru_cache``."""
+
+    info_before = mod.scale_for_chord.cache_info()
+    mod.scale_for_chord("C", "G")
+    mod.scale_for_chord("C", "G")
+    info_after = mod.scale_for_chord.cache_info()
+    assert info_after.hits >= info_before.hits + 1
+
+
+def test_note_to_midi_cache_hits():
+    """Repeated note conversions should trigger cache hits."""
+
+    info_before = mod.note_to_midi.cache_info()
+    mod.note_to_midi("C4")
+    mod.note_to_midi("C4")
+    info_after = mod.note_to_midi.cache_info()
+    assert info_after.hits >= info_before.hits + 1
+
+
+def test_candidate_cache_preloaded():
+    """Importing the module should populate ``_CANDIDATE_CACHE``."""
+
+    assert mod._CANDIDATE_CACHE

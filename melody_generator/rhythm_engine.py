@@ -7,13 +7,21 @@ rhythm from pitch mirrors a typical composing workflow where the groove is
 established first and notes are layered on afterwards.
 
 The default transitions form a first-order Markov process so that each duration
-suggests a few likely successors.  ``generate_rhythm`` simply proxies to a
+suggests a few likely successors. ``generate_rhythm`` simply proxies to a
 module-level ``RhythmGenerator`` instance for convenience.
+
+Candidate selection now uses :func:`numpy.random.choice` when available to
+avoid Python loops over the duration arrays.
 """
 
 from __future__ import annotations
 
 import random
+
+try:
+    import numpy as np  # type: ignore
+except Exception:  # pragma: no cover - optional
+    np = None
 from typing import Dict, List
 
 
@@ -57,6 +65,8 @@ class RhythmGenerator:
     def generate(self, length: int) -> List[float]:
         """Return a rhythm pattern ``length`` events long."""
 
+        # ``length`` controls how many durations are produced. Guard against
+        # invalid values so the generation loop always terminates.
         if length <= 0:
             raise ValueError("length must be positive")
         current = self.start
@@ -69,7 +79,15 @@ class RhythmGenerator:
                 choices = {d: 1.0 for d in self.transitions}
             durations = list(choices)
             weights = list(choices.values())
-            current = random.choices(durations, weights=weights, k=1)[0]
+            if np is not None:
+                # Vectorised sampling eliminates Python loops. The weights are
+                # first normalised so ``numpy.random.choice`` interprets them as
+                # probabilities.
+                weights_arr = np.asarray(weights, dtype=float)
+                weights_arr = weights_arr / weights_arr.sum()
+                current = float(np.random.choice(durations, p=weights_arr))
+            else:
+                current = random.choices(durations, weights=weights, k=1)[0]
             pattern.append(current)
         return pattern[:length]
 

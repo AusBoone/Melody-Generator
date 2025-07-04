@@ -164,6 +164,12 @@ while keeping the algorithm efficient and deterministic.
 - **Vectorized Candidate Selection** – Candidate filtering and sampling now use
   NumPy broadcasting with ``numpy.random.choice`` when possible, eliminating
   Python-level loops for better performance.
+- **Parallel Batch Generation** – Large exports use ``ProcessPoolExecutor`` and
+  the web interface dispatches work to Celery so multiple melodies are created
+  concurrently without blocking the UI.
+- **Caching and Memoization** – ``scale_for_chord`` and ``note_to_midi`` are
+  memoized with ``functools.lru_cache`` and candidate note pools are
+  precomputed at import for faster selection.
 
 ## Candidate Weighting in Depth
 
@@ -197,7 +203,8 @@ toward the distribution of real music.
 ### ONNX Export and Quantization
 
 The helper :func:`melody_generator.sequence_model.export_onnx` exports an LSTM
-to ONNX format. Tools such as ``onnxruntime`` can then apply dynamic
-quantisation, reducing the model to 8‑bit weights for fast CPU inference. The
-exported model expects a sequence of scale‑degree indices and outputs logits for
-the next degree, mirroring ``SequenceModel.predict_logits``.
+to ONNX format. :func:`melody_generator.sequence_model.quantize_onnx_model`
+invokes ``onnxruntime.quantization.quantize_dynamic`` to produce an 8‑bit model
+for CPU inference.  The exported model expects a sequence of scale‑degree
+indices and outputs logits for the next degree, mirroring
+``SequenceModel.predict_logits``.

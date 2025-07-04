@@ -116,3 +116,38 @@ def test_generate_melody_invokes_sequence_model():
     # branch that consults the sequence model.
     mg.generate_melody("C", 4, ["C"], motif_length=2, sequence_model=model)
     assert model.calls > 0
+
+
+def test_quantize_onnx_model_called(monkeypatch):
+    """``quantize_onnx_model`` should call ONNX Runtime's helper."""
+
+    quant_mod = types.ModuleType("quantization")
+    called = {}
+
+    def fake_quantize(model_input, model_output, weight_type=None):
+        called["args"] = (model_input, model_output, weight_type)
+
+    quant_mod.quantize_dynamic = fake_quantize
+    quant_mod.QuantType = types.SimpleNamespace(QInt8="qint8")
+    ort_stub = types.ModuleType("onnxruntime")
+    ort_stub.quantization = quant_mod
+    monkeypatch.setitem(sys.modules, "onnxruntime", ort_stub)
+    monkeypatch.setitem(sys.modules, "onnxruntime.quantization", quant_mod)
+
+    seq = importlib.reload(importlib.import_module("melody_generator.sequence_model"))
+    seq.quantize_onnx_model("in.onnx", "out.onnx")
+
+    assert called["args"][0] == "in.onnx"
+    assert called["args"][1] == "out.onnx"
+    assert called["args"][2] == quant_mod.QuantType.QInt8
+
+
+def test_quantize_onnx_model_requires_runtime(monkeypatch):
+    """An informative error should be raised when ONNX Runtime is missing."""
+
+    monkeypatch.setitem(sys.modules, "onnxruntime", None)
+    monkeypatch.setitem(sys.modules, "onnxruntime.quantization", None)
+    seq = importlib.reload(importlib.import_module("melody_generator.sequence_model"))
+
+    with pytest.raises(RuntimeError):
+        seq.quantize_onnx_model("model.onnx", "quant.onnx")

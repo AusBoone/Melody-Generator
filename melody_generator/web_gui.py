@@ -32,6 +32,11 @@ from typing import List
 from melody_generator import playback
 from melody_generator.playback import MidiPlaybackError
 
+try:
+    from celery import Celery
+except Exception:  # pragma: no cover - optional dependency
+    Celery = None
+
 from flask import Flask, render_template, request, flash
 import base64
 import os
@@ -80,6 +85,97 @@ if not secret:
         "Using a randomly generated key; sessions will not persist across restarts."
     )
 app.secret_key = secret
+
+# Optional Celery application used to offload melody rendering so the
+# Flask thread remains responsive. The broker defaults to the in-memory
+# backend which requires no external services for small deployments.
+celery_app = None
+if Celery is not None:
+    celery_app = Celery(
+        __name__, broker=os.environ.get("CELERY_BROKER_URL", "memory://")
+    )
+
+
+def _generate_preview(
+    key: str,
+    bpm: int,
+    timesig: tuple[int, int],
+    notes: int,
+    motif_length: int,
+    base_octave: int,
+    instrument: str,
+    harmony: bool,
+    random_rhythm: bool,
+    counterpoint: bool,
+    harmony_lines: int,
+    include_chords: bool,
+    chords_same: bool,
+    chords: List[str],
+) -> tuple[str, str]:
+    """Return ``(audio_b64, midi_b64)`` for the requested melody."""
+
+    melody = generate_melody(
+        key,
+        notes,
+        chords,
+        motif_length=motif_length,
+        base_octave=base_octave,
+    )
+    rhythm = generate_random_rhythm_pattern() if random_rhythm else None
+    extra: List[List[str]] = []
+    for _ in range(max(0, harmony_lines)):
+        extra.append(generate_harmony_line(melody))
+    if counterpoint:
+        extra.append(generate_counterpoint_melody(melody, key))
+
+    tmp = NamedTemporaryFile(suffix=".mid", delete=False)
+    try:
+        tmp_path = tmp.name
+    finally:
+        tmp.close()
+
+    numerator, denominator = timesig
+    create_midi_file(
+        melody,
+        bpm,
+        (numerator, denominator),
+        tmp_path,
+        harmony=harmony,
+        pattern=rhythm,
+        extra_tracks=extra,
+        chord_progression=chords if include_chords else None,
+        chords_separate=not chords_same,
+        program=INSTRUMENTS.get(instrument, 0),
+    )
+
+    wav_tmp = NamedTemporaryFile(suffix=".wav", delete=False)
+    try:
+        wav_path = wav_tmp.name
+    finally:
+        wav_tmp.close()
+
+    try:
+        playback.render_midi_to_wav(tmp_path, wav_path)
+    except MidiPlaybackError:
+        wav_data = None
+    else:
+        with open(wav_path, "rb") as fh:
+            wav_data = fh.read()
+    finally:
+        if os.path.exists(wav_path):
+            os.remove(wav_path)
+
+    with open(tmp_path, "rb") as fh:
+        midi_bytes = fh.read()
+    os.remove(tmp_path)
+
+    audio_encoded = base64.b64encode(wav_data).decode("ascii") if wav_data else ""
+    midi_encoded = base64.b64encode(midi_bytes).decode("ascii")
+    return audio_encoded, midi_encoded
+
+
+if celery_app is not None:
+    generate_preview_task = celery_app.task(_generate_preview)  # type: ignore
 
 
 @app.route('/', methods=['GET', 'POST'])
@@ -156,79 +252,34 @@ def index():
                 f"Base octave must be between {MIN_OCTAVE} and {MAX_OCTAVE}."
             )
             return render_template('index.html', scale=sorted(SCALE.keys()), instruments=INSTRUMENTS.keys())
-        melody = generate_melody(
-            key,
-            notes,
-            chords,
+
+        params = dict(
+            key=key,
+            bpm=bpm,
+            timesig=(numerator, denominator),
+            notes=notes,
             motif_length=motif_length,
             base_octave=base_octave,
-        )
-        rhythm = generate_random_rhythm_pattern() if random_rhythm else None
-        extra: List[List[str]] = []
-        for _ in range(max(0, harmony_lines)):
-            # Create as many harmony lines as requested
-            extra.append(generate_harmony_line(melody))
-        if counterpoint:
-            extra.append(generate_counterpoint_melody(melody, key))
-
-        # Write the MIDI data to a temporary file and return a page with
-        # an embedded audio player so the user can immediately preview
-        # the result in the browser. The temporary file is created with
-        # ``delete=False`` so it can be reopened on Windows systems where
-        # a file cannot be read while still open for writing.
-        tmp = NamedTemporaryFile(suffix='.mid', delete=False)
-        try:
-            tmp_path = tmp.name
-        finally:
-            # Ensure the handle is closed immediately so the file can be
-            # reopened by ``create_midi_file`` on all platforms.
-            tmp.close()
-
-        create_midi_file(
-            melody,
-            bpm,
-            (numerator, denominator),
-            tmp_path,
+            instrument=instrument,
             harmony=harmony,
-            pattern=rhythm,
-            extra_tracks=extra,
-            chord_progression=chords if include_chords else None,
-            chords_separate=not chords_same,
-            program=INSTRUMENTS.get(instrument, 0),
+            random_rhythm=random_rhythm,
+            counterpoint=counterpoint,
+            harmony_lines=harmony_lines,
+            include_chords=include_chords,
+            chords_same=chords_same,
+            chords=chords,
         )
 
-        # Render the MIDI file to WAV so browsers without native MIDI support
-        # can still play the result. The original MIDI is also offered as a
-        # download link.
-        wav_tmp = NamedTemporaryFile(suffix='.wav', delete=False)
-        try:
-            wav_path = wav_tmp.name
-        finally:
-            wav_tmp.close()
-
-        try:
-            playback.render_midi_to_wav(tmp_path, wav_path)
-        except MidiPlaybackError:
-            # Rendering failures occur when FluidSynth or a compatible soundfont
-            # is unavailable. Inform the user and fall back to providing the raw
-            # MIDI file without an audio preview.
-            flash(
-                "Preview audio could not be generated because FluidSynth or a "
-                "soundfont is unavailable."
-            )
-            wav_data = None
+        if celery_app is not None:
+            result = generate_preview_task.delay(params).get()
         else:
-            with open(wav_path, 'rb') as fh:
-                wav_data = fh.read()
-        finally:
-            if os.path.exists(wav_path):
-                os.remove(wav_path)
+            result = _generate_preview(**params)
 
-        with open(tmp_path, 'rb') as fh:
-            midi_bytes = fh.read()
-        os.remove(tmp_path)
-        audio_encoded = base64.b64encode(wav_data).decode('ascii') if wav_data else ''
-        midi_encoded = base64.b64encode(midi_bytes).decode('ascii')
+        audio_encoded, midi_encoded = result
+        if not audio_encoded:
+            flash(
+                "Preview audio could not be generated because FluidSynth or a soundfont is unavailable."
+            )
         return render_template('play.html', audio=audio_encoded, midi=midi_encoded)
 
     # On a normal GET request simply render the form so the user can

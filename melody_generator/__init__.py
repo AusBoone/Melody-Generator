@@ -84,8 +84,8 @@ __version__ = "0.1.0"
 # * Applied `functools.lru_cache` to `canonical_key` and `canonical_chord` to
 #   avoid repeated dictionary lookups when these helpers are used frequently in
 #   batch melody generation.
-# * Added caching for `note_to_midi` conversions and precomputed scale indices
-#   for faster lookups.
+# * Added `lru_cache` memoization for `scale_for_chord` and `note_to_midi` and
+#   preloaded candidate note pools to eliminate repeated computations.
 # * Melody generation now weights candidate notes to favour chord tones and
 #   smooth motion, filters tritone leaps and selects scales based on the active
 #   chord.
@@ -240,15 +240,10 @@ NOTE_TO_SEMITONE = {
 # relies on it.
 NOTES: List[str] = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 
-# ``_NOTE_TO_MIDI_CACHE`` stores conversions from note strings to MIDI numbers
-# so repeated calls avoid recomputing the same values. ``functools.lru_cache``
-# cannot be used here because the function accepts user input that may be quite
-# large. A simple dictionary is sufficient and easy to inspect when debugging.
-_NOTE_TO_MIDI_CACHE: dict[str, int] = {}
 
 # ``_SCALE_INDICES`` maps each key to a dictionary of note names to their index
-# within the corresponding scale. This avoids repeated ``list.index`` lookups
-# when the generator determines the next scale degree.
+# within the corresponding scale. These tables let the generator translate note
+# names to scale degrees in constant time.
 _SCALE_INDICES: dict[str, dict[str, int]] = {}
 
 # ``_CANDIDATE_CACHE`` stores precomputed candidate note lists keyed by
@@ -281,9 +276,6 @@ _SIMILARITY_WEIGHTS: dict[int, float] = {
     3: 0.4,
 }
 
-# Cache the preferred scale for each (key, chord) pair so repeated lookups in
-# ``scale_for_chord`` do not rebuild the same list.
-_CHORD_SCALE_CACHE: dict[tuple[str, str], List[str]] = {}
 
 # Map key names to the notes that make up their diatonic scale. Functions that
 # generate melodies or harmonies reference this to stay in the chosen key.
@@ -581,19 +573,14 @@ def diatonic_chords(key: str) -> List[str]:
     return chords
 
 
+@lru_cache(maxsize=None)
 def scale_for_chord(key: str, chord: str) -> List[str]:
     """Return the preferred scale for ``chord`` within ``key``.
 
-    This helper supplies chord-specific scales so the melody can better
-    outline the harmony. Dominant chords use a mixolydian mode while other
-    major and minor triads fall back to the natural major or minor scale of
-    the chord root.
+    The function is pure so ``lru_cache`` memoises results. Dominant chords
+    use a mixolydian flavour while minor triads fall back to the natural minor
+    scale of the root.
     """
-
-    cache_key = (key, chord)
-    cached = _CHORD_SCALE_CACHE.get(cache_key)
-    if cached is not None:
-        return cached
 
     chord = canonical_chord(chord)
     root = chord.rstrip("m")
@@ -608,7 +595,6 @@ def scale_for_chord(key: str, chord: str) -> List[str]:
     else:
         scale = SCALE[key]
 
-    _CHORD_SCALE_CACHE[cache_key] = scale
     return scale
 
 
@@ -627,6 +613,17 @@ def _candidate_pool(key: str, chord: str, root_octave: int, *, strong: bool) -> 
         pool = [n + str(oct) for n in notes for oct in range(root_octave, root_octave + 2)]
         _CANDIDATE_CACHE[cache_key] = pool
     return pool
+
+
+def _preload_candidate_cache() -> None:
+    """Fill :data:`_CANDIDATE_CACHE` at import time."""
+
+    for key in SCALE:
+        for chord in CHORDS:
+            for strong in (True, False):
+                for octave in range(MIN_OCTAVE, MAX_OCTAVE + 1):
+                    _candidate_pool(key, chord, octave, strong=strong)
+
 
 
 def generate_random_rhythm_pattern(length: int = 3) -> List[float]:
@@ -666,6 +663,7 @@ def generate_random_rhythm_pattern(length: int = 3) -> List[float]:
     return pattern
 
 
+@lru_cache(maxsize=None)
 def note_to_midi(note: str) -> int:
     """Convert ``note`` strings such as ``C#4`` into MIDI numbers.
 
@@ -681,9 +679,8 @@ def note_to_midi(note: str) -> int:
     # ensures the note consists of a letter with an optional accidental
     # followed by one or more digits (or a leading minus sign for negative
     # octaves).
-    # Use the cache to avoid recomputing conversions for the same note string.
-    if note in _NOTE_TO_MIDI_CACHE:
-        return _NOTE_TO_MIDI_CACHE[note]
+    # Repeated conversions are automatically memoised by ``lru_cache`` so the
+    # wrapper returns immediately when ``note`` was processed before.
 
     match = re.fullmatch(r"([A-Ga-g][#b]?)(-?\d+)", note)
     if not match:
@@ -720,7 +717,6 @@ def note_to_midi(note: str) -> int:
 
     # MIDI note number is calculated relative to C0 at index 12
     midi_val = note_idx + (octave * 12)
-    _NOTE_TO_MIDI_CACHE[note] = midi_val
     return midi_val
 
 
@@ -795,6 +791,9 @@ def pick_note(candidates: List[str], weights: Sequence[float]) -> str:
         prob = arr / arr.sum()
         return str(np.random.choice(candidates, p=prob))
     return random.choices(list(candidates), weights=list(weights), k=1)[0]
+
+
+_preload_candidate_cache()
 
 
 def generate_motif(length: int, key: str, base_octave: int = 4) -> List[str]:
@@ -1134,8 +1133,10 @@ def generate_melody(
             intervals_all = np.abs(pool_midis - prev_midi)
             min_interval = float(intervals_all.min())
             mask = intervals_all <= (min_interval + 1)
-            candidates = [n for n, keep in zip(source_pool, mask) if keep]
             cand_midis = pool_midis[mask]
+            # ``mask`` is applied to both the MIDI values and the original note
+            # strings via vectorised indexing so no Python loop is required.
+            candidates = np.asarray(source_pool, dtype=object)[mask].tolist()
         else:
             for candidate_note in source_pool:
                 interval = get_interval(prev_note, candidate_note)
@@ -1172,7 +1173,8 @@ def generate_melody(
                 mask = np.abs(cand_midis - prev_midi) != 6
                 if mask.any():
                     cand_midis = cand_midis[mask]
-                    candidates = [c for c, keep in zip(candidates, mask) if keep]
+                    # Filter notes using the boolean mask with vectorised indexing.
+                    candidates = np.asarray(candidates, dtype=object)[mask].tolist()
             else:
                 filtered = [
                     c
@@ -1191,7 +1193,8 @@ def generate_melody(
                 mask = (diff * leap_dir < 0) & (np.abs(diff) <= 2)
                 if mask.any():
                     cand_midis = cand_midis[mask]
-                    candidates = [c for c, keep in zip(candidates, mask) if keep]
+                    # Apply the mask directly to ``candidates`` rather than looping.
+                    candidates = np.asarray(candidates, dtype=object)[mask].tolist()
             else:
                 filtered = [
                     c
@@ -1213,11 +1216,12 @@ def generate_melody(
                 mask = diff * direction >= 0
                 if mask.any():
                     cand_midis = cand_midis[mask]
-                    candidates = [c for c, keep in zip(candidates, mask) if keep]
+                    # ``candidates`` filtered in one step via boolean indexing.
+                    candidates = np.asarray(candidates, dtype=object)[mask].tolist()
                 elif direction < 0:
                     idx = int(np.argmin(cand_midis))
-                    candidates = [candidates[idx]]
                     cand_midis = np.array([cand_midis[idx]])
+                    candidates = [candidates[idx]]
             else:
                 directional = [c for c in candidates if (note_to_midi(c) - prev_midi) * direction >= 0]
                 if directional:
