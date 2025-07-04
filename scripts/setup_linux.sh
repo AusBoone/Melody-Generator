@@ -12,7 +12,9 @@
 #
 # Set the environment variable DRY_RUN=1 to print commands without
 # executing them. This is useful for verifying the commands on systems
-# where sudo privileges might be restricted.
+# where sudo privileges might be restricted. Set INSTALL_ML_DEPS=1 to also
+# install optional PyTorch and NumPy dependencies used by the sequence
+# model features.
 #----------------------------------------------------------------------
 set -euo pipefail
 
@@ -84,12 +86,20 @@ main() {
         echo "DRY RUN: pip install --upgrade pip"
         echo "DRY RUN: pip install -r requirements.txt"
         echo "DRY RUN: pip install -e ."
+        if [[ "${INSTALL_ML_DEPS:-0}" == "1" ]]; then
+            echo "DRY RUN: pip install numpy"
+            echo "DRY RUN: pip install torch --index-url https://download.pytorch.org/whl/cpu"
+        fi
     else
         # shellcheck source=/dev/null
         source venv/bin/activate
         run_cmd pip install --upgrade pip
         run_cmd pip install -r requirements.txt
         run_cmd pip install -e .
+        if [[ "${INSTALL_ML_DEPS:-0}" == "1" ]]; then
+            run_cmd pip install numpy
+            run_cmd pip install torch --index-url https://download.pytorch.org/whl/cpu
+        fi
         deactivate
     fi
 
