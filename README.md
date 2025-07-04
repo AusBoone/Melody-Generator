@@ -26,6 +26,10 @@ setup guide, FluidSynth notes and soundfont resources.
 - Variations when motifs repeat so phrases remain interesting.
 - Web interface now previews the generated melody using a WAV rendering created
   with FluidSynth.
+- Batch export helper uses ``ProcessPoolExecutor`` and Celery for parallel
+  generation.
+- Lookup tables and common helpers are memoized with ``functools.lru_cache``
+  to speed up repeated note and scale queries.
 
 # Requirements
 - Python 3.x

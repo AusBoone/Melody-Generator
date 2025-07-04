@@ -26,6 +26,12 @@ except Exception:  # pragma: no cover - dependency may be missing
 
     nn = types.SimpleNamespace(Module=object)
 
+try:  # Optional dependency used when exporting or quantizing models
+    from onnxruntime.quantization import QuantType, quantize_dynamic
+except Exception:  # pragma: no cover - optional
+    quantize_dynamic = None
+    QuantType = None
+
 
 class SequenceModel(Protocol):
     """Abstract interface for predictive sequence models."""
@@ -134,4 +140,30 @@ def export_onnx(model: MelodyLSTM, path: str, seq_len: int = 4) -> None:
         input_names=["seq"],
         output_names=["logits"],
         opset_version=12,
+    )
+
+
+def quantize_onnx_model(input_path: str, output_path: str) -> None:
+    """Apply dynamic 8-bit quantization to an ONNX model.
+
+    Parameters
+    ----------
+    input_path:
+        Path to the floating point ``.onnx`` model.
+    output_path:
+        Destination for the quantised model.
+
+    Raises
+    ------
+    RuntimeError
+        If ``onnxruntime`` is unavailable.
+    """
+
+    if quantize_dynamic is None or QuantType is None:
+        raise RuntimeError("onnxruntime is required for quantize_onnx_model")
+
+    quantize_dynamic(
+        model_input=input_path,
+        model_output=output_path,
+        weight_type=QuantType.QInt8,
     )
