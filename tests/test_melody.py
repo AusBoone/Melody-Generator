@@ -439,7 +439,7 @@ def test_melody_trends_up_then_down():
     """Seeded melodies exhibit an overall rise then fall contour."""
     chords = ["C", "G", "Am", "F"]
     random.seed(0)
-    mel = generate_melody("C", 12, chords, motif_length=4)
+    mel = generate_melody("C", 12, chords, motif_length=4, pattern=[0.25])
     midi_vals = [note_to_midi(n) for n in mel]
     mid = len(midi_vals) // 2
     first_half = midi_vals[:mid]
@@ -596,3 +596,20 @@ def test_allow_tritone_filter():
     random.seed(0)
     mel_allow = generate_melody("C", 20, chords, motif_length=4, allow_tritone=True)
     assert len(mel_allow) == 20
+
+
+def test_generate_melody_custom_rhythm_generator():
+    """``generate_melody`` should call the provided ``RhythmGenerator``."""
+
+    class DummyGen:
+        def __init__(self) -> None:
+            self.called = 0
+
+        def generate(self, length: int):
+            self.called += 1
+            return [0.25] * length
+
+    gen = DummyGen()
+    generate_melody("C", 4, ["C"], motif_length=2, rhythm_generator=gen)
+    assert gen.called == 1
+

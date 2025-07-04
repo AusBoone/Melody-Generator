@@ -83,3 +83,91 @@ def generate_phrase_plan(num_notes: int, base_octave: int, pitch_span: int = 2) 
     tension = (rise + fall)[: num_notes]
 
     return PhrasePlan(num_notes, (min_oct, max_oct), tension)
+
+
+class PhrasePlanner:
+    """Hierarchical planner generating a phrase skeleton then filling it in."""
+
+    def plan_skeleton(self, chords: List[str], tension_curve: List[float]) -> List[tuple[int, str]]:
+        """Return bar-level anchor notes for ``chords``.
+
+        Parameters
+        ----------
+        chords:
+            Sequence of chord names aligning with the phrase bars.
+        tension_curve:
+            Tension values per bar used to locate peaks and valleys.
+
+        Returns
+        -------
+        List[Tuple[int, str]]
+            ``(index, note)`` pairs marking structural pivots.
+
+        Raises
+        ------
+        ValueError
+            If input lists are empty or lengths do not match.
+        """
+
+        if not chords:
+            raise ValueError("chords must not be empty")
+        if len(tension_curve) < len(chords):
+            raise ValueError("tension_curve must cover every chord")
+
+        anchors: List[tuple[int, str]] = []
+        for i, chord in enumerate(chords):
+            from . import CHORDS, canonical_chord  # Local import avoids circular
+            # dependency when ``melody_generator`` imports this module during
+            # package initialization.
+            prev = tension_curve[i - 1] if i > 0 else tension_curve[i]
+            curr = tension_curve[i]
+            nxt = tension_curve[i + 1] if i + 1 < len(tension_curve) else tension_curve[i]
+
+            is_peak = curr >= prev and curr >= nxt
+            is_valley = curr <= prev and curr <= nxt
+            if i == 0 or i == len(chords) - 1 or is_peak or is_valley:
+                root = CHORDS[canonical_chord(chord)][0]
+                anchors.append((i, root))
+        return anchors
+
+    def infill_skeleton(self, skeleton: List[tuple[int, str]], motif: List[str]) -> List[str]:
+        """Fill notes between ``skeleton`` anchors using ``motif``.
+
+        Parameters
+        ----------
+        skeleton:
+            Ordered list of ``(index, note)`` pairs starting at ``0``.
+        motif:
+            Short sequence repeated to fill the gaps. Must not be empty.
+
+        Returns
+        -------
+        List[str]
+            Full melody including anchor notes and interpolated motif notes.
+
+        Raises
+        ------
+        ValueError
+            If ``skeleton`` or ``motif`` is empty or indices are not ascending
+            from ``0``.
+        """
+
+        if not skeleton:
+            raise ValueError("skeleton must not be empty")
+        if not motif:
+            raise ValueError("motif must not be empty")
+
+        indices = [idx for idx, _ in skeleton]
+        if indices[0] != 0 or indices != sorted(indices):
+            raise ValueError("skeleton indices must start at 0 and be ascending")
+
+        melody: List[str] = []
+        motif_pos = 0
+        for i, (idx, note) in enumerate(skeleton):
+            melody.append(note)
+            next_idx = skeleton[i + 1][0] if i + 1 < len(skeleton) else idx
+            gap = next_idx - idx - 1
+            for _ in range(gap):
+                melody.append(motif[motif_pos % len(motif)])
+                motif_pos += 1
+        return melody

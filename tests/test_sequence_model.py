@@ -32,14 +32,53 @@ sys.modules.setdefault("torch", torch_stub)
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+# Stub ``mido`` and ``tkinter`` so importing ``melody_generator`` succeeds
+stub_mido = types.ModuleType("mido")
+stub_mido.Message = object
+stub_mido.MidiFile = object
+stub_mido.MidiTrack = list
+stub_mido.MetaMessage = lambda *a, **kw: object()
+stub_mido.bpm2tempo = lambda bpm: bpm
+sys.modules.setdefault("mido", stub_mido)
+
+tk_stub = types.ModuleType("tkinter")
+tk_stub.filedialog = types.ModuleType("filedialog")
+tk_stub.messagebox = types.ModuleType("messagebox")
+tk_stub.ttk = types.ModuleType("ttk")
+sys.modules.setdefault("tkinter", tk_stub)
+sys.modules.setdefault("tkinter.filedialog", tk_stub.filedialog)
+sys.modules.setdefault("tkinter.messagebox", tk_stub.messagebox)
+sys.modules.setdefault("tkinter.ttk", tk_stub.ttk)
+
 seq_mod = importlib.reload(importlib.import_module("melody_generator.sequence_model"))
 
 
 def test_predict_next_requires_history():
     """``predict_next`` should validate that history is non-empty."""
-    model = types.SimpleNamespace()
+
+    class DummyModel:
+        def predict_logits(self, history):
+            return [0.0, 0.0]
+
     with pytest.raises(ValueError):
-        seq_mod.predict_next(model, [])
+        seq_mod.predict_next(DummyModel(), [])
+
+
+def test_predict_next_returns_argmax():
+    """Highest scoring index should be returned."""
+
+    class DummyModel:
+        def __init__(self):
+            self.seen = []
+
+        def predict_logits(self, history):
+            self.seen.append(tuple(history))
+            return [0.1, 0.9]
+
+    model = DummyModel()
+    result = seq_mod.predict_next(model, [1])
+    assert result == 1
+    assert model.seen == [(1,)]
 
 
 def test_export_onnx_called():
@@ -56,3 +95,24 @@ def test_export_onnx_called():
     torch_stub.onnx.export = fake_export
     seq_mod.export_onnx(DummyModel(), "out.onnx", seq_len=2)
     assert called['args'][2] == "out.onnx"
+
+
+def test_generate_melody_invokes_sequence_model():
+    """``generate_melody`` should consult the provided sequence model."""
+
+    mg = importlib.import_module("melody_generator")
+
+    class DummyModel:
+        def __init__(self):
+            self.calls = 0
+
+        def predict_logits(self, history):
+            self.calls += 1
+            # Strongly favour scale degree 0
+            return [2.0] + [0.0] * (len(mg.SCALE["C"]) - 1)
+
+    model = DummyModel()
+    # ``motif_length`` greater than one ensures the generation loop runs a
+    # branch that consults the sequence model.
+    mg.generate_melody("C", 4, ["C"], motif_length=2, sequence_model=model)
+    assert model.calls > 0

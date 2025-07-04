@@ -71,3 +71,45 @@ def test_generate_progression_lengths():
     chords, rhythm = harmony.generate_progression("C", length=4)
     assert len(chords) == 4
     assert len(rhythm) == 4
+
+
+def test_harmony_generator_rule_based():
+    """Fallback generator should match bar count when no model is supplied."""
+    harmony = importlib.import_module("melody_generator.harmony_generator")
+    gen = harmony.HarmonyGenerator()
+    rhythm = [1.0] * 4  # one bar of 4/4
+    chords, durations = gen.generate("C", ["C4"], rhythm)
+    assert len(chords) == 1
+    assert durations == [4]
+
+
+def test_harmony_generator_multiple_bars():
+    """Downbeat detection should produce one chord per bar."""
+    harmony = importlib.import_module("melody_generator.harmony_generator")
+    gen = harmony.HarmonyGenerator()
+    rhythm = [1.0] * 8  # two bars of 4/4
+    chords, durations = gen.generate("C", ["C4"], rhythm)
+    assert len(chords) == 2
+    assert durations == [4, 4]
+
+
+def test_harmony_generator_custom_model():
+    """A provided model should be queried once per bar."""
+    harmony = importlib.import_module("melody_generator.harmony_generator")
+
+    class DummyModel:
+        def __init__(self):
+            self.calls = 0
+
+        def predict(self, history):
+            self.calls += 1
+            # Always return the first degree as most likely
+            return [1.0] + [0.0] * 6
+
+    model = DummyModel()
+    gen = harmony.HarmonyGenerator(model)
+    rhythm = [1.0] * 8  # two bars
+    chords, _ = gen.generate("C", ["C4"], rhythm)
+    assert model.calls == 2
+    # Ensure returned chords correspond to degree zero
+    assert all(c == "C" for c in chords)

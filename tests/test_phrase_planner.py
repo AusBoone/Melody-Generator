@@ -31,6 +31,7 @@ phrase_module = importlib.import_module("melody_generator.phrase_planner")
 PhrasePlan = phrase_module.PhrasePlan
 generate_phrase_plan = phrase_module.generate_phrase_plan
 generate_melody = importlib.import_module("melody_generator").generate_melody
+PhrasePlanner = phrase_module.PhrasePlanner
 
 
 def test_generate_phrase_plan_basic():
@@ -56,5 +57,23 @@ def test_melody_respects_phrase_plan():
     plan = generate_phrase_plan(8, base_octave=2)
     mel = generate_melody("C", 8, chords, motif_length=4, base_octave=4, phrase_plan=plan)
     assert {int(n[-1]) for n in mel}.issubset(set(range(2, 5)))
+
+
+def test_plan_skeleton_selects_peaks_and_ends():
+    """``PhrasePlanner.plan_skeleton`` should mark boundaries and tension peaks."""
+    planner = PhrasePlanner()
+    chords = ["C", "G", "Am", "F"]
+    tension = [0.1, 0.5, 1.0, 0.2]
+    skeleton = planner.plan_skeleton(chords, tension)
+    assert skeleton == [(0, "C"), (2, "A"), (3, "F")]
+
+
+def test_infill_skeleton_repeats_motif():
+    """Motif should fill the gaps between skeleton anchor notes."""
+    planner = PhrasePlanner()
+    skeleton = [(0, "C"), (2, "G"), (4, "C")]
+    melody = planner.infill_skeleton(skeleton, ["D", "E"])
+    assert melody == ["C", "D", "G", "E", "C"]
+
 
 
