@@ -73,6 +73,18 @@ __version__ = "0.1.0"
 #   resources for easy navigation.
 # * `generate_motif` and `generate_melody` now validate unknown keys and raise `ValueError` when violated.
 # * `generate_melody` and `create_midi_file` reject negative durations in `pattern`.
+# * Added caching for `note_to_midi` conversions and precomputed scale indices
+#   for faster lookups.
+# * Melody generation now weights candidate notes to favour chord tones and
+#   smooth motion, filters tritone leaps and selects scales based on the active
+#   chord.
+# * Melody generation caches candidate note pools for each chord to avoid
+#   repeated list construction and adds an optional ``structure`` parameter for
+#   repeating sections.
+# * MIDI output uses a crescendo-decrescendo velocity curve with downbeat
+#   accents for a more musical performance.
+# * Candidate weighting now uses a simple transition matrix and the final note
+#   resolves to the root of the last chord for a basic cadence.
 # ---------------------------------------------------------------
 
 import mido
@@ -173,6 +185,51 @@ NOTE_TO_SEMITONE = {
 # relies on it.
 NOTES: List[str] = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 
+# ``_NOTE_TO_MIDI_CACHE`` stores conversions from note strings to MIDI numbers
+# so repeated calls avoid recomputing the same values. ``functools.lru_cache``
+# cannot be used here because the function accepts user input that may be quite
+# large. A simple dictionary is sufficient and easy to inspect when debugging.
+_NOTE_TO_MIDI_CACHE: dict[str, int] = {}
+
+# ``_SCALE_INDICES`` maps each key to a dictionary of note names to their index
+# within the corresponding scale. This avoids repeated ``list.index`` lookups
+# when the generator determines the next scale degree.
+_SCALE_INDICES: dict[str, dict[str, int]] = {}
+
+# ``_CANDIDATE_CACHE`` stores precomputed candidate note lists keyed by
+# ``(key, chord, strong, root_octave)``. This avoids rebuilding the same
+# source pools each iteration inside ``generate_melody``.
+_CANDIDATE_CACHE: dict[tuple[str, str, bool, int], List[str]] = {}
+
+# ``_TRANSITION_WEIGHTS`` encodes the relative likelihood of moving by a
+# given interval in semitones. Values were chosen heuristically so that
+# repeated notes and small steps are favoured over large leaps. The
+# dictionary acts as a rudimentary Markov transition matrix guiding
+# candidate weighting during melody generation.
+_TRANSITION_WEIGHTS: dict[int, float] = {
+    0: 1.2,  # repeated pitch
+    1: 1.0,
+    2: 0.8,
+    3: 0.6,
+    4: 0.4,
+    5: 0.3,
+    6: 0.1,  # tritone (rarely used)
+}
+
+# ``_SIMILARITY_WEIGHTS`` biases interval choices toward sizes close to the
+# previous step. When the last interval was, for example, two semitones, moving
+# another two semitones is slightly preferred over a much larger jump.
+_SIMILARITY_WEIGHTS: dict[int, float] = {
+    0: 1.0,
+    1: 0.8,
+    2: 0.6,
+    3: 0.4,
+}
+
+# Cache the preferred scale for each (key, chord) pair so repeated lookups in
+# ``scale_for_chord`` do not rebuild the same list.
+_CHORD_SCALE_CACHE: dict[tuple[str, str], List[str]] = {}
+
 # Map key names to the notes that make up their diatonic scale. Functions that
 # generate melodies or harmonies reference this to stay in the chosen key.
 SCALE = {
@@ -243,6 +300,12 @@ for note in NOTES:
         # Pre-compute common modal scales for every root note.  The resulting
         # key names take the form "C_dorian", "G_pentatonic", etc.
         SCALE[f"{note}_{mode}"] = _build_scale(note, pattern)
+
+# Build quick-lookup dictionaries for each scale so note positions can be
+# retrieved in constant time during melody generation. This avoids repeated
+# ``list.index`` calls which become costly as the number of notes grows.
+for name, notes in SCALE.items():
+    _SCALE_INDICES[name] = {n: i for i, n in enumerate(notes)}
 
 # ``CHORDS`` maps chord names to the notes they contain. This lookup table is
 # used when constructing harmony lines and validating chord progressions.
@@ -335,6 +398,7 @@ def canonical_chord(name: str) -> str:
         raise ValueError(f"Unknown chord: {name}")
     return chord
 
+
 # ``PATTERNS`` stores common rhythmic figures. Each inner list represents a
 # sequence of note durations (in fractions of a whole note) that repeat while
 # creating the MIDI file.
@@ -416,10 +480,7 @@ def generate_random_chord_progression(key: str, length: int = 4) -> List[str]:
     progression = [degree_to_chord(d) for d in degrees]
     if length > len(progression):
         # Pad the progression with random chords if the requested length is longer
-        extra = [
-            degree_to_chord(random.randint(0, 5))
-            for _ in range(length - len(progression))
-        ]
+        extra = [degree_to_chord(random.randint(0, 5)) for _ in range(length - len(progression))]
         # Extend with random chords so the returned list matches ``length``
         progression.extend(extra)
     return progression[:length]
@@ -443,9 +504,7 @@ def diatonic_chords(key: str) -> List[str]:
     is_minor = key.endswith("m")
     notes = SCALE[key]
     qualities = (
-        ["m", "dim", "", "m", "m", "", ""]
-        if is_minor
-        else ["", "m", "m", "", "", "m", "dim"]
+        ["m", "dim", "", "m", "m", "", ""] if is_minor else ["", "m", "m", "", "", "m", "dim"]
     )
     chords = []
     translation = {
@@ -463,6 +522,54 @@ def diatonic_chords(key: str) -> List[str]:
         if chord in CHORDS and chord not in chords:
             chords.append(chord)
     return chords
+
+
+def scale_for_chord(key: str, chord: str) -> List[str]:
+    """Return the preferred scale for ``chord`` within ``key``.
+
+    This helper supplies chord-specific scales so the melody can better
+    outline the harmony. Dominant chords use a mixolydian mode while other
+    major and minor triads fall back to the natural major or minor scale of
+    the chord root.
+    """
+
+    cache_key = (key, chord)
+    cached = _CHORD_SCALE_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+
+    chord = canonical_chord(chord)
+    root = chord.rstrip("m")
+    if not chord.endswith("m") and root in SCALE and chord in CHORDS:
+        # Use mixolydian when the chord acts as the dominant of the key.
+        if root != canonical_key(key).rstrip("m") and f"{root}_mixolydian" in SCALE:
+            scale = SCALE[f"{root}_mixolydian"]
+        else:
+            scale = SCALE.get(root, SCALE[key])
+    elif chord.endswith("m") and f"{root}m" in SCALE:
+        scale = SCALE[f"{root}m"]
+    else:
+        scale = SCALE[key]
+
+    _CHORD_SCALE_CACHE[cache_key] = scale
+    return scale
+
+
+def _candidate_pool(key: str, chord: str, root_octave: int, *, strong: bool) -> List[str]:
+    """Return cached candidate notes for ``chord`` and octave.
+
+    This helper reduces allocations by caching source pools for each chord and
+    octave. ``strong`` controls whether the pool consists of chord tones or the
+    broader scale associated with ``chord``.
+    """
+
+    cache_key = (key, chord, strong, root_octave)
+    pool = _CANDIDATE_CACHE.get(cache_key)
+    if pool is None:
+        notes = get_chord_notes(chord) if strong else scale_for_chord(key, chord)
+        pool = [n + str(oct) for n in notes for oct in range(root_octave, root_octave + 2)]
+        _CANDIDATE_CACHE[cache_key] = pool
+    return pool
 
 
 def generate_random_rhythm_pattern(length: int = 3) -> List[float]:
@@ -517,6 +624,10 @@ def note_to_midi(note: str) -> int:
     # ensures the note consists of a letter with an optional accidental
     # followed by one or more digits (or a leading minus sign for negative
     # octaves).
+    # Use the cache to avoid recomputing conversions for the same note string.
+    if note in _NOTE_TO_MIDI_CACHE:
+        return _NOTE_TO_MIDI_CACHE[note]
+
     match = re.fullmatch(r"([A-Ga-g][#b]?)(-?\d+)", note)
     if not match:
         logging.error(f"Invalid note format: {note}")
@@ -551,7 +662,9 @@ def note_to_midi(note: str) -> int:
         raise
 
     # MIDI note number is calculated relative to C0 at index 12
-    return note_idx + (octave * 12)
+    midi_val = note_idx + (octave * 12)
+    _NOTE_TO_MIDI_CACHE[note] = midi_val
+    return midi_val
 
 
 def midi_to_note(midi_note: int) -> str:
@@ -620,6 +733,8 @@ def generate_melody(
     time_signature: Tuple[int, int] = (4, 4),
     pattern: Optional[List[float]] = None,
     base_octave: int = 4,
+    structure: Optional[str] = None,
+    allow_tritone: bool = False,
 ) -> List[str]:
     """Return a melody in ``key`` spanning ``num_notes`` notes.
 
@@ -636,6 +751,10 @@ def generate_melody(
     6.  Large leaps are tracked so the following note can correct the motion.
     7.  Strong beats are restricted to chord tones while weak beats may use any
         scale note.
+    8.  Candidate notes are weighted using a small transition matrix so common
+        intervals appear more frequently.
+    9.  The final note is forced to the root of the last chord to create a
+        simple cadence.
 
     @param key (str): Musical key for the melody. ``ValueError`` is raised
         when the key does not exist in :data:`SCALE` so that invalid input is
@@ -653,6 +772,12 @@ def generate_melody(
     @param base_octave (int): Preferred starting octave. Must fall within
         ``MIN_OCTAVE`` and ``MAX_OCTAVE`` so all generated MIDI notes remain
         valid.
+    @param structure (str|None): Optional section pattern such as ``"AABA"``.
+        Each unique letter generates a fresh phrase while repeated letters reuse
+        and lightly mutate the earlier phrase. Only letters ``A-Z`` are allowed.
+    @param allow_tritone (bool): When ``False`` (default) melodic intervals of
+        six semitones are filtered out to avoid the dissonant tritone unless no
+        other options exist.
     @returns List[str]: Generated melody as note strings.
     """
     # The chord progression provides harmonic context for each note. Reject an
@@ -669,6 +794,7 @@ def generate_melody(
     if key not in SCALE:
         raise ValueError(f"Unknown key '{key}'")
     notes_in_key = SCALE[key]
+    indices_in_key = _SCALE_INDICES[key]
 
     # Choose a rhythmic pattern when the caller does not supply one.  The
     # pattern cycles throughout the melody to give it an underlying pulse.
@@ -689,24 +815,55 @@ def generate_melody(
     # is restricted to common musical denominators to keep rhythm calculations
     # simple.
     valid_denoms = {1, 2, 4, 8, 16}
-    if (
-        time_signature[0] <= 0
-        or time_signature[1] <= 0
-        or time_signature[1] not in valid_denoms
-    ):
+    if time_signature[0] <= 0 or time_signature[1] <= 0 or time_signature[1] not in valid_denoms:
         raise ValueError(
-            "time_signature denominator must be one of 1, 2, 4, 8 or 16 and "
-            "numerator must be > 0"
+            "time_signature denominator must be one of 1, 2, 4, 8 or 16 and numerator must be > 0"
         )
 
     # ``base_octave`` controls the register of the melody. Restrict it to a
     # safe MIDI range so generated notes remain between 0 and 127.
     if not MIN_OCTAVE <= base_octave <= MAX_OCTAVE:
-        raise ValueError(
-            f"base_octave must be between {MIN_OCTAVE} and {MAX_OCTAVE}"
-        )
+        raise ValueError(f"base_octave must be between {MIN_OCTAVE} and {MAX_OCTAVE}")
     beat_unit = 1 / time_signature[1]
     start_beat = 0.0
+
+    if structure is not None:
+        if not structure.isalpha():
+            raise ValueError("structure must only contain letters A-Z")
+        seg_len = num_notes // len(structure)
+        remainder = num_notes % len(structure)
+
+        def _mutate(n: str) -> str:
+            """Return ``n`` shifted by a scale step with small probability."""
+
+            if random.random() < 0.3:
+                name, octv = n[:-1], int(n[-1])
+                idx = indices_in_key[name]
+                idx = (idx + random.choice([-1, 1])) % len(notes_in_key)
+                name = notes_in_key[idx]
+                return f"{name}{octv}"
+            return n
+
+        sections: dict[str, List[str]] = {}
+        final: List[str] = []
+        for i, label in enumerate(structure):
+            length = seg_len + (1 if i < remainder else 0)
+            if label not in sections:
+                seg = generate_melody(
+                    key,
+                    length,
+                    chord_progression,
+                    motif_length=motif_length,
+                    time_signature=time_signature,
+                    pattern=pattern,
+                    base_octave=base_octave,
+                    structure=None,
+                )
+                sections[label] = seg
+            else:
+                seg = [_mutate(n) for n in sections[label][:length]]
+            final.extend(seg)
+        return final[:num_notes]
 
     # Current octave offset relative to ``base_octave``. This may shift by
     # one at phrase boundaries to vary the register slightly.
@@ -722,7 +879,7 @@ def generate_melody(
         curr = melody[j]
         if note_to_midi(curr) <= note_to_midi(prev):
             name, octave = prev[:-1], int(prev[-1])
-            idx = notes_in_key.index(name)
+            idx = indices_in_key[name]
             idx += 1
             if idx >= len(notes_in_key):
                 idx -= len(notes_in_key)
@@ -750,6 +907,12 @@ def generate_melody(
     # Track the direction of any large melodic leaps.  This information guides
     # the next note so the line moves back toward the centre after a big jump.
     leap_dir: Optional[int] = None
+    prev_interval_size: Optional[int] = None
+
+    if len(melody) >= 2:
+        prev_interval_size = abs(
+            note_to_midi(melody[-1]) - note_to_midi(melody[-2])
+        )
 
     # The overall contour rises during the first half of the melody and falls
     # during the second half. ``half_point`` marks the boundary between these
@@ -778,7 +941,7 @@ def generate_melody(
 
             base = melody[i - motif_length]
             name, octave = base[:-1], int(base[-1])
-            idx = notes_in_key.index(name)
+            idx = indices_in_key[name]
             new_idx = idx + direction
             if new_idx < 0:
                 new_idx += len(notes_in_key)
@@ -802,8 +965,7 @@ def generate_melody(
                 new_name = min(
                     chord_notes,
                     key=lambda n: abs(
-                        note_to_midi(n + str(octave))
-                        - note_to_midi(new_name + str(octave))
+                        note_to_midi(n + str(octave)) - note_to_midi(new_name + str(octave))
                     ),
                 )
             melody.append(new_name + str(octave))
@@ -811,48 +973,58 @@ def generate_melody(
             continue
         chord = chord_progression[i % len(chord_progression)]
         chord_notes = get_chord_notes(chord)
+        scale_for_chord(key, chord)
         prev_note = melody[-1]
         candidates = []
         min_interval = None
 
-        source_pool = chord_notes if strong else notes_in_key
+        root_octave = base_octave + octave_offset
+        source_pool = _candidate_pool(
+            key,
+            chord,
+            root_octave,
+            strong=strong,
+        )
 
         # Scan candidate pitches and keep track of which is closest to the
         # previous note. This gives a baseline for selecting smooth motion.
-        for note in source_pool:
-            for octave in range(
-                base_octave + octave_offset, base_octave + octave_offset + 2
-            ):
-                candidate_note = note + str(octave)
-                interval = get_interval(prev_note, candidate_note)
-                if min_interval is None or interval < min_interval:
-                    min_interval = interval
+        for candidate_note in source_pool:
+            interval = get_interval(prev_note, candidate_note)
+            if min_interval is None or interval < min_interval:
+                min_interval = interval
 
         # Collect any notes that are within a semitone of that best interval so
         # we have a small pool of options that still move by a reasonable step.
         if min_interval is not None:
             threshold = min_interval + 1
-            for note in source_pool:
-                for octave in range(
-                    base_octave + octave_offset, base_octave + octave_offset + 2
-                ):
-                    candidate_note = note + str(octave)
-                    interval = get_interval(prev_note, candidate_note)
-                    if interval <= threshold:
-                        candidates.append(candidate_note)
+            for candidate_note in source_pool:
+                interval = get_interval(prev_note, candidate_note)
+                if interval <= threshold:
+                    candidates.append(candidate_note)
 
         # Fallback: If no candidates are found, choose a random note from the key.
         if not candidates:
             logging.warning(
                 f"No candidate found for chord {chord} with previous note {prev_note}. Using fallback."
             )
-            pool = chord_notes if strong else notes_in_key
-            fallback_note = random.choice(pool) + str(
-                random.randint(
-                    base_octave + octave_offset, base_octave + octave_offset + 1
-                )
+            pool = _candidate_pool(
+                key,
+                chord,
+                root_octave,
+                strong=strong,
             )
+            fallback_note = random.choice(pool)
             candidates.append(fallback_note)
+
+        # Optionally remove tritone leaps unless explicitly allowed. Filtering
+        # these intervals yields a smoother line for genres that avoid the
+        # dissonant augmented fourth/diminished fifth.
+        if not allow_tritone:
+            candidates = [
+                c
+                for c in candidates
+                if abs(note_to_midi(c) - note_to_midi(prev_note)) != 6
+            ] or candidates
 
         # If the previous interval was a leap, favour notes that move back
         # toward the origin by a small step.
@@ -872,9 +1044,7 @@ def generate_melody(
 
         # Bias overall motion toward the current direction when possible.
         directional = [
-            c
-            for c in candidates
-            if (note_to_midi(c) - note_to_midi(prev_note)) * direction >= 0
+            c for c in candidates if (note_to_midi(c) - note_to_midi(prev_note)) * direction >= 0
         ]
         if directional:
             candidates = directional
@@ -884,7 +1054,21 @@ def generate_melody(
             # the overall trend of the phrase.
             candidates = [min(candidates, key=note_to_midi)]
 
-        next_note = random.choice(candidates)
+        # Weight candidate notes so smaller intervals and chord tones on strong
+        # beats are favoured. This creates a rudimentary Markov-style bias
+        # without requiring a full transition matrix learned from data.
+        weights = []
+        for cand in candidates:
+            interval = abs(note_to_midi(cand) - note_to_midi(prev_note))
+            weight = _TRANSITION_WEIGHTS.get(interval, 0.2)
+            if prev_interval_size is not None:
+                diff = abs(interval - prev_interval_size)
+                weight *= _SIMILARITY_WEIGHTS.get(diff, 0.2)
+            if strong and cand[:-1] in chord_notes:
+                weight *= 1.5
+            weights.append(weight)
+
+        next_note = random.choices(candidates, weights=weights, k=1)[0]
         melody.append(next_note)
 
         start_beat += pattern[i % len(pattern)] / beat_unit
@@ -892,8 +1076,19 @@ def generate_melody(
         # Determine if this interval constitutes a leap so the next note can
         # compensate accordingly.
         interval = note_to_midi(next_note) - note_to_midi(prev_note)
-        if abs(interval) >= 7:
+        prev_interval_size = abs(interval)
+        if prev_interval_size >= 7:
             leap_dir = 1 if interval > 0 else -1
+
+    # Resolve the phrase by forcing the last note to the root of the
+    # final chord. This creates a basic cadence so melodies feel
+    # complete even when the stochastic process would end on a
+    # non-resolving tone.
+    final_chord = chord_progression[(num_notes - 1) % len(chord_progression)]
+    final_root = get_chord_notes(final_chord)[0]
+    last_name, last_oct = melody[-1][:-1], melody[-1][-1]
+    if last_name != final_root:
+        melody[-1] = f"{final_root}{last_oct}"
 
     return melody
 
@@ -1023,14 +1218,9 @@ def create_midi_file(
     if chord_progression is not None and not chord_progression:
         raise ValueError("chord_progression must contain at least one chord")
     valid_denoms = {1, 2, 4, 8, 16}
-    if (
-        time_signature[0] <= 0
-        or time_signature[1] <= 0
-        or time_signature[1] not in valid_denoms
-    ):
+    if time_signature[0] <= 0 or time_signature[1] <= 0 or time_signature[1] not in valid_denoms:
         raise ValueError(
-            "time_signature denominator must be one of 1, 2, 4, 8 or 16 and "
-            "numerator must be > 0"
+            "time_signature denominator must be one of 1, 2, 4, 8 or 16 and numerator must be > 0"
         )
     ticks_per_beat = 480
     mid = MidiFile(ticks_per_beat=ticks_per_beat)
@@ -1083,6 +1273,7 @@ def create_midi_file(
     beat_ticks = int(beat_fraction * whole_note_ticks)
     beats_per_segment = time_signature[0]
     beats_elapsed = 0
+    start_beat = 0.0
     rest_ticks = 0
     last_note = None
     last_velocity = 64
@@ -1093,21 +1284,30 @@ def create_midi_file(
     for i, note in enumerate(melody):
         # Determine how long this note should last based on the pattern
         duration_fraction = pattern[i % len(pattern)]
-        velocity = int(50 + 40 * (i / max(len(melody) - 1, 1)))
+        # Create a gentle crescendo followed by a decrescendo so the
+        # phrase has more expressive dynamics than a simple linear ramp.
+        half = max(len(melody) - 1, 1) / 2
+        if i <= half:
+            frac = i / half
+        else:
+            frac = 1 - ((i - half) / half)
+        strong = abs(start_beat - round(start_beat)) < 1e-6
+        velocity = int(50 + 40 * frac)
+        if strong:
+            velocity = min(velocity + 10, 127)
 
         if duration_fraction == 0:
             # Treat ``0`` as a rest equal to one beat.
             rest_ticks += beat_ticks
             beats_elapsed += 1
+            start_beat += 1
             continue
 
         note_duration = int(duration_fraction * whole_note_ticks)
         midi_note = note_to_midi(note)
 
         note_on = Message("note_on", note=midi_note, velocity=velocity, time=rest_ticks)
-        note_off = Message(
-            "note_off", note=midi_note, velocity=velocity, time=note_duration
-        )
+        note_off = Message("note_off", note=midi_note, velocity=velocity, time=note_duration)
         track.append(note_on)
         track.append(note_off)
         if harmony_track is not None:
@@ -1143,15 +1343,14 @@ def create_midi_file(
         total_beats += beat_len
         last_note = midi_note
         last_velocity = velocity
+        start_beat += beat_len
 
         if beats_elapsed >= beats_per_segment:
             if last_note is not None and random.random() < 0.5:
                 extra_fraction = random.choice([0.5, 1.0])
                 extra_ticks = int(extra_fraction * whole_note_ticks)
                 on = Message("note_on", note=last_note, velocity=last_velocity, time=0)
-                off = Message(
-                    "note_off", note=last_note, velocity=last_velocity, time=extra_ticks
-                )
+                off = Message("note_off", note=last_note, velocity=last_velocity, time=extra_ticks)
                 track.append(on)
                 track.append(off)
                 rest_ticks = beat_ticks
@@ -1160,9 +1359,7 @@ def create_midi_file(
     if chord_track is not None:
         # Compute when each chord should start and end using absolute ticks so
         # merged chords align with the melody when ``chords_separate`` is False.
-        ticks_per_measure = int(
-            time_signature[0] * ticks_per_beat * (4 / time_signature[1])
-        )
+        ticks_per_measure = int(time_signature[0] * ticks_per_beat * (4 / time_signature[1]))
         ticks_per_chord = ticks_per_measure
         total_ticks = int(total_beats * ticks_per_beat * (4 / time_signature[1]))
         num_chords = max(1, math.ceil(total_ticks / ticks_per_chord))
@@ -1262,9 +1459,7 @@ def _open_default_player(path: str, *, delete_after: bool = False) -> None:
                     # premature deletion when ``delete_after`` is ``True``.
                     # Modern versions support ``--wait`` so attempt to use it
                     # and fall back to the standard behaviour on failure.
-                    proc = subprocess.run(
-                        ["xdg-open", "--wait", path], check=False
-                    )
+                    proc = subprocess.run(["xdg-open", "--wait", path], check=False)
                     if proc.returncode != 0:
                         subprocess.run(["xdg-open", path], check=False)
         except Exception as exc:  # pragma: no cover - platform dependent
@@ -1315,9 +1510,7 @@ def run_cli() -> None:
         action="store_true",
         help="List all supported chords and exit",
     )
-    parser.add_argument(
-        "--key", type=str, required=True, help="Musical key (e.g., C, Dm, etc.)."
-    )
+    parser.add_argument("--key", type=str, required=True, help="Musical key (e.g., C, Dm, etc.).")
     parser.add_argument(
         "--chords", type=str, help="Comma-separated chord progression (e.g., C,Am,F,G)."
     )
@@ -1327,38 +1520,28 @@ def run_cli() -> None:
         metavar="N",
         help="Generate a random chord progression of N chords, ignoring --chords.",
     )
-    parser.add_argument(
-        "--bpm", type=int, required=True, help="Beats per minute (integer)."
-    )
+    parser.add_argument("--bpm", type=int, required=True, help="Beats per minute (integer).")
     parser.add_argument(
         "--timesig",
         type=str,
         required=True,
         help="Time signature in numerator/denominator format (e.g., 4/4).",
     )
-    parser.add_argument(
-        "--notes", type=int, required=True, help="Number of notes in the melody."
-    )
-    parser.add_argument(
-        "--output", type=str, required=True, help="Output MIDI file path."
-    )
+    parser.add_argument("--notes", type=int, required=True, help="Number of notes in the melody.")
+    parser.add_argument("--output", type=str, required=True, help="Output MIDI file path.")
     parser.add_argument(
         "--motif_length",
         type=int,
         default=4,
         help="Length of the initial motif (default: 4).",
     )
-    parser.add_argument(
-        "--harmony", action="store_true", help="Add a simple harmony track."
-    )
+    parser.add_argument("--harmony", action="store_true", help="Add a simple harmony track.")
     parser.add_argument(
         "--random-rhythm",
         action="store_true",
         help="Generate a random rhythmic pattern.",
     )
-    parser.add_argument(
-        "--counterpoint", action="store_true", help="Generate a counterpoint line."
-    )
+    parser.add_argument("--counterpoint", action="store_true", help="Generate a counterpoint line.")
     parser.add_argument(
         "--harmony-lines",
         type=int,
@@ -1370,10 +1553,7 @@ def run_cli() -> None:
         "--base-octave",
         type=int,
         default=4,
-        help=(
-            f"Starting octave for the melody ({MIN_OCTAVE}-{MAX_OCTAVE}, "
-            "default: 4)."
-        ),
+        help=(f"Starting octave for the melody ({MIN_OCTAVE}-{MAX_OCTAVE}, default: 4)."),
     )
     parser.add_argument(
         "--include-chords",
@@ -1394,7 +1574,7 @@ def run_cli() -> None:
     parser.add_argument(
         "--soundfont",
         type=str,
-        help="Path to a SoundFont (.sf2) file used when " "previewing with --play",
+        help="Path to a SoundFont (.sf2) file used when previewing with --play",
     )
     parser.add_argument(
         "--play", action="store_true", help="Play the MIDI file after it is created"
@@ -1424,9 +1604,7 @@ def run_cli() -> None:
     # Ensure the base octave stays within a musically reasonable range so
     # generated notes remain valid MIDI values.
     if not MIN_OCTAVE <= args.base_octave <= MAX_OCTAVE:
-        logging.error(
-            f"Base octave must be between {MIN_OCTAVE} and {MAX_OCTAVE}."
-        )
+        logging.error(f"Base octave must be between {MIN_OCTAVE} and {MAX_OCTAVE}.")
         sys.exit(1)
 
     # Validate key and chord progression in a case-insensitive manner so
@@ -1440,9 +1618,7 @@ def run_cli() -> None:
 
     if args.random_chords:
         # Let the helper pick a progression based solely on the key
-        chord_progression = generate_random_chord_progression(
-            args.key, args.random_chords
-        )
+        chord_progression = generate_random_chord_progression(args.key, args.random_chords)
     else:
         if not args.chords:
             logging.error("Chord progression required unless --random-chords is used.")
@@ -1526,16 +1702,12 @@ def main() -> None:
     else:
         try:
             # Import the GUI lazily so tests without Tkinter can still run
-            MelodyGeneratorGUI = import_module(
-                "melody_generator.gui"
-            ).MelodyGeneratorGUI
+            MelodyGeneratorGUI = import_module("melody_generator.gui").MelodyGeneratorGUI
         except ImportError:
             logging.error(
                 "Tkinter is required for the GUI. Run with CLI arguments or install Tkinter."
             )
-            logging.error(
-                "Tkinter is not available. Please run with CLI options or install it."
-            )
+            logging.error("Tkinter is not available. Please run with CLI options or install it.")
             sys.exit(1)
 
         gui = MelodyGeneratorGUI(

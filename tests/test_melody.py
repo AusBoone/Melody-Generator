@@ -445,12 +445,8 @@ def test_melody_trends_up_then_down():
     first_half = midi_vals[:mid]
     second_half = midi_vals[mid:]
 
-    up_trend = sum(b - a for a, b in zip(first_half, first_half[1:])) / (
-        len(first_half) - 1
-    )
-    down_trend = sum(b - a for a, b in zip(second_half, second_half[1:])) / (
-        len(second_half) - 1
-    )
+    up_trend = sum(b - a for a, b in zip(first_half, first_half[1:])) / (len(first_half) - 1)
+    down_trend = sum(b - a for a, b in zip(second_half, second_half[1:])) / (len(second_half) - 1)
 
     assert up_trend >= 0
     assert down_trend <= 0
@@ -543,3 +539,60 @@ def test_chord_duration_respects_time_signature(tmp_path, monkeypatch):
     chord_track = mid.tracks[1]
     off_times = [m.time for m in chord_track if m.type == "note_off"]
     assert off_times and off_times[0] == 1440
+
+
+def test_candidate_cache_populated():
+    """``generate_melody`` populates the candidate cache."""
+
+    chords = ["C", "G"]
+    melody_generator._CANDIDATE_CACHE.clear()
+    generate_melody("C", 4, chords, motif_length=2)
+    assert melody_generator._CANDIDATE_CACHE
+
+
+def test_generate_melody_invalid_structure():
+    """Invalid structure strings should raise ``ValueError``."""
+
+    chords = ["C", "G"]
+    with pytest.raises(ValueError):
+        generate_melody("C", 8, chords, motif_length=4, structure="A1B")
+
+
+def test_velocity_accent_on_downbeats(tmp_path):
+    """Downbeat notes receive a velocity boost."""
+
+    melody = ["C4", "D4", "E4", "F4"]
+    out = tmp_path / "vel.mid"
+    create_midi_file(melody, 120, (4, 4), str(out), pattern=[0.25])
+
+    mid = DummyMidiFile.last_instance
+    velocities = [m.velocity for m in mid.tracks[0] if m.type == "note_on"]
+    # The first note falls on a strong beat so its velocity includes the accent
+    # of ``+10`` on top of the base dynamic curve. Without the accent the value
+    # would be ``50`` at position ``0``.
+    assert velocities[0] == 60
+
+
+def test_final_cadence_matches_last_chord():
+    """Melodies resolve on the root of the final chord."""
+
+    chords = ["C", "G"]
+    mel = generate_melody("C", 8, chords, motif_length=4)
+    assert mel[-1][:-1] == melody_generator.CHORDS[chords[-1]][0]
+
+
+def test_allow_tritone_filter():
+    """Disallowing tritone intervals removes them from the melody."""
+
+    chords = ["C", "G", "Am", "F"]
+    random.seed(0)
+    mel = generate_melody("C", 20, chords, motif_length=4, allow_tritone=False)
+    intervals = [
+        abs(note_to_midi(b) - note_to_midi(a))
+        for a, b in zip(mel, mel[1:])
+    ]
+    assert 6 not in intervals
+
+    random.seed(0)
+    mel_allow = generate_melody("C", 20, chords, motif_length=4, allow_tritone=True)
+    assert len(mel_allow) == 20
