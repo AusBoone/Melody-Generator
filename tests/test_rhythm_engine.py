@@ -13,3 +13,11 @@ def test_generate_rhythm_length():
     """``generate_rhythm`` should return the requested number of durations."""
     pattern = rhythm.generate_rhythm(5)
     assert len(pattern) == 5
+
+
+def test_rhythm_generator_custom_transitions():
+    """A custom ``RhythmGenerator`` should honour its transition map."""
+
+    gen = rhythm.RhythmGenerator({0.5: {0.5: 1.0}}, start=0.5)
+    assert gen.generate(3) == [0.5, 0.5, 0.5]
+

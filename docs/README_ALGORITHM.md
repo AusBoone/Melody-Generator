@@ -131,16 +131,39 @@ while keeping the algorithm efficient and deterministic.
 - **Phrase Planning** – A high-level planning stage now sketches an octave
   range and tension curve before note generation. This ensures the melody rises
   and falls predictably across each phrase.
+- **Hierarchical Phrase Planner** – ``PhrasePlanner`` first extracts bar-level
+  anchor notes then infills surrounding notes with a repeating motif for
+  improved long-term coherence.
 - **Sequence Model Integration** – Candidate weights may be biased by a small
-  LSTM trained on MIDI data for smoother motifs. The reference implementation
-  uses **PyTorch**; if the library is unavailable the code falls back to
-  heuristic weighting.
-- **Style Embeddings** – Static vectors nudge note choice toward Baroque, jazz
-  or pop idioms and can be blended together.
-- **Independent Rhythm Engine** – Rhythmic patterns are produced by a separate
-  module so pitch generation and onsets evolve independently.
-- **Harmonic Generator** – ``harmony_generator`` creates chord sequences and
-  associated durations that align with the melody.
+  LSTM trained on MIDI data for smoother motifs. The model implements the
+  ``SequenceModel`` interface so alternative architectures can be swapped in.
+  When PyTorch is unavailable the code falls back to heuristic weighting.
+- **Style Embeddings** – A small VAE learns continuous style latents. Call
+  ``set_style`` to activate a vector or ``interpolate_vectors`` to blend
+  genres like Baroque, jazz and pop.
+- **Independent Rhythm Engine** – Rhythmic patterns are produced by a dedicated
+  :class:`RhythmGenerator` which models transitions between common note lengths.
+  Onset times are generated first and melodies are fitted onto that skeleton.
+- **Polyphonic Counterpoint** – ``PolyphonicGenerator`` runs four melody lines
+  in parallel and adjusts them to avoid voice crossing before exporting to a
+  multi-track MIDI file.
+- **Harmonic Generator** – ``HarmonyGenerator`` predicts chord progressions
+  and durations using a small BLSTM trained on lead-sheet data with
+  Roman-numeral fallbacks when the model is unavailable. Chords align to
+  downbeats detected in the rhythm skeleton.
+- **Objective Feedback** – Generated phrases may be refined via Frechet Music
+  Distance. Up to 5% of notes are randomly swapped when they reduce the
+  distance to a small training corpus, encouraging more human-like melodies.
+- **Data Augmentation & Transfer Learning** – ``augment_sequences`` provides
+  transpositions, inversions and rhythm jitters for training data while
+  ``fine_tune_model`` adapts the sequence model to genre-specific subsets.
+- **Numba Optimizations** – Weight calculations run inside ``compute_base_weights``
+  which is JIT-compiled with ``@njit`` when Numba is available. A ``profile``
+  context manager based on ``cProfile`` helps inspect hot paths like
+  ``pick_note``.
+- **Vectorized Candidate Selection** – Candidate filtering and sampling now use
+  NumPy broadcasting with ``numpy.random.choice`` when possible, eliminating
+  Python-level loops for better performance.
 
 ## Candidate Weighting in Depth
 
@@ -158,12 +181,18 @@ lower tension favours steps and repeated notes. All these calculations execute
 with NumPy when available for speed.
 
 Supplying a pretrained LSTM with ``sequence_model`` further shapes the melody.
-The last few scale degrees feed into ``predict_next``; the predicted degree
-adds one to the corresponding candidate weight. Static style vectors contribute
-additional offsets so genres like Baroque or jazz subtly colour note choice.
+The last few scale degrees feed into ``SequenceModel.predict_logits``; the
+returned scores are added to candidate weights. When ``set_style`` provides a
+style vector its values are added as an offset so genres like Baroque or jazz
+subtly colour note choice.
 Parallel fifths and octaves against the chord root are halved to maintain basic
-counterpoint. After note generation an optional hill-climbing pass swaps random
-pitches when they improve a simple quality metric based on interval variety.
+counterpoint. Candidate weights also include a small bonus for contrary motion
+and a penalty for repeated perfect fifth or octave leaps as determined by
+``counterpoint_penalty``. After note generation an optional refinement step
+computes the Frechet Music Distance (FMD) between the phrase and a small
+training corpus. Up to five percent of notes are randomly replaced in a
+hill-climbing loop and kept only when the FMD decreases, nudging melodies
+toward the distribution of real music.
 
 ### ONNX Export and Quantization
 
@@ -171,4 +200,4 @@ The helper :func:`melody_generator.sequence_model.export_onnx` exports an LSTM
 to ONNX format. Tools such as ``onnxruntime`` can then apply dynamic
 quantisation, reducing the model to 8‑bit weights for fast CPU inference. The
 exported model expects a sequence of scale‑degree indices and outputs logits for
-the next degree, mirroring :func:`predict_next`.
+the next degree, mirroring ``SequenceModel.predict_logits``.

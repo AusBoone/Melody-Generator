@@ -1,18 +1,21 @@
-"""Lightweight sequence model placeholder for melodic prediction.
+"""Sequence model helpers used to bias note selection.
 
-This module provides a minimal LSTM network to demonstrate how a
-pretrained model could be integrated. The implementation intentionally
-keeps the architecture simple so unit tests run quickly.
+The ``SequenceModel`` interface exposes a single method,
+``predict_logits``, which returns unnormalised scores for the next
+scale degree given the history of previous degrees.  A lightweight LSTM
+implementation provides a concrete model, but callers may supply any
+object adhering to the interface.  The design deliberately keeps the
+architecture simple so that unit tests run quickly and external
+dependencies remain optional.
 
-In a real system the weights would be trained on a MIDI corpus and
-loaded from disk via :func:`load_sequence_model`. The small helper
-:func:`predict_next` performs one forward pass to obtain a note index.
+Real applications would train a much larger network on MIDI corpora and
+load the resulting weights via :func:`load_sequence_model`.
 """
 
 from __future__ import annotations
 
 import os
-from typing import List, Optional
+from typing import List, Optional, Protocol
 
 try:
     import torch
@@ -22,6 +25,13 @@ except Exception:  # pragma: no cover - dependency may be missing
     import types
 
     nn = types.SimpleNamespace(Module=object)
+
+
+class SequenceModel(Protocol):
+    """Abstract interface for predictive sequence models."""
+
+    def predict_logits(self, history: List[int]) -> List[float]:
+        """Return raw logits for the next item given ``history``."""
 
 
 class MelodyLSTM(nn.Module):
@@ -41,8 +51,38 @@ class MelodyLSTM(nn.Module):
         out = self.fc(out[:, -1])
         return out
 
+    def predict_logits(self, history: List[int]) -> List[float]:
+        """Return raw output scores for the next degree.
 
-def load_sequence_model(path: Optional[str], vocab_size: int) -> MelodyLSTM:
+        Parameters
+        ----------
+        history:
+            Sequence of previous scale degrees represented as integer indices.
+
+        Returns
+        -------
+        List[float]
+            Raw logits for each possible next degree.
+
+        Raises
+        ------
+        ValueError
+            If ``history`` is empty since the model requires context.
+        RuntimeError
+            If PyTorch is unavailable.
+        """
+
+        if torch is None:
+            raise RuntimeError("PyTorch is required for predict_logits")
+        if not history:
+            raise ValueError("history must contain at least one index")
+        tensor = torch.tensor([history], dtype=torch.long)
+        with torch.no_grad():
+            logits = self(tensor)
+        return logits.squeeze(0).tolist()
+
+
+def load_sequence_model(path: Optional[str], vocab_size: int) -> SequenceModel:
     """Load a pretrained model or create a fresh one when ``path`` is absent."""
     if torch is None:
         raise RuntimeError("PyTorch is required to load the sequence model")
@@ -54,17 +94,15 @@ def load_sequence_model(path: Optional[str], vocab_size: int) -> MelodyLSTM:
     return model
 
 
-def predict_next(model: MelodyLSTM, history: List[int]) -> int:
-    """Return the most likely next index according to ``model``."""
-    if torch is None:
-        raise RuntimeError("PyTorch is required for predict_next")
+def predict_next(model: SequenceModel, history: List[int]) -> int:
+    """Return the index with the highest score predicted by ``model``."""
     if not history:
         raise ValueError("history must contain at least one index")
-    tensor = torch.tensor([history], dtype=torch.long)
-    with torch.no_grad():
-        logits = model(tensor)
-        probs = torch.softmax(logits, dim=1)
-        return int(torch.argmax(probs, dim=1)[0])
+
+    logits = model.predict_logits(history)
+    if not logits:
+        raise ValueError("model returned no logits")
+    return int(max(range(len(logits)), key=lambda i: logits[i]))
 
 
 def export_onnx(model: MelodyLSTM, path: str, seq_len: int = 4) -> None:
