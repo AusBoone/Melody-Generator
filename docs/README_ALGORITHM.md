@@ -28,14 +28,22 @@ specified either directly by the user or by the helper function
    sounding static.
 4. **Chord Alignment** – On strong beats the candidate notes are restricted to
    chord tones derived from the progression so the melody naturally emphasizes
-   the harmony.
-5. **Interval Bias** – Small intervals are preferred when choosing the next note
-   relative to the previous one. Large leaps are monitored and the next note is
-   nudged in the opposite direction to smooth the contour.
-6. **Fallback Logic** – If no suitable note fits the current constraints a
-   random scale tone is chosen to avoid stalls. This ensures every call returns a
-   complete melody.
-7. **Optional Parts** – Additional helper functions create harmony lines,
+   the harmony. The surrounding scale may change per chord (e.g., mixolydian on
+   dominant chords) so non-chord tones outline the harmony more clearly.
+5. **Weighted Selection** – Candidate notes are weighted by interval distance
+   and whether they belong to the active chord. A small transition matrix
+   biases the process toward stepwise motion, emulating learned probabilities.
+6. **Interval Bias and Filters** – Large leaps are tracked so the next note is
+   nudged in the opposite direction. Tritone jumps are removed unless no other
+   options exist.
+7. **Candidate Cache** – Source pools for each chord and octave are cached so
+   note selection avoids rebuilding the same lists each iteration.
+8. **Fallback Logic** – If no suitable note fits the current constraints a
+   random scale tone is chosen to avoid stalls. This ensures every call returns
+   a complete melody.
+9. **Final Cadence** – The melody's last note is forced to the root of the
+   final chord to provide a simple resolution.
+10. **Optional Parts** – Additional helper functions create harmony lines,
    counterpoint melodies and chord tracks. These follow the same scale and chord
    rules so they blend with the main melody.
 
@@ -93,6 +101,22 @@ incrementing scale degrees whenever a motif repeats while the second half trends
 downward. The ``half_point`` index marks where this switch occurs. Octave shifts
 are allowed at phrase boundaries but remain limited to one octave from the base
 to maintain a focused register.
+
+**Caching and Dynamics**
+Repeated conversions from note names to MIDI numbers are cached so the
+algorithm scales linearly even for long melodies. Candidate note lists for each
+chord are also cached per octave to avoid rebuilding them during every
+iteration. MIDI velocities follow a crescendo then decrescendo curve and apply a
+slight accent on downbeats so the phrase breathes like a real performance. A
+``structure`` parameter lets callers repeat or vary sections (e.g. ``"AABA"``)
+to create longer forms from smaller motifs.
+
+**Markov Weights and Tritone Control**
+Candidate weighting uses a small transition matrix favouring repeated pitches or
+steps close to the previous interval. This Markov-style bias keeps motion
+smooth while still allowing occasional leaps. The preferred scale for each chord
+is cached, and the ``allow_tritone`` flag can suppress augmented fourth jumps
+when a more consonant melody is desired.
 
 These heuristics strike a balance between structured repetition and random
 variation, yielding phrases that are musically coherent without relying on
