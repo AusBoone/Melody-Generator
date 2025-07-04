@@ -32,6 +32,8 @@ setup guide, FluidSynth notes and soundfont resources.
 - mido (for MIDI generation)
 - Flask (for the web interface)
 - tkinter (for the GUI)
+- PyTorch (optional, enables the pretrained sequence model)
+- NumPy (optional, improves tension weighting)
 
 ## Installing dependencies
 Running `pip install .` will install these packages automatically. For

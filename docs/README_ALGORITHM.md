@@ -125,3 +125,50 @@ From a data science perspective the rules serve as priors that encode stylistic
 assumptions without the need for a large training corpus. Musicians can adjust
 the parameters to experiment with different harmonic idioms or rhythmic feels
 while keeping the algorithm efficient and deterministic.
+
+## Recent Additions
+
+- **Phrase Planning** – A high-level planning stage now sketches an octave
+  range and tension curve before note generation. This ensures the melody rises
+  and falls predictably across each phrase.
+- **Sequence Model Integration** – Candidate weights may be biased by a small
+  LSTM trained on MIDI data for smoother motifs. The reference implementation
+  uses **PyTorch**; if the library is unavailable the code falls back to
+  heuristic weighting.
+- **Style Embeddings** – Static vectors nudge note choice toward Baroque, jazz
+  or pop idioms and can be blended together.
+- **Independent Rhythm Engine** – Rhythmic patterns are produced by a separate
+  module so pitch generation and onsets evolve independently.
+- **Harmonic Generator** – ``harmony_generator`` creates chord sequences and
+  associated durations that align with the melody.
+
+## Candidate Weighting in Depth
+
+Candidate selection is a weighted random draw. Each possible note begins with a
+baseline weight derived from ``_TRANSITION_WEIGHTS`` based on the semitone
+distance from the previous pitch. When the preceding interval is known,
+``_SIMILARITY_WEIGHTS`` nudges the next step toward similar sizes, preserving
+melodic contour. Chord tones on strong beats receive a 1.5x multiplier so the
+harmony is emphasised.
+
+If a :class:`melody_generator.phrase_planner.PhrasePlan` is provided, the
+``tension_profile`` value for the current position biases weights via
+``apply_tension_weights``. Higher tension encourages dissonant intervals, while
+lower tension favours steps and repeated notes. All these calculations execute
+with NumPy when available for speed.
+
+Supplying a pretrained LSTM with ``sequence_model`` further shapes the melody.
+The last few scale degrees feed into ``predict_next``; the predicted degree
+adds one to the corresponding candidate weight. Static style vectors contribute
+additional offsets so genres like Baroque or jazz subtly colour note choice.
+Parallel fifths and octaves against the chord root are halved to maintain basic
+counterpoint. After note generation an optional hill-climbing pass swaps random
+pitches when they improve a simple quality metric based on interval variety.
+
+### ONNX Export and Quantization
+
+The helper :func:`melody_generator.sequence_model.export_onnx` exports an LSTM
+to ONNX format. Tools such as ``onnxruntime`` can then apply dynamic
+quantisation, reducing the model to 8‑bit weights for fast CPU inference. The
+exported model expects a sequence of scale‑degree indices and outputs logits for
+the next degree, mirroring :func:`predict_next`.

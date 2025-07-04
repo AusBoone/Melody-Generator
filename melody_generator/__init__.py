@@ -39,6 +39,11 @@ Features include:
 - Integrated rhythmic patterns for note durations.
 - Enhanced melody generation with controlled randomness.
 - Robust fallback mechanisms for note selection.
+- Optional phrase-level planning to sketch a pitch range and tension curve
+  before notes are generated.
+- Lightweight LSTM integration for probabilistic weighting when PyTorch is
+  installed.
+- Static style embeddings allowing simple genre blending.
 - Both GUI (Tkinter) and CLI interfaces.
 - Detailed logging and improved documentation.
 
@@ -102,6 +107,17 @@ import math
 import subprocess
 import threading
 import re
+try:
+    import numpy as np
+except Exception:  # pragma: no cover - optional dependency
+    np = None
+
+from .phrase_planner import PhrasePlan, generate_phrase_plan
+from .sequence_model import MelodyLSTM, predict_next
+from .style_embeddings import get_style_vector
+from .tension import tension_for_notes, apply_tension_weights
+from .dynamics import humanize_events
+from .rhythm_engine import generate_rhythm
 
 # Default path for storing user preferences
 # The file lives in the user's home directory so settings persist
@@ -735,6 +751,10 @@ def generate_melody(
     base_octave: int = 4,
     structure: Optional[str] = None,
     allow_tritone: bool = False,
+    phrase_plan: Optional[PhrasePlan] = None,
+    sequence_model: Optional[MelodyLSTM] = None,
+    style: Optional[str] = None,
+    refine: bool = False,
 ) -> List[str]:
     """Return a melody in ``key`` spanning ``num_notes`` notes.
 
@@ -778,6 +798,15 @@ def generate_melody(
     @param allow_tritone (bool): When ``False`` (default) melodic intervals of
         six semitones are filtered out to avoid the dissonant tritone unless no
         other options exist.
+    @param phrase_plan (PhrasePlan|None): Optional high-level phrase outline.
+        When supplied the ``pitch_range`` guides octave choices and the
+        ``tension_profile`` is available for future weighting strategies.
+    @param sequence_model (MelodyLSTM|None): Optional LSTM used to predict the
+        next scale degree. When provided its output biases candidate weights.
+    @param style (str|None): Name of a style defined in
+        :mod:`style_embeddings` used to nudge note selection.
+    @param refine (bool): When ``True`` a small post-processing loop adjusts
+        notes that fall outside the desired pitch range.
     @returns List[str]: Generated melody as note strings.
     """
     # The chord progression provides harmonic context for each note. Reject an
@@ -799,7 +828,9 @@ def generate_melody(
     # Choose a rhythmic pattern when the caller does not supply one.  The
     # pattern cycles throughout the melody to give it an underlying pulse.
     if pattern is None:
-        pattern = random.choice(PATTERNS)
+        # Rhythm generation is handled by ``rhythm_engine`` so the melodic
+        # contour and onset pattern can evolve independently.
+        pattern = generate_rhythm(num_notes)
     elif not pattern:
         # An explicitly empty pattern would cause divide-by-zero errors when
         # cycling through the list. Reject this early with a clear message so
@@ -824,6 +855,17 @@ def generate_melody(
     # safe MIDI range so generated notes remain between 0 and 127.
     if not MIN_OCTAVE <= base_octave <= MAX_OCTAVE:
         raise ValueError(f"base_octave must be between {MIN_OCTAVE} and {MAX_OCTAVE}")
+
+    # Establish a phrase outline when one is not provided. The resulting
+    # ``pitch_range`` restricts subsequent octave choices during note
+    # generation.
+    phrase_plan = phrase_plan or generate_phrase_plan(num_notes, base_octave)
+    plan_min_oct, plan_max_oct = phrase_plan.pitch_range
+    base_octave = max(plan_min_oct, min(base_octave, plan_max_oct - 1))
+
+    style_vec = get_style_vector(style) if style else None
+    from .voice_leading import parallel_fifth_or_octave
+
     beat_unit = 1 / time_signature[1]
     start_beat = 0.0
 
@@ -884,8 +926,8 @@ def generate_melody(
             if idx >= len(notes_in_key):
                 idx -= len(notes_in_key)
                 octave += 1
-            allowed_min = base_octave + octave_offset
-            allowed_max = allowed_min + 1
+            allowed_min = max(plan_min_oct, base_octave + octave_offset)
+            allowed_max = min(plan_max_oct, allowed_min + 1)
             octave = max(allowed_min, min(allowed_max, octave))
             melody[j] = notes_in_key[idx] + str(octave)
 
@@ -949,8 +991,8 @@ def generate_melody(
             elif new_idx >= len(notes_in_key):
                 new_idx -= len(notes_in_key)
                 octave += 1
-            allowed_min = base_octave + octave_offset
-            allowed_max = allowed_min + 1
+            allowed_min = max(plan_min_oct, base_octave + octave_offset)
+            allowed_max = min(plan_max_oct, allowed_min + 1)
             octave += diff
             if diff > 0:
                 octave = allowed_max
@@ -978,13 +1020,17 @@ def generate_melody(
         candidates = []
         min_interval = None
 
-        root_octave = base_octave + octave_offset
+        root_octave = max(plan_min_oct, min(plan_max_oct, base_octave + octave_offset))
         source_pool = _candidate_pool(
             key,
             chord,
             root_octave,
             strong=strong,
         )
+        # Constrain candidates to the planned pitch range so octave offsets do
+        # not exceed ``plan_max_oct`` when ``root_octave`` equals the upper
+        # boundary.
+        source_pool = [n for n in source_pool if plan_min_oct <= int(n[-1]) <= plan_max_oct]
 
         # Scan candidate pitches and keep track of which is closest to the
         # previous note. This gives a baseline for selecting smooth motion.
@@ -1013,6 +1059,7 @@ def generate_melody(
                 root_octave,
                 strong=strong,
             )
+            pool = [n for n in pool if plan_min_oct <= int(n[-1]) <= plan_max_oct]
             fallback_note = random.choice(pool)
             candidates.append(fallback_note)
 
@@ -1057,16 +1104,83 @@ def generate_melody(
         # Weight candidate notes so smaller intervals and chord tones on strong
         # beats are favoured. This creates a rudimentary Markov-style bias
         # without requiring a full transition matrix learned from data.
-        weights = []
-        for cand in candidates:
-            interval = abs(note_to_midi(cand) - note_to_midi(prev_note))
-            weight = _TRANSITION_WEIGHTS.get(interval, 0.2)
+        prev_midi_val = note_to_midi(prev_note)
+        if np is not None:
+            cand_midis = np.array([note_to_midi(c) for c in candidates])
+            intervals = np.abs(cand_midis - prev_midi_val)
+            weights = np.array([
+                _TRANSITION_WEIGHTS.get(int(val), 0.2) for val in intervals
+            ], dtype=float)
             if prev_interval_size is not None:
-                diff = abs(interval - prev_interval_size)
-                weight *= _SIMILARITY_WEIGHTS.get(diff, 0.2)
-            if strong and cand[:-1] in chord_notes:
-                weight *= 1.5
-            weights.append(weight)
+                diffs = np.abs(intervals - prev_interval_size)
+                weights *= np.array([
+                    _SIMILARITY_WEIGHTS.get(int(d), 0.2) for d in diffs
+                ])
+            if strong:
+                chord_mask = np.array([c[:-1] in chord_notes for c in candidates])
+                weights *= np.where(chord_mask, 1.5, 1.0)
+        else:
+            cand_midis = [note_to_midi(c) for c in candidates]
+            intervals = [abs(m - prev_midi_val) for m in cand_midis]
+            weights = [_TRANSITION_WEIGHTS.get(int(val), 0.2) for val in intervals]
+            if prev_interval_size is not None:
+                diffs = [abs(val - prev_interval_size) for val in intervals]
+                weights = [
+                    w * _SIMILARITY_WEIGHTS.get(int(d), 0.2)
+                    for w, d in zip(weights, diffs)
+                ]
+            if strong:
+                weights = [
+                    w * 1.5 if c[:-1] in chord_notes else w
+                    for w, c in zip(weights, candidates)
+                ]
+
+        if sequence_model is not None:
+            # Feed the last few scale degrees into the LSTM and boost the
+            # predicted note so melodic phrasing follows the training data when
+            # PyTorch is available.
+            hist = [indices_in_key[n[:-1]] for n in melody[max(0, i - 4) : i]]
+            if hist:
+                pred = predict_next(sequence_model, hist)
+                pref = notes_in_key[pred % len(notes_in_key)]
+                if np is not None:
+                    pref_mask = np.array([c[:-1] == pref for c in candidates], dtype=float)
+                    weights += pref_mask
+                else:
+                    weights = [w + (1.0 if c[:-1] == pref else 0.0) for w, c in zip(weights, candidates)]
+
+        if style_vec is not None:
+            # Add the style embedding value for each candidate so the melody
+            # leans toward the selected genre vector.
+            idxs = [indices_in_key[c[:-1]] % len(style_vec) for c in candidates]
+            if np is not None:
+                style_vals = np.array([float(style_vec[i]) for i in idxs])
+                weights += style_vals
+            else:
+                weights = [w + float(style_vec[idx]) for w, idx in zip(weights, idxs)]
+
+        # Penalize parallel fifths and octaves with the chord roots to maintain
+        # smoother voice leading against the underlying harmony.
+        prev_root = get_chord_notes(chord_progression[(i - 1) % len(chord_progression)])[0] + str(base_octave)
+        curr_root = get_chord_notes(chord)[0] + str(base_octave)
+        for idx, cand in enumerate(candidates):
+            if parallel_fifth_or_octave(prev_note, prev_root, cand, curr_root):
+                weights[idx] *= 0.5
+
+        target_tension = phrase_plan.tension_profile[i]
+        tensions = [tension_for_notes(prev_note, c) for c in candidates]
+        if np is not None:
+            # Shift weights toward notes that match the planned tension curve
+            # using a simple inverse-distance metric. When all weights drop to
+            # zero (possible with extreme tension targets) fall back to equal
+            # probabilities so the melody continues.
+            weights = apply_tension_weights(np.array(weights), tensions, target_tension)
+            if np.all(weights == 0):
+                weights = np.ones_like(weights)
+            weights = weights.astype(float)
+            weights = weights.tolist()
+        else:
+            weights = apply_tension_weights(weights, tensions, target_tension)
 
         next_note = random.choices(candidates, weights=weights, k=1)[0]
         melody.append(next_note)
@@ -1086,9 +1200,62 @@ def generate_melody(
     # non-resolving tone.
     final_chord = chord_progression[(num_notes - 1) % len(chord_progression)]
     final_root = get_chord_notes(final_chord)[0]
-    last_name, last_oct = melody[-1][:-1], melody[-1][-1]
-    if last_name != final_root:
-        melody[-1] = f"{final_root}{last_oct}"
+    last_oct = melody[-1][-1]
+    # Always select the root of the final chord but choose the octave that
+    # yields the smallest leap from the previous note. When the melody
+    # contains only a single note the previous pitch is reused so the
+    # cadence calculation does not fail.
+    low_oct = max(plan_min_oct, int(last_oct) - 1)
+    high_oct = min(plan_max_oct, int(last_oct))
+    low = f"{final_root}{low_oct}"
+    high = f"{final_root}{high_oct}"
+    prev_midi = note_to_midi(melody[-2]) if len(melody) >= 2 else note_to_midi(melody[-1])
+    if note_to_midi(low) <= prev_midi:
+        melody[-1] = low
+    else:
+        melody[-1] = high
+
+    if refine:
+        # Simple hill-climbing refinement that tweaks random notes and keeps
+        # changes that improve a basic quality score.
+
+        def _score(seq: List[str]) -> int:
+            """Return a crude quality metric for ``seq``."""
+
+            unique = len({n[:-1] for n in seq})
+            leaps = sum(
+                1
+                for a, b in zip(seq, seq[1:])
+                if abs(note_to_midi(b) - note_to_midi(a)) > 7
+            )
+            return unique - leaps
+
+        base = _score(melody)
+        for _ in range(2):
+            for j in range(1, len(melody) - 1):
+                original = melody[j]
+                pool = _candidate_pool(
+                    key,
+                    chord_progression[j % len(chord_progression)],
+                    base_octave,
+                    strong=False,
+                )
+                trial = random.choice(pool)
+                melody[j] = trial
+                new_score = _score(melody)
+                if new_score < base:
+                    melody[j] = original
+                else:
+                    base = new_score
+
+    if refine:
+        low, high = phrase_plan.pitch_range
+        for idx, n in enumerate(melody):
+            octv = int(n[-1])
+            if octv < low:
+                melody[idx] = n[:-1] + str(low)
+            elif octv > high:
+                melody[idx] = n[:-1] + str(high)
 
     return melody
 
@@ -1256,10 +1423,9 @@ def create_midi_file(
 
     # Select a rhythmic pattern and compute the duration of a whole note in ticks.
     if pattern is None:
-        # Pick one of the predefined rhythms if the caller did not supply a
-        # pattern. This keeps the timing interesting while still deterministic
-        # for a given melody length.
-        pattern = random.choice(PATTERNS)
+        # Use the rhythm generator to create an onset pattern matching the
+        # melody length when no explicit pattern is provided.
+        pattern = generate_rhythm(len(melody))
     elif not pattern:
         # Using an empty pattern would make ``pattern[i % len(pattern)]`` fail
         # later in the function. Validate early and report a clear error.
@@ -1408,6 +1574,10 @@ def create_midi_file(
                 msg.time = tick - last
                 track.append(msg)
                 last = tick
+
+    # Apply humanization to the primary melody track only so tests relying on
+    # exact chord timings remain deterministic.
+    humanize_events(mid.tracks[0])
 
     # Write all tracks to disk
     mid.save(output_file)

@@ -6,7 +6,8 @@ Setup script for Melody-Generator on Windows 10/11.
 Installs Python and supporting libraries using winget if necessary, then
 creates a virtual environment in ./venv and installs project dependencies.
 Set the environment variable DRY_RUN=1 to print commands without executing
-them.
+them. Set INSTALL_ML_DEPS=1 to also install optional PyTorch and NumPy
+packages for the sequence model features.
 #>
 
 $ErrorActionPreference = 'Stop'
@@ -55,12 +56,20 @@ function main {
         Write-Host 'DRY RUN: pip install --upgrade pip'
         Write-Host 'DRY RUN: pip install -r requirements.txt'
         Write-Host 'DRY RUN: pip install -e .'
+        if ($env:INSTALL_ML_DEPS -eq '1') {
+            Write-Host 'DRY RUN: pip install numpy'
+            Write-Host 'DRY RUN: pip install torch --index-url https://download.pytorch.org/whl/cpu'
+        }
     }
     else {
         .\venv\Scripts\Activate.ps1
         Run-Command 'pip install --upgrade pip'
         Run-Command 'pip install -r requirements.txt'
         Run-Command 'pip install -e .'
+        if ($env:INSTALL_ML_DEPS -eq '1') {
+            Run-Command 'pip install numpy'
+            Run-Command 'pip install torch --index-url https://download.pytorch.org/whl/cpu'
+        }
         deactivate
     }
     Write-Host 'Setup complete. Activate with: .\\venv\\Scripts\\Activate.ps1'

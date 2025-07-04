@@ -23,6 +23,19 @@ Run the PowerShell script:
 ```
 It uses `winget` to install Python and Fluidsynth before setting up a virtual environment.
 
-After a script completes activate the environment (`source venv/bin/activate` or `./venv/Scripts/Activate.ps1`) and run `pip install -e .` to install the package in editable mode.
+After a script completes, activate the environment (`source venv/bin/activate` or `./venv/Scripts/Activate.ps1`) and run `pip install -e .` to install the package in editable mode.
+
+Set `INSTALL_ML_DEPS=1` before running a script to automatically install optional
+PyTorch and NumPy dependencies.
 
 For details on the FluidSynth library itself see [README_FLUIDSYNTH.md](README_FLUIDSYNTH.md).
+
+## Optional ML Dependencies
+
+Some features integrate a small LSTM implemented with **PyTorch**. Install it with:
+
+```bash
+pip install torch --index-url https://download.pytorch.org/whl/cpu
+```
+
+`numpy` is also recommended for the tension-weighting helpers. The code falls back to heuristic rules when either dependency is missing.
