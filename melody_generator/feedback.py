@@ -91,6 +91,12 @@ def refine_with_fmd(
     if not melody:
         raise ValueError("melody must not be empty")
 
+    if len(melody) < 3:
+        # With fewer than three notes there are no interior positions to
+        # modify while keeping the first and last notes fixed, so simply
+        # return the melody unchanged.
+        return melody
+
     size = max(1, int(len(melody) * 0.05))
     best_score = compute_fmd(melody)
 
