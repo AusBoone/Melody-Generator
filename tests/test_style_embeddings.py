@@ -4,9 +4,26 @@ import importlib
 import sys
 from pathlib import Path
 import types
+import pytest
 
 # Ensure the repository root is on ``sys.path`` so the package imports.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+# Provide a minimal ``mido`` stub so importing the package does not fail.
+stub_mido = types.ModuleType("mido")
+stub_mido.Message = object
+class _DummyMidiFile:
+    """Minimal ``MidiFile`` stub used during import."""
+
+    def __init__(self, *_, **__):
+        self.tracks = []
+
+
+stub_mido.MidiFile = _DummyMidiFile
+stub_mido.MidiTrack = list
+stub_mido.MetaMessage = lambda *a, **kw: object()
+stub_mido.bpm2tempo = lambda bpm: bpm
+sys.modules.setdefault("mido", stub_mido)
 
 style = importlib.import_module("melody_generator.style_embeddings")
 
@@ -24,6 +41,21 @@ def test_set_and_get_active_style():
     vec = style.get_active_style()
     assert list(vec) == [0.2, 0.3, 0.5]
     style.set_style(None)
+
+
+def test_vectors_are_copied():
+    """Returned style vectors should not expose internal state."""
+
+    vec = style.get_style_vector("jazz")
+    vec[0] = 99
+    # Fetch the vector again; it should remain unmodified
+    fresh = style.get_style_vector("jazz")
+    assert list(fresh)[0] != 99
+
+    style.set_style([0.1, 0.2, 0.3])
+    active = style.get_active_style()
+    active[0] = 42
+    assert style.get_active_style()[0] != 42
 
 
 def test_interpolate_vectors():
@@ -77,4 +109,26 @@ def test_generate_melody_uses_active_style(monkeypatch):
     mg.generate_melody("C", 4, ["C"], motif_length=2)
     assert calls["count"] > 0
     style.set_style(None)
+
+
+def test_module_without_numpy(monkeypatch):
+    """Fallback logic should work when numpy is unavailable."""
+
+    monkeypatch.setitem(sys.modules, "numpy", None)
+    style_no_np = importlib.reload(importlib.import_module("melody_generator.style_embeddings"))
+
+    vec = style_no_np.get_style_vector("pop")
+    assert vec == [0.0, 0.0, 1.0]
+
+    blended = style_no_np.blend_styles("baroque", "pop", 0.5)
+    assert blended == [0.5, 0.0, 0.5]
+
+    style_no_np.set_style([0.1, 0.2, 0.3])
+    assert style_no_np.get_active_style() == [0.1, 0.2, 0.3]
+
+    with pytest.raises(RuntimeError):
+        style_no_np.StyleVAE()
+
+    # Reload module so later tests use the original NumPy-backed version
+    importlib.reload(style)
 
