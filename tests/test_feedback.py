@@ -58,3 +58,14 @@ def test_refine_with_fmd_improves_distance():
     after = fb.compute_fmd(refined)
     assert after <= before
 
+
+def test_refine_with_fmd_short_sequences_return_input():
+    """Sequences with fewer than three notes should not be modified."""
+
+    fb = importlib.import_module("melody_generator.feedback")
+
+    one = ["C4"]
+    two = ["C4", "E4"]
+    assert fb.refine_with_fmd(one.copy(), "C", ["C"], 4) == one
+    assert fb.refine_with_fmd(two.copy(), "C", ["C"], 4) == two
+
