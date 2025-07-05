@@ -140,7 +140,12 @@ except Exception:  # pragma: no cover - optional dependency
     np = None
 
 from .phrase_planner import PhrasePlan, PhrasePlanner, generate_phrase_plan  # noqa: F401
-from .sequence_model import SequenceModel, MelodyLSTM, predict_next  # noqa: F401
+from .sequence_model import (
+    SequenceModel,
+    MelodyLSTM,  # noqa: F401
+    predict_next,  # noqa: F401
+    load_sequence_model,
+)  # noqa: F401
 from .style_embeddings import get_style_vector, set_style, get_active_style  # noqa: F401
 from .tension import tension_for_notes, apply_tension_weights
 from .dynamics import humanize_events
@@ -1769,7 +1774,9 @@ def run_cli() -> None:
     file using :func:`create_midi_file`.
 
     The ``--soundfont`` argument allows supplying a custom ``.sf2`` file
-    used when previewing the result via ``--play``.
+    used when previewing the result via ``--play``. ``--enable-ml`` loads
+    a small LSTM so note weighting uses learned statistics. ``--style``
+    selects a predefined style embedding.
 
     @returns None: Exits via ``sys.exit`` on failure.
     """
@@ -1858,6 +1865,16 @@ def run_cli() -> None:
         help="MIDI program number for the melody instrument",
     )
     parser.add_argument(
+        "--enable-ml",
+        action="store_true",
+        help="Activate ML-based weighting using a small sequence model",
+    )
+    parser.add_argument(
+        "--style",
+        type=str,
+        help="Optional style name to bias note selection",
+    )
+    parser.add_argument(
         "--soundfont",
         type=str,
         help="Path to a SoundFont (.sf2) file used when previewing with --play",
@@ -1934,12 +1951,29 @@ def run_cli() -> None:
         )
         sys.exit(1)
 
+    if args.style:
+        try:
+            get_style_vector(args.style)
+        except KeyError:
+            logging.error(f"Unknown style: {args.style}")
+            sys.exit(1)
+
+    seq_model = None
+    if args.enable_ml:
+        try:
+            seq_model = load_sequence_model(None, len(SCALE[args.key]))
+        except RuntimeError as exc:
+            logging.error(str(exc))
+            sys.exit(1)
+
     melody = generate_melody(
         args.key,
         args.notes,
         chord_progression,
         motif_length=args.motif_length,
         base_octave=args.base_octave,
+        sequence_model=seq_model,
+        style=args.style,
     )
     rhythm = generate_random_rhythm_pattern() if args.random_rhythm else None
     # Collect additional harmony tracks requested on the command line

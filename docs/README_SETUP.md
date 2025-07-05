@@ -38,4 +38,6 @@ Some features integrate a small LSTM implemented with **PyTorch**. Install it wi
 pip install torch --index-url https://download.pytorch.org/whl/cpu
 ```
 
-`numpy` is also recommended for the tension-weighting helpers. The code falls back to heuristic rules when either dependency is missing.
+`numpy` is also recommended for the tension-weighting helpers. Additional optional packages are
+`onnxruntime` for running exported models and `numba` for JIT compiling hot loops.
+The code falls back to heuristic rules when any of these dependencies are absent.

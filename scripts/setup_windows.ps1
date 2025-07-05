@@ -6,8 +6,9 @@ Setup script for Melody-Generator on Windows 10/11.
 Installs Python and supporting libraries using winget if necessary, then
 creates a virtual environment in ./venv and installs project dependencies.
 Set the environment variable DRY_RUN=1 to print commands without executing
-them. Set INSTALL_ML_DEPS=1 to also install optional PyTorch and NumPy
-packages for the sequence model features.
+them. Set INSTALL_ML_DEPS=1 to install optional machine learning libraries
+(numpy, the CPU build of torch, onnxruntime and numba) used by the sequence
+model and style embedding features.
 #>
 
 $ErrorActionPreference = 'Stop'
@@ -59,6 +60,8 @@ function main {
         if ($env:INSTALL_ML_DEPS -eq '1') {
             Write-Host 'DRY RUN: pip install numpy'
             Write-Host 'DRY RUN: pip install torch --index-url https://download.pytorch.org/whl/cpu'
+            Write-Host 'DRY RUN: pip install onnxruntime'
+            Write-Host 'DRY RUN: pip install numba'
         }
     }
     else {
@@ -69,6 +72,8 @@ function main {
         if ($env:INSTALL_ML_DEPS -eq '1') {
             Run-Command 'pip install numpy'
             Run-Command 'pip install torch --index-url https://download.pytorch.org/whl/cpu'
+            Run-Command 'pip install onnxruntime'
+            Run-Command 'pip install numba'
         }
         deactivate
     }

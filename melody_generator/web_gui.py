@@ -22,6 +22,12 @@ infrastructure.
 # fails because either FluidSynth itself or a compatible SoundFont is missing.
 # The play template now displays flash messages so users are aware that the
 # preview audio is unavailable.
+#
+# The current update extends the form with options to enable machine-learning
+# based weighting and to choose a predefined style embedding. When the user
+# activates these features but required dependencies such as PyTorch are not
+# installed, the view now flashes a clear error instead of returning a server
+# error.
 
 from __future__ import annotations
 
@@ -62,6 +68,9 @@ generate_harmony_line = melody_generator.generate_harmony_line
 generate_counterpoint_melody = melody_generator.generate_counterpoint_melody
 MIN_OCTAVE = melody_generator.MIN_OCTAVE
 MAX_OCTAVE = melody_generator.MAX_OCTAVE
+load_sequence_model = melody_generator.load_sequence_model
+STYLE_VECTORS = melody_generator.style_embeddings.STYLE_VECTORS
+get_style_vector = melody_generator.style_embeddings.get_style_vector
 
 INSTRUMENTS = {
     "Piano": 0,
@@ -110,9 +119,19 @@ def _generate_preview(
     harmony_lines: int,
     include_chords: bool,
     chords_same: bool,
+    enable_ml: bool,
+    style: str | None,
     chords: List[str],
 ) -> tuple[str, str]:
     """Return ``(audio_b64, midi_b64)`` for the requested melody."""
+
+    seq_model = None
+    if enable_ml:
+        try:
+            seq_model = load_sequence_model(None, len(SCALE[key]))
+        except RuntimeError as exc:
+            # Propagate dependency errors so the caller can display a message
+            raise RuntimeError(str(exc)) from exc
 
     melody = generate_melody(
         key,
@@ -120,6 +139,8 @@ def _generate_preview(
         chords,
         motif_length=motif_length,
         base_octave=base_octave,
+        sequence_model=seq_model,
+        style=style or None,
     )
     rhythm = generate_random_rhythm_pattern() if random_rhythm else None
     extra: List[List[str]] = []
@@ -197,7 +218,7 @@ def index():
             key = canonical_key(key)
         except ValueError:
             flash("Invalid key selected. Please choose a valid key.")
-            return render_template('index.html', scale=sorted(SCALE.keys()), instruments=INSTRUMENTS.keys())
+            return render_template('index.html', scale=sorted(SCALE.keys()), instruments=INSTRUMENTS.keys(), styles=STYLE_VECTORS.keys())
 
         bpm = int(request.form.get('bpm') or 120)
         timesig = request.form.get('timesig') or '4/4'
@@ -211,6 +232,8 @@ def index():
         harmony_lines = int(request.form.get('harmony_lines') or 0)
         include_chords = bool(request.form.get('include_chords'))
         chords_same = bool(request.form.get('chords_same'))
+        enable_ml = bool(request.form.get('enable_ml'))
+        style = request.form.get('style') or None
 
         # Determine the chord progression. The user may provide one
         # manually or tick the "random" box to generate it.
@@ -228,7 +251,7 @@ def index():
                         chords.append(canonical_chord(chord))
                     except ValueError:
                         flash(f"Unknown chord: {chord}")
-                        return render_template('index.html', scale=sorted(SCALE.keys()), instruments=INSTRUMENTS.keys())
+                        return render_template('index.html', scale=sorted(SCALE.keys()), instruments=INSTRUMENTS.keys(), styles=STYLE_VECTORS.keys())
 
         try:
             parts = timesig.split('/')
@@ -241,17 +264,24 @@ def index():
             flash(
                 "Time signature must be two integers in the form 'numerator/denominator' with numerator > 0 and denominator > 0."
             )
-            return render_template('index.html', scale=sorted(SCALE.keys()), instruments=INSTRUMENTS.keys())
+            return render_template('index.html', scale=sorted(SCALE.keys()), instruments=INSTRUMENTS.keys(), styles=STYLE_VECTORS.keys())
 
         if motif_length > notes:
             flash("Motif length cannot exceed the number of notes.")
-            return render_template('index.html', scale=sorted(SCALE.keys()), instruments=INSTRUMENTS.keys())
+            return render_template('index.html', scale=sorted(SCALE.keys()), instruments=INSTRUMENTS.keys(), styles=STYLE_VECTORS.keys())
 
         if not MIN_OCTAVE <= base_octave <= MAX_OCTAVE:
             flash(
                 f"Base octave must be between {MIN_OCTAVE} and {MAX_OCTAVE}."
             )
-            return render_template('index.html', scale=sorted(SCALE.keys()), instruments=INSTRUMENTS.keys())
+            return render_template('index.html', scale=sorted(SCALE.keys()), instruments=INSTRUMENTS.keys(), styles=STYLE_VECTORS.keys())
+
+        if style:
+            try:
+                get_style_vector(style)
+            except KeyError:
+                flash(f"Unknown style: {style}")
+                return render_template('index.html', scale=sorted(SCALE.keys()), instruments=INSTRUMENTS.keys(), styles=STYLE_VECTORS.keys())
 
         params = dict(
             key=key,
@@ -267,13 +297,24 @@ def index():
             harmony_lines=harmony_lines,
             include_chords=include_chords,
             chords_same=chords_same,
+            enable_ml=enable_ml,
+            style=style,
             chords=chords,
         )
 
-        if celery_app is not None:
-            result = generate_preview_task.delay(params).get()
-        else:
-            result = _generate_preview(**params)
+        try:
+            if celery_app is not None:
+                result = generate_preview_task.delay(params).get()
+            else:
+                result = _generate_preview(**params)
+        except RuntimeError as exc:
+            flash(str(exc))
+            return render_template(
+                'index.html',
+                scale=sorted(SCALE.keys()),
+                instruments=INSTRUMENTS.keys(),
+                styles=STYLE_VECTORS.keys(),
+            )
 
         audio_encoded, midi_encoded = result
         if not audio_encoded:
@@ -284,7 +325,7 @@ def index():
 
     # On a normal GET request simply render the form so the user can
     # enter their parameters.
-    return render_template('index.html', scale=sorted(SCALE.keys()), instruments=INSTRUMENTS.keys())
+    return render_template('index.html', scale=sorted(SCALE.keys()), instruments=INSTRUMENTS.keys(), styles=STYLE_VECTORS.keys())
 
 # Allow the module to be run directly with ``python web_gui.py``.
 # ``pragma: no cover`` keeps test coverage tools from complaining when
