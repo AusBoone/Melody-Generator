@@ -51,5 +51,10 @@ def test_multi_digit_octaves():
     This ensures ``note_to_midi`` handles values like ``C10`` or ``Gb11`` by
     reading all trailing digits instead of only the last character.
     """
-    assert note_to_midi('C10') == 132
-    assert note_to_midi('Gb11') == 150
+    assert note_to_midi('C10') == 127  # values above 127 are clamped
+    assert note_to_midi('Gb11') == 127
+
+
+def test_negative_octaves_clamped():
+    """Notes below MIDI 0 clamp to 0."""
+    assert note_to_midi('C-2') == 0
