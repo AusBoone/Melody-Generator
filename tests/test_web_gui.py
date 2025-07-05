@@ -285,6 +285,36 @@ def test_playback_failure_flash(monkeypatch):
     assert b"Preview audio could not be generated" in resp.data
 
 
+def test_enable_ml_missing_dependency(monkeypatch):
+    """Enabling ML without PyTorch should flash an error message."""
+
+    client = app.test_client()
+
+    monkeypatch.setattr(web_gui, "create_midi_file", lambda *a, **k: None)
+
+    def raise_dep(*_a, **_k):
+        raise RuntimeError("PyTorch is required")
+
+    monkeypatch.setattr(web_gui, "load_sequence_model", raise_dep)
+
+    resp = client.post(
+        "/",
+        data={
+            "key": "C",
+            "chords": "C",
+            "bpm": "120",
+            "timesig": "4/4",
+            "notes": "1",
+            "motif_length": "1",
+            "base_octave": "4",
+            "enable_ml": "1",
+        },
+    )
+
+    assert resp.status_code == 200
+    assert b"PyTorch is required" in resp.data
+
+
 
 def test_generation_dispatched_to_celery(monkeypatch):
     """When Celery is available ``index`` should send work to a task."""

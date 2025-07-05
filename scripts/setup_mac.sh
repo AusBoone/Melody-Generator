@@ -12,8 +12,9 @@
 # Set the environment variable DRY_RUN=1 to print commands without
 # executing them. The FORCE_MAC=1 variable allows running the script on
 # non-macOS systems (useful for CI testing). Set INSTALL_ML_DEPS=1 to
-# also install optional PyTorch and NumPy packages for the sequence
-# model features.
+# also install optional machine learning libraries (``numpy``, the CPU
+# build of ``torch``, ``onnxruntime`` and ``numba``) required for the
+# sequence model and style embedding features.
 #----------------------------------------------------------------------
 set -euo pipefail
 
@@ -96,6 +97,8 @@ main() {
         if [[ "${INSTALL_ML_DEPS:-0}" == "1" ]]; then
             echo "DRY RUN: pip install numpy"
             echo "DRY RUN: pip install torch --index-url https://download.pytorch.org/whl/cpu"
+            echo "DRY RUN: pip install onnxruntime"
+            echo "DRY RUN: pip install numba"
         fi
     else
         # shellcheck source=/dev/null
@@ -106,6 +109,8 @@ main() {
         if [[ "${INSTALL_ML_DEPS:-0}" == "1" ]]; then
             run_cmd pip install numpy
             run_cmd pip install torch --index-url https://download.pytorch.org/whl/cpu
+            run_cmd pip install onnxruntime
+            run_cmd pip install numba
         fi
         deactivate
     fi

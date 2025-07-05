@@ -35,6 +35,12 @@
       {% for name in instruments %}<option value="{{name}}">{{name}}</option>{% endfor %}
     </select><br>
     Motif length: <input type="number" name="motif_length" value="4"><br>
+    <label><input type="checkbox" name="enable_ml" value="1"> Use ML Model</label><br>
+    Style:
+    <select name="style">
+      <option value=""></option>
+      {% for name in styles %}<option value="{{name}}">{{name}}</option>{% endfor %}
+    </select><br>
     <label><input type="checkbox" name="harmony" value="1"> Harmony</label><br>
     Counterpoint: <input type="checkbox" name="counterpoint" value="1"><br>
     Harmony lines: <input type="number" name="harmony_lines" value="0"><br>

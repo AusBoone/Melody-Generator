@@ -247,6 +247,56 @@ def test_cli_lists_chords_and_exits(capsys):
     assert captured.out == chords
 
 
+def test_cli_enable_ml_and_style(tmp_path, monkeypatch):
+    """``--enable-ml`` should load the sequence model and pass the style."""
+
+    mod, _, _ = load_module()
+    output = tmp_path / "out.mid"
+    called = {}
+
+    def fake_load(path, vocab):
+        called["loaded"] = True
+        return object()
+
+    def gen_mel(*args, **kwargs):
+        called["seq"] = kwargs.get("sequence_model")
+        called["style"] = kwargs.get("style")
+        return ["C4"]
+
+    monkeypatch.setattr(mod, "load_sequence_model", fake_load)
+    monkeypatch.setattr(mod, "generate_melody", gen_mel)
+    argv = [
+        "prog",
+        "--key",
+        "C",
+        "--chords",
+        "C",
+        "--bpm",
+        "120",
+        "--timesig",
+        "4/4",
+        "--notes",
+        "1",
+        "--motif_length",
+        "1",
+        "--base-octave",
+        "4",
+        "--output",
+        str(output),
+        "--enable-ml",
+        "--style",
+        "jazz",
+    ]
+    old = sys.argv
+    sys.argv = argv
+    mod.run_cli()
+    sys.argv = old
+
+    assert called.get("loaded")
+    assert called.get("seq") is not None
+    assert called.get("style") == "jazz"
+
+
 def test_generate_button_click(tmp_path, monkeypatch):
     """Simulate a user clicking the "Generate" button in the GUI.
 
@@ -258,7 +308,7 @@ def test_generate_button_click(tmp_path, monkeypatch):
     out = tmp_path / "gui.mid"
     calls = {}
 
-    def gen_mel(key, notes, chords, motif_length=4, base_octave=4):
+    def gen_mel(key, notes, chords, motif_length=4, base_octave=4, **kwargs):
         calls["oct"] = base_octave
         return ["C4"] * notes
 
@@ -280,6 +330,8 @@ def test_generate_button_click(tmp_path, monkeypatch):
     gui.counterpoint_fn = cp
     gui.save_settings = None
     gui.rhythm_pattern = None
+    gui.ml_var = types.SimpleNamespace(get=lambda: False)
+    gui.style_var = types.SimpleNamespace(get=lambda: "")
     gui.key_var = types.SimpleNamespace(get=lambda: "C")
     gui.bpm_var = types.SimpleNamespace(get=lambda: 120)
     gui.timesig_var = types.SimpleNamespace(get=lambda: "4/4")
@@ -353,6 +405,8 @@ def test_generate_button_click_non_positive(tmp_path, monkeypatch):
     gui.counterpoint_fn = None
     gui.save_settings = None
     gui.rhythm_pattern = None
+    gui.ml_var = types.SimpleNamespace(get=lambda: False)
+    gui.style_var = types.SimpleNamespace(get=lambda: "")
     gui.key_var = types.SimpleNamespace(get=lambda: "C")
     gui.bpm_var = types.SimpleNamespace(get=lambda: 0)
     gui.timesig_var = types.SimpleNamespace(get=lambda: "4/4")
@@ -392,6 +446,8 @@ def test_generate_button_click_invalid_denominator(tmp_path, monkeypatch):
     gui.counterpoint_fn = None
     gui.save_settings = None
     gui.rhythm_pattern = None
+    gui.ml_var = types.SimpleNamespace(get=lambda: False)
+    gui.style_var = types.SimpleNamespace(get=lambda: "")
     gui.key_var = types.SimpleNamespace(get=lambda: "C")
     gui.bpm_var = types.SimpleNamespace(get=lambda: 120)
     gui.timesig_var = types.SimpleNamespace(get=lambda: "4/0")
@@ -436,6 +492,8 @@ def test_generate_button_click_invalid_numerator(tmp_path, monkeypatch):
     gui.counterpoint_fn = None
     gui.save_settings = None
     gui.rhythm_pattern = None
+    gui.ml_var = types.SimpleNamespace(get=lambda: False)
+    gui.style_var = types.SimpleNamespace(get=lambda: "")
     gui.key_var = types.SimpleNamespace(get=lambda: "C")
     gui.bpm_var = types.SimpleNamespace(get=lambda: 120)
     gui.timesig_var = types.SimpleNamespace(get=lambda: "0/4")
@@ -480,6 +538,8 @@ def test_generate_button_click_motif_exceeds_notes(tmp_path, monkeypatch):
     gui.counterpoint_fn = None
     gui.save_settings = None
     gui.rhythm_pattern = None
+    gui.ml_var = types.SimpleNamespace(get=lambda: False)
+    gui.style_var = types.SimpleNamespace(get=lambda: "")
     gui.key_var = types.SimpleNamespace(get=lambda: "C")
     gui.bpm_var = types.SimpleNamespace(get=lambda: 120)
     gui.timesig_var = types.SimpleNamespace(get=lambda: "4/4")
@@ -521,6 +581,8 @@ def test_generate_button_click_invalid_base_octave(tmp_path, monkeypatch):
     gui.counterpoint_fn = None
     gui.save_settings = None
     gui.rhythm_pattern = None
+    gui.ml_var = types.SimpleNamespace(get=lambda: False)
+    gui.style_var = types.SimpleNamespace(get=lambda: "")
     gui.key_var = types.SimpleNamespace(get=lambda: "C")
     gui.bpm_var = types.SimpleNamespace(get=lambda: 120)
     gui.timesig_var = types.SimpleNamespace(get=lambda: "4/4")
@@ -747,6 +809,8 @@ def test_preview_button_uses_playback(monkeypatch, tmp_path):
     gui.counterpoint_fn = None
     gui.save_settings = None
     gui.rhythm_pattern = None
+    gui.ml_var = types.SimpleNamespace(get=lambda: False)
+    gui.style_var = types.SimpleNamespace(get=lambda: "")
     gui.key_var = types.SimpleNamespace(get=lambda: "C")
     gui.bpm_var = types.SimpleNamespace(get=lambda: 120)
     gui.timesig_var = types.SimpleNamespace(get=lambda: "4/4")
@@ -789,6 +853,8 @@ def test_preview_button_falls_back(monkeypatch, tmp_path):
     gui.counterpoint_fn = None
     gui.save_settings = None
     gui.rhythm_pattern = None
+    gui.ml_var = types.SimpleNamespace(get=lambda: False)
+    gui.style_var = types.SimpleNamespace(get=lambda: "")
     gui.key_var = types.SimpleNamespace(get=lambda: "C")
     gui.bpm_var = types.SimpleNamespace(get=lambda: 120)
     gui.timesig_var = types.SimpleNamespace(get=lambda: "4/4")
@@ -834,6 +900,8 @@ def test_preview_file_removed(monkeypatch, tmp_path):
     gui.counterpoint_fn = None
     gui.save_settings = None
     gui.rhythm_pattern = None
+    gui.ml_var = types.SimpleNamespace(get=lambda: False)
+    gui.style_var = types.SimpleNamespace(get=lambda: "")
     gui.key_var = types.SimpleNamespace(get=lambda: "C")
     gui.bpm_var = types.SimpleNamespace(get=lambda: 120)
     gui.timesig_var = types.SimpleNamespace(get=lambda: "4/4")
@@ -879,6 +947,8 @@ def test_preview_file_waits_for_player(monkeypatch):
     gui.counterpoint_fn = None
     gui.save_settings = None
     gui.rhythm_pattern = None
+    gui.ml_var = types.SimpleNamespace(get=lambda: False)
+    gui.style_var = types.SimpleNamespace(get=lambda: "")
     gui.key_var = types.SimpleNamespace(get=lambda: "C")
     gui.bpm_var = types.SimpleNamespace(get=lambda: 120)
     gui.timesig_var = types.SimpleNamespace(get=lambda: "4/4")
