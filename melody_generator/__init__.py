@@ -674,6 +674,8 @@ def note_to_midi(note: str) -> int:
 
     @param note (str): Note name including octave.
     @returns int: MIDI note number ``0-127``.
+    Note values outside the standard range are clamped to keep the
+    resulting MIDI pitch valid.
     """
     # Extract the note name and octave using a strict pattern.  The pattern
     # ensures the note consists of a letter with an optional accidental
@@ -715,9 +717,11 @@ def note_to_midi(note: str) -> int:
         logging.error(f"Note {note_name} not recognized.")
         raise
 
-    # MIDI note number is calculated relative to C0 at index 12
+    # MIDI note number is calculated relative to C0 at index 12. The resulting
+    # value may fall outside the ``0-127`` range when the octave is extreme,
+    # so clamp it to keep the result valid for standard MIDI files.
     midi_val = note_idx + (octave * 12)
-    return midi_val
+    return max(0, min(127, midi_val))
 
 
 def midi_to_note(midi_note: int) -> str:
