@@ -14,6 +14,12 @@ resulting sequence balances repetition with stochastic choice. Harmony is
 specified either directly by the user or by the helper function
 `generate_random_chord_progression`.
 
+While the algorithm is primarily heuristic, optional machine learning models can
+subtly bias these choices. A lightweight LSTM predicts the next scale degree and
+style embeddings derived from a variational autoencoder nudge the weights toward
+specific genres. These components act as learned priors layered atop the
+hand-crafted rules, providing a blend of determinism and data-driven variation.
+
 ## Step-by-Step Process
 
 1. **Motif Creation** – `generate_motif` selects random notes from the chosen key
@@ -208,3 +214,12 @@ invokes ``onnxruntime.quantization.quantize_dynamic`` to produce an 8‑bit mode
 for CPU inference.  The exported model expects a sequence of scale‑degree
 indices and outputs logits for the next degree, mirroring
 ``SequenceModel.predict_logits``.
+
+## Putting It All Together
+
+The heuristics outlined above are intentionally simple yet capture enough
+structure to produce musically coherent phrases. When machine learning
+extensions are enabled they act only as soft preferences, leaving the
+deterministic backbone intact. This design keeps the system lightweight and
+interpretable while still allowing researchers to experiment with more advanced
+models.

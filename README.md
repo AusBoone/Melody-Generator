@@ -7,7 +7,11 @@ file for use in digital audio workstations. For a formal exposition of the algor
 ## Documentation
 
 The [docs/README.md](docs/README.md) index links to the algorithm description,
-setup guide, FluidSynth notes and soundfont resources.
+setup guide, FluidSynth notes and soundfont resources. Separate guides cover
+the machine learning components used for style embeddings and sequence models
+([docs/README_ML_CONCEPTS.md](docs/README_ML_CONCEPTS.md)) and offer a brief
+musician's perspective
+([docs/README_MUSICAL_OVERVIEW.md](docs/README_MUSICAL_OVERVIEW.md)).
 
 ## Features
 

@@ -10,6 +10,8 @@ def humanize_events(messages: Iterable) -> None:
     """Apply micro timing offsets and velocity variation in place."""
 
     for msg in messages:
+        # Each MIDI message is adjusted individually so playback feels less
+        # mechanical. Only events with a positive delta time are modified.
         if hasattr(msg, "time") and msg.time > 0:
             jitter = random.randint(-15, 15)
             msg.time = max(0, msg.time + jitter)

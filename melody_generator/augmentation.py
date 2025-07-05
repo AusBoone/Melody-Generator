@@ -86,10 +86,15 @@ def augment_sequences(
 
     augmented: List[List[int]] = []
     for seq in sequences:
+        # Operate on a list copy so repeated transpositions do not mutate the
+        # caller's sequence object.
         seq = list(seq)
         for t in transpose_range:
+            # Add a transposed version for each semitone offset.
             augmented.append(transpose_sequence(seq, t))
             if invert:
+                # Optionally include the inverted form using the first note as
+                # the pivot so melodic contour is mirrored.
                 augmented.append(invert_sequence(seq, seq[0]))
     return augmented
 
@@ -115,9 +120,13 @@ def fine_tune_model(
     optimiser = torch.optim.Adam(model.parameters(), lr=lr)
     criterion = nn.CrossEntropyLoss()
     for _ in range(epochs):
+        # Iterate over the dataset one sequence at a time. Short sequences are
+        # skipped because the model requires at least one input and one target
+        # token for teacher forcing.
         for seq in sequences:
             if len(seq) < 2:
                 continue
+            # Prepare input/output tensors on CPU for a single training step.
             data = torch.tensor([seq[:-1]], dtype=torch.long)
             target = torch.tensor(seq[1:], dtype=torch.long)
             optimiser.zero_grad()
