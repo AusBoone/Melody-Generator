@@ -147,6 +147,10 @@ from .sequence_model import (
     load_sequence_model,
 )  # noqa: F401
 from .style_embeddings import get_style_vector, set_style, get_active_style  # noqa: F401
+# Re-export the full module so ``melody_generator.style_embeddings`` exists for
+# callers that rely on the submodule attribute.  Tests importing the web GUI
+# expect this reference to be present when reloading the package.
+from . import style_embeddings  # noqa: F401
 from .tension import tension_for_notes, apply_tension_weights
 from .dynamics import humanize_events
 from .rhythm_engine import RhythmGenerator, generate_rhythm
