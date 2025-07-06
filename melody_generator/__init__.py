@@ -1966,6 +1966,9 @@ def run_cli() -> None:
             logging.error(str(exc))
             sys.exit(1)
 
+    rhythm = (
+        generate_random_rhythm_pattern(args.notes) if args.random_rhythm else None
+    )
     melody = generate_melody(
         args.key,
         args.notes,
@@ -1974,8 +1977,8 @@ def run_cli() -> None:
         base_octave=args.base_octave,
         sequence_model=seq_model,
         style=args.style,
+        pattern=rhythm,
     )
-    rhythm = generate_random_rhythm_pattern() if args.random_rhythm else None
     # Collect additional harmony tracks requested on the command line
     extra: List[List[str]] = []
     for _ in range(max(0, args.harmony_lines)):
