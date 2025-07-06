@@ -1250,3 +1250,60 @@ def test_gui_open_default_player_waits_linux(monkeypatch, tmp_path):
     time.sleep(0.06)
     assert not midi.exists()
     assert calls and "--wait" in calls[0]
+
+
+def test_cli_random_rhythm_passed(monkeypatch, tmp_path):
+    """``--random-rhythm`` should forward the pattern to all helpers."""
+
+    mod, _, _ = load_module()
+    out = tmp_path / "rr.mid"
+
+    argv = [
+        "prog",
+        "--key",
+        "C",
+        "--chords",
+        "C,G",
+        "--bpm",
+        "120",
+        "--timesig",
+        "4/4",
+        "--notes",
+        "4",
+        "--motif_length",
+        "2",
+        "--base-octave",
+        "4",
+        "--output",
+        str(out),
+        "--random-rhythm",
+    ]
+
+    captured = {}
+
+    def stub_pattern(n=3):
+        captured["length"] = n
+        return [0.25] * n
+
+    monkeypatch.setattr(mod, "generate_random_rhythm_pattern", stub_pattern)
+
+    def gen_mel(*a, **kw):
+        captured["pattern"] = kw.get("pattern")
+        return ["C4"] * 4
+
+    def create(_mel, _bpm, _ts, path, *, pattern=None, **_kw):
+        captured["create"] = pattern
+        path_obj = Path(path)
+        path_obj.write_text("midi")
+
+    monkeypatch.setattr(mod, "generate_melody", gen_mel)
+    monkeypatch.setattr(mod, "create_midi_file", create)
+
+    old = sys.argv
+    sys.argv = argv
+    mod.run_cli()
+    sys.argv = old
+
+    assert captured["length"] == 4
+    assert captured["pattern"] == [0.25] * 4
+    assert captured["create"] == [0.25] * 4
