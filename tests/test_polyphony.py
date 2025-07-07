@@ -4,6 +4,7 @@ import types
 import importlib
 import sys
 from pathlib import Path
+import pytest
 
 # Stub 'mido' so ``PolyphonicGenerator.to_midi`` works without the real package.
 stub_mido = types.ModuleType("mido")
@@ -57,6 +58,8 @@ mg = importlib.import_module("melody_generator")
 PolyphonicGenerator = polyphony.PolyphonicGenerator
 note_to_midi = mg.note_to_midi
 MidiFileStub = mg.MidiFile
+MIN_OCTAVE = mg.MIN_OCTAVE
+MAX_OCTAVE = mg.MAX_OCTAVE
 
 
 def test_generate_returns_all_voices():
@@ -70,5 +73,21 @@ def test_generate_returns_all_voices():
     for quartet in zip(parts["soprano"], parts["alto"], parts["tenor"], parts["bass"]):
         mids = [note_to_midi(n) for n in quartet]
         assert mids == sorted(mids, reverse=True)
+
+
+def test_generate_invalid_octave_low():
+    """Providing a base octave below ``MIN_OCTAVE`` should raise ``ValueError``."""
+
+    gen = PolyphonicGenerator()
+    with pytest.raises(ValueError):
+        gen.generate("C", 4, ["C"], base_octaves={"soprano": MIN_OCTAVE - 1})
+
+
+def test_generate_invalid_octave_high():
+    """Providing a base octave above ``MAX_OCTAVE`` should raise ``ValueError``."""
+
+    gen = PolyphonicGenerator()
+    with pytest.raises(ValueError):
+        gen.generate("C", 4, ["C"], base_octaves={"alto": MAX_OCTAVE + 1})
 
 
