@@ -325,8 +325,9 @@ def test_generation_dispatched_to_celery(monkeypatch):
         def __init__(self, fn):
             self.fn = fn
 
-        def delay(self, params):
-            called["params"] = params
+        def delay(self, **kwargs):
+            """Capture keyword arguments supplied to ``delay`` for assertion."""
+            called["kwargs"] = kwargs
 
             class Res:
                 def get(self, timeout=None):
@@ -363,4 +364,7 @@ def test_generation_dispatched_to_celery(monkeypatch):
         },
     )
 
-    assert called.get("task") and called["params"]["key"] == "C"
+    assert called.get("task")
+    assert called["kwargs"]["key"] == "C"
+    assert called["kwargs"]["bpm"] == 120
+    assert called["kwargs"]["notes"] == 1

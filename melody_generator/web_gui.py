@@ -28,6 +28,11 @@ infrastructure.
 # activates these features but required dependencies such as PyTorch are not
 # installed, the view now flashes a clear error instead of returning a server
 # error.
+#
+# This revision also ensures Celery tasks receive keyword arguments. The
+# ``index`` view now dispatches ``generate_preview_task`` using
+# ``delay(**params)`` so that asynchronous workers get the same named
+# parameters as the synchronous path.
 
 from __future__ import annotations
 
@@ -304,8 +309,12 @@ def index():
 
         try:
             if celery_app is not None:
-                result = generate_preview_task.delay(params).get()
+                # ``delay`` passes the parameters to the Celery worker using
+                # keyword arguments so the task receives the same structure as
+                # the direct function call.
+                result = generate_preview_task.delay(**params).get()
             else:
+                # Execute synchronously when Celery is unavailable.
                 result = _generate_preview(**params)
         except RuntimeError as exc:
             flash(str(exc))
