@@ -390,3 +390,80 @@ def test_generation_dispatched_to_celery(monkeypatch):
     assert called["kwargs"]["key"] == "C"
     assert called["kwargs"]["bpm"] == 120
     assert called["kwargs"]["notes"] == 1
+
+
+def test_delay_arguments_match_preview_parameters(monkeypatch):
+    """Ensure ``delay`` receives only keyword arguments matching preview params."""
+
+    # Capture all arguments passed to ``delay`` for later inspection.
+    called = {}
+
+    celery_mod = types.ModuleType("celery")
+
+    class DummyTask:
+        def __init__(self, fn):
+            self.fn = fn
+
+        def delay(self, *args, **kwargs):
+            """Record positional and keyword arguments supplied by ``index``."""
+            called["args"] = args
+            called["kwargs"] = kwargs
+
+            class Res:
+                def get(self, timeout=None):
+                    return ("", "")
+
+            return Res()
+
+    class DummyCelery:
+        def __init__(self, *a, **k):
+            pass
+
+        def task(self, fn):
+            called["task"] = True
+            return DummyTask(fn)
+
+    celery_mod.Celery = DummyCelery
+    monkeypatch.setitem(sys.modules, "celery", celery_mod)
+
+    gui = importlib.reload(importlib.import_module("melody_generator.web_gui"))
+    client = gui.app.test_client()
+
+    # Avoid heavy processing during the test by stubbing the actual generator.
+    monkeypatch.setattr(gui, "_generate_preview", lambda **kw: ("", ""))
+
+    client.post(
+        "/",
+        data={
+            "key": "C",
+            "chords": "C",
+            "bpm": "120",
+            "timesig": "4/4",
+            "notes": "1",
+            "motif_length": "1",
+            "base_octave": "4",
+        },
+    )
+
+    expected_params = {
+        "key": "C",
+        "bpm": 120,
+        "timesig": (4, 4),
+        "notes": 1,
+        "motif_length": 1,
+        "base_octave": 4,
+        "instrument": "Piano",
+        "harmony": False,
+        "random_rhythm": False,
+        "counterpoint": False,
+        "harmony_lines": 0,
+        "include_chords": False,
+        "chords_same": False,
+        "enable_ml": False,
+        "style": None,
+        "chords": ["C"],
+    }
+
+    assert called.get("task")
+    assert called.get("args") == ()
+    assert called.get("kwargs") == expected_params
