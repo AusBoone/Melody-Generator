@@ -1172,9 +1172,10 @@ def test_open_default_player_error_threadsafe(monkeypatch):
     calls = []
     gui.root = types.SimpleNamespace(after=lambda d, func, *a: calls.append((func, a)))
 
-    monkeypatch.setattr(gui_mod.subprocess, "run", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
-    monkeypatch.setattr(gui_mod.os, "environ", {})
-    monkeypatch.setattr(gui_mod.sys, "platform", "linux", raising=False)
+    play_mod = importlib.import_module("melody_generator.playback")
+    monkeypatch.setattr(play_mod.subprocess, "run", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
+    monkeypatch.setattr(play_mod.os, "environ", {})
+    monkeypatch.setattr(play_mod.sys, "platform", "linux", raising=False)
     errors = []
     monkeypatch.setattr(
         gui_mod.messagebox,
@@ -1214,9 +1215,10 @@ def test_open_default_player_waits_linux(monkeypatch, tmp_path):
         time.sleep(0.05)
         return types.SimpleNamespace(returncode=0)
 
-    monkeypatch.setattr(mod.subprocess, "run", fake_run)
-    monkeypatch.setattr(mod.os, "environ", {})
-    monkeypatch.setattr(mod.sys, "platform", "linux", raising=False)
+    play_mod = importlib.import_module("melody_generator.playback")
+    monkeypatch.setattr(play_mod.subprocess, "run", fake_run)
+    monkeypatch.setattr(play_mod.os, "environ", {})
+    monkeypatch.setattr(play_mod.sys, "platform", "linux", raising=False)
 
     mod._open_default_player(str(midi), delete_after=True)
     assert midi.exists()
@@ -1239,9 +1241,10 @@ def test_gui_open_default_player_waits_linux(monkeypatch, tmp_path):
         time.sleep(0.05)
         return types.SimpleNamespace(returncode=0)
 
-    monkeypatch.setattr(gui_mod.subprocess, "run", fake_run)
-    monkeypatch.setattr(gui_mod.os, "environ", {})
-    monkeypatch.setattr(gui_mod.sys, "platform", "linux", raising=False)
+    play_mod = importlib.import_module("melody_generator.playback")
+    monkeypatch.setattr(play_mod.subprocess, "run", fake_run)
+    monkeypatch.setattr(play_mod.os, "environ", {})
+    monkeypatch.setattr(play_mod.sys, "platform", "linux", raising=False)
 
     gui = gui_mod.MelodyGeneratorGUI.__new__(gui_mod.MelodyGeneratorGUI)
     gui.root = types.SimpleNamespace()

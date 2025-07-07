@@ -43,6 +43,7 @@ playback = importlib.import_module("melody_generator.playback")
 _resolve_soundfont = playback._resolve_soundfont
 render_midi_to_wav = playback.render_midi_to_wav
 MidiPlaybackError = playback.MidiPlaybackError
+open_default_player = playback.open_default_player
 
 
 def test_resolve_soundfont_env_variable(tmp_path, monkeypatch):
@@ -119,3 +120,35 @@ def test_render_midi_invokes_subprocess(tmp_path, monkeypatch):
     assert called["check"] is True
     assert called["stdout"] == subprocess.DEVNULL
     assert called["stderr"] == subprocess.DEVNULL
+
+
+@pytest.mark.parametrize(
+    "platform,expected_prefix",
+    [
+        ("win32", ["cmd", "/c", "start", "/wait", ""]),
+        ("darwin", ["open", "-W"]),
+        ("linux", ["xdg-open", "--wait"]),
+    ],
+)
+def test_open_default_player_commands(monkeypatch, tmp_path, platform, expected_prefix):
+    """Verify platform-specific commands used by ``open_default_player``."""
+
+    midi = tmp_path / "x.mid"
+    midi.write_text("data")
+
+    calls = []
+
+    def fake_run(cmd, check=False):
+        calls.append(cmd)
+        return types.SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(playback.subprocess, "run", fake_run)
+    monkeypatch.setattr(playback.os, "environ", {})
+    monkeypatch.setattr(playback.sys, "platform", platform, raising=False)
+
+    open_default_player(str(midi), delete_after=True)
+
+    assert calls
+    assert calls[0][: len(expected_prefix)] == expected_prefix
+    assert calls[0][-1] == str(midi)
+    assert not midi.exists()
