@@ -64,17 +64,30 @@ def play_midi(path: str, soundfont: Optional[str] = None) -> None:
     Raises
     ------
     MidiPlaybackError
-        If FluidSynth is unavailable or playback fails.
+        If PyFluidSynth is unavailable, ``fluidsynth`` is missing, or playback
+        fails.  When the underlying executable is absent a
+        ``MidiPlaybackError`` with the message ``"fluidsynth not installed"``
+        is raised.
     """
 
     try:
         import fluidsynth  # type: ignore
+    except FileNotFoundError as exc:  # type: ignore[attr-defined]
+        # ``fluidsynth`` C library not found; provide a clear error message
+        raise MidiPlaybackError("fluidsynth not installed") from exc
     except Exception as exc:  # type: ignore
+        # Any other import failure indicates PyFluidSynth itself is missing
         raise MidiPlaybackError("PyFluidSynth is required for playback") from exc
 
     sf_path = _resolve_soundfont(soundfont)
 
-    synth = fluidsynth.Synth()
+    try:
+        synth = fluidsynth.Synth()
+    except FileNotFoundError as exc:
+        # Raised when the underlying ``fluidsynth`` binary or library is
+        # missing entirely. This provides a clearer message than the raw
+        # exception text from the dependency.
+        raise MidiPlaybackError("fluidsynth not installed") from exc
     try:
         synth.start()
     except Exception as exc:
@@ -90,12 +103,21 @@ def play_midi(path: str, soundfont: Optional[str] = None) -> None:
         synth.delete()
 
 
-def render_midi_to_wav(midi_path: str, wav_path: str, soundfont: Optional[str] = None) -> None:
+def render_midi_to_wav(
+    midi_path: str, wav_path: str, soundfont: Optional[str] = None
+) -> None:
     """Render ``midi_path`` to ``wav_path`` using the ``fluidsynth`` CLI.
 
-    ``fluidsynth`` must be installed on the system for this to work.  The
+    ``fluidsynth`` must be installed on the system for this to work. The
     function is primarily used by the web interface to embed audio in the
     browser when native MIDI playback is not available.
+
+    Raises
+    ------
+    MidiPlaybackError
+        If ``fluidsynth`` is missing, the MIDI file does not exist or the
+        subprocess fails for any other reason. When the executable is absent
+        the error message will be ``"fluidsynth not installed"``.
     """
 
     sf_path = _resolve_soundfont(soundfont)
@@ -114,7 +136,15 @@ def render_midi_to_wav(midi_path: str, wav_path: str, soundfont: Optional[str] =
         midi_path,
     ]
     try:
-        subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(
+            cmd,
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except FileNotFoundError as exc:
+        # ``fluidsynth`` executable not present in ``PATH``
+        raise MidiPlaybackError("fluidsynth not installed") from exc
     except Exception as exc:
         raise MidiPlaybackError(f"Failed to render MIDI: {exc}") from exc
 
