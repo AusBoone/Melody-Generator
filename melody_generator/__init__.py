@@ -116,6 +116,8 @@ __version__ = "0.1.0"
 #   functions like ``pick_note``.
 # * Candidate filtering and sampling now use NumPy broadcasting and
 #   ``numpy.random.choice`` when available for faster vector operations.
+# * Candidate note pools are created lazily on first use rather than
+#   preloading every combination at import time.
 # ---------------------------------------------------------------
 
 import mido
@@ -608,20 +610,24 @@ def scale_for_chord(key: str, chord: str) -> List[str]:
 
 
 def _candidate_pool(key: str, chord: str, root_octave: int, *, strong: bool) -> List[str]:
-    """Return cached candidate notes for ``chord`` and octave.
+    """Return candidate notes for ``chord`` within ``key``.
 
-    This helper reduces allocations by caching source pools for each chord and
-    octave. ``strong`` controls whether the pool consists of chord tones or the
-    broader scale associated with ``chord``.
+    Candidate pools are created on demand and cached for reuse.  The
+    ``strong`` flag determines whether only chord tones are included or the
+    full scale associated with ``chord``.  Subsequent calls with the same
+    parameters reuse the previously constructed list to avoid repeated
+    allocations.
     """
 
     cache_key = (key, chord, strong, root_octave)
-    pool = _CANDIDATE_CACHE.get(cache_key)
-    if pool is None:
+    if cache_key not in _CANDIDATE_CACHE:
         notes = get_chord_notes(chord) if strong else scale_for_chord(key, chord)
-        pool = [n + str(oct) for n in notes for oct in range(root_octave, root_octave + 2)]
-        _CANDIDATE_CACHE[cache_key] = pool
-    return pool
+        _CANDIDATE_CACHE[cache_key] = [
+            f"{n}{oct}"
+            for n in notes
+            for oct in range(root_octave, root_octave + 2)
+        ]
+    return _CANDIDATE_CACHE[cache_key]
 
 
 def _preload_candidate_cache() -> None:
@@ -806,7 +812,7 @@ def pick_note(candidates: List[str], weights: Sequence[float]) -> str:
     return random.choices(list(candidates), weights=list(weights), k=1)[0]
 
 
-_preload_candidate_cache()
+
 
 
 def generate_motif(length: int, key: str, base_octave: int = 4) -> List[str]:

@@ -26,7 +26,12 @@ sys.modules.setdefault("tkinter.ttk", tk_stub.ttk)
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-mod = importlib.import_module("melody_generator")
+# Reload the module to ensure global caches start from a clean state in case
+# other tests imported it earlier.
+if "melody_generator" in sys.modules:
+    mod = importlib.reload(sys.modules["melody_generator"])
+else:
+    mod = importlib.import_module("melody_generator")
 
 
 def test_canonical_key_cache_hits():
@@ -67,7 +72,9 @@ def test_note_to_midi_cache_hits():
     assert info_after.hits >= info_before.hits + 1
 
 
-def test_candidate_cache_preloaded():
-    """Importing the module should populate ``_CANDIDATE_CACHE``."""
-
-    assert mod._CANDIDATE_CACHE
+def test_candidate_cache_initially_empty():
+    """The candidate note cache should be empty immediately after import."""
+    sys.modules.setdefault("mido", mido_stub)
+    sys.modules.setdefault("tkinter", tk_stub)
+    reloaded = importlib.reload(sys.modules["melody_generator"])
+    assert not reloaded._CANDIDATE_CACHE

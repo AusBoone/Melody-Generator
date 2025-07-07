@@ -542,12 +542,25 @@ def test_chord_duration_respects_time_signature(tmp_path, monkeypatch):
 
 
 def test_candidate_cache_populated():
-    """``generate_melody`` populates the candidate cache."""
+    """``generate_melody`` should populate the candidate cache on first use."""
 
     chords = ["C", "G"]
     melody_generator._CANDIDATE_CACHE.clear()
+    assert not melody_generator._CANDIDATE_CACHE
     generate_melody("C", 4, chords, motif_length=2)
     assert melody_generator._CANDIDATE_CACHE
+
+
+def test_candidate_cache_lazy_initialization():
+    """Cache should start empty after reload and fill on first generation."""
+
+    # Ensure required stubs exist before reloading the module.
+    sys.modules.setdefault("mido", stub_mido)
+    sys.modules.setdefault("tkinter", tk_stub)
+    mod = importlib.reload(sys.modules["melody_generator"])  # reload active module
+    assert not mod._CANDIDATE_CACHE
+    mod.generate_melody("C", 4, ["C"], motif_length=2)
+    assert mod._CANDIDATE_CACHE
 
 
 def test_generate_melody_invalid_structure():
