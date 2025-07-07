@@ -467,3 +467,57 @@ def test_delay_arguments_match_preview_parameters(monkeypatch):
     assert called.get("task")
     assert called.get("args") == ()
     assert called.get("kwargs") == expected_params
+
+
+def test_celery_failure_falls_back_to_sync(monkeypatch):
+    """Preview generation should continue if the Celery broker is unreachable."""
+
+    celery_mod = types.ModuleType("celery")
+    called = {}
+
+    class DummyTask:
+        def __init__(self, fn):
+            self.fn = fn
+
+        def delay(self, **_kw):
+            """Simulate a broker connection error when dispatching."""
+            called["delay"] = True
+            raise RuntimeError("broker unreachable")
+
+    class DummyCelery:
+        def __init__(self, *a, **k):
+            pass
+
+        def task(self, fn):
+            return DummyTask(fn)
+
+    celery_mod.Celery = DummyCelery
+    monkeypatch.setitem(sys.modules, "celery", celery_mod)
+
+    gui = importlib.reload(importlib.import_module("melody_generator.web_gui"))
+    client = gui.app.test_client()
+
+    called_sync = {}
+
+    def fake_preview(**_kw):
+        called_sync["called"] = True
+        return "", ""
+
+    monkeypatch.setattr(gui, "_generate_preview", fake_preview)
+
+    resp = client.post(
+        "/",
+        data={
+            "key": "C",
+            "chords": "C",
+            "bpm": "120",
+            "timesig": "4/4",
+            "notes": "1",
+            "motif_length": "1",
+            "base_octave": "4",
+        },
+    )
+
+    assert resp.status_code == 200
+    assert called.get("delay")
+    assert called_sync.get("called")
