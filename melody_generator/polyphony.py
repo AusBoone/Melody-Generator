@@ -63,7 +63,9 @@ class PolyphonicGenerator:
         chord_progression:
             Harmony driving note choice.
         base_octaves:
-            Optional per-voice octave overrides.
+            Optional per-voice octave overrides. Each value must fall within
+            ``MIN_OCTAVE`` and ``MAX_OCTAVE`` otherwise a ``ValueError`` will be
+            raised.
 
         Returns
         -------
@@ -78,6 +80,13 @@ class PolyphonicGenerator:
         for voice in self.voices:
             model = self.sequence_models.get(voice)
             octave = base_octaves.get(voice, self.default_octaves[voice])
+            # Validate provided octave range rather than silently clamping. This
+            # prevents surprising register shifts when a caller accidentally
+            # supplies an out-of-bounds value.
+            if voice in base_octaves and not MIN_OCTAVE <= octave <= MAX_OCTAVE:
+                raise ValueError(
+                    f"base_octaves[{voice!r}] must be between {MIN_OCTAVE} and {MAX_OCTAVE}"
+                )
             octave = max(MIN_OCTAVE, min(MAX_OCTAVE, octave))
             from . import generate_melody  # Local import avoids circular deps
             line = generate_melody(
