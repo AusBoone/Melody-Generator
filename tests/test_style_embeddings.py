@@ -1,6 +1,7 @@
 """Tests for the style embedding helpers."""
 
 import importlib
+import json
 import sys
 from pathlib import Path
 import types
@@ -131,4 +132,22 @@ def test_module_without_numpy(monkeypatch):
 
     # Reload module so later tests use the original NumPy-backed version
     importlib.reload(style)
+
+
+def test_load_styles_json(tmp_path):
+    """New styles loaded from JSON should be retrievable."""
+
+    path = tmp_path / "styles.json"
+    path.write_text(json.dumps({"blues": [0.3, 0.3, 0.4]}))
+    style.load_styles(str(path))
+    assert list(style.get_style_vector("blues")) == [0.3, 0.3, 0.4]
+
+
+def test_load_styles_invalid_format(tmp_path):
+    """Invalid style files must raise ``ValueError``."""
+
+    bad = tmp_path / "bad.json"
+    bad.write_text("[]")  # Not a mapping
+    with pytest.raises(ValueError):
+        style.load_styles(str(bad))
 

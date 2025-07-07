@@ -6,6 +6,9 @@ utilities: a tiny :class:`StyleVAE` for demonstrations, functions for setting
 an active style vector, interpolation helpers and a way to extract a style
 embedding from a reference MIDI file.
 
+``load_styles`` allows additional style vectors to be imported from JSON or
+YAML files at runtime so experiments can easily extend the built-in presets.
+
 ``STYLE_VECTORS`` is now defined unconditionally for better static analysis and
 helper functions return copies rather than references so callers cannot mutate
 module-level state by accident.
@@ -44,6 +47,60 @@ else:
 
 # Global style vector applied when ``set_style`` is called.
 _ACTIVE_STYLE: Optional[Sequence[float]] = None
+
+
+def load_styles(path: str) -> None:
+    """Merge style vectors from a JSON or YAML file into ``STYLE_VECTORS``.
+
+    The file must contain a mapping from style names to numeric vectors. Vectors
+    are converted to either ``numpy.ndarray`` or ``list`` depending on whether
+    NumPy is available. Existing entries are replaced if a name already exists.
+
+    Parameters
+    ----------
+    path:
+        Path to a ``.json`` or ``.yaml``/``.yml`` file defining additional
+        styles.
+
+    Raises
+    ------
+    ValueError
+        If the file cannot be parsed or does not contain a mapping of vectors.
+    RuntimeError
+        If a YAML file is supplied but the ``yaml`` package is missing.
+    """
+
+    import json
+    import os
+
+    ext = os.path.splitext(path)[1].lower()
+    with open(path, "r", encoding="utf-8") as fh:
+        if ext == ".json":
+            try:
+                data = json.load(fh)
+            except Exception as exc:  # pragma: no cover - parse errors
+                raise ValueError("invalid JSON style file") from exc
+        elif ext in {".yaml", ".yml"}:
+            try:
+                import yaml  # type: ignore
+            except Exception as exc:  # pragma: no cover - optional dependency
+                raise RuntimeError("PyYAML is required for YAML style files") from exc
+            try:
+                data = yaml.safe_load(fh)
+            except Exception as exc:  # pragma: no cover - parse errors
+                raise ValueError("invalid YAML style file") from exc
+        else:
+            raise ValueError(f"unsupported style file format: {ext}")
+
+    if not isinstance(data, dict):
+        raise ValueError("style file must contain a mapping of names to vectors")
+
+    for name, vec in data.items():
+        if not isinstance(vec, (list, tuple)):
+            raise ValueError(f"vector for {name!r} must be a sequence")
+        STYLE_VECTORS[name] = (
+            np.array(list(vec), dtype=float) if USE_NUMPY else [float(v) for v in vec]
+        )
 
 
 def get_style_vector(name: str) -> Sequence[float]:

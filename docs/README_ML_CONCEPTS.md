@@ -21,6 +21,15 @@ The optional neural modules rely on [PyTorch](https://pytorch.org) for tensor op
 ## Style Embeddings
 
 A variational autoencoder (VAE) learns compact style vectors from MIDI corpora. The active vector can be set globally or supplied per-call to subtly influence note probabilities. Interpolating between vectors blends genres in a continuous manner.
+Additional presets can be loaded using `load_styles`. Provide a JSON or YAML
+file mapping style names to vectors and each entry will merge into the preset
+dictionary. Example (``docs/example_styles.json``)::
+
+    {
+        "blues": [0.5, 0.4, 0.1],
+        "chiptune": [0.1, 0.8, 0.1]
+    }
+
 
 ## Tension Modelling
 
