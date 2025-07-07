@@ -18,6 +18,7 @@ import importlib
 import sys
 from pathlib import Path
 import types
+import subprocess
 
 import pytest
 
@@ -142,3 +143,24 @@ def test_play_midi_driver_start_failure(monkeypatch):
     with pytest.raises(MidiPlaybackError):
         playback.play_midi("dummy.mid")
 
+
+
+def test_render_midi_missing_file(tmp_path, monkeypatch):
+    """``render_midi_to_wav`` should error when the MIDI file does not exist."""
+
+    output = tmp_path / "song.wav"
+    # Ensure SoundFont resolution succeeds so only the missing MIDI triggers
+    # the failure.
+    monkeypatch.setattr(playback, "_resolve_soundfont", lambda sf: "font.sf2")
+    called = False
+
+    def fake_run(*_a, **_k):
+        nonlocal called
+        called = True
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    with pytest.raises(MidiPlaybackError, match="MIDI file not found"):
+        playback.render_midi_to_wav("missing.mid", str(output))
+
+    assert not called
