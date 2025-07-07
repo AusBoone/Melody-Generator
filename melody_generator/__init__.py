@@ -133,7 +133,6 @@ from typing import List, Tuple, Optional, Sequence
 from functools import lru_cache
 import os
 import math
-import subprocess
 import threading
 import re
 try:
@@ -1716,61 +1715,15 @@ def create_midi_file(
 
 
 def _open_default_player(path: str, *, delete_after: bool = False) -> None:
-    """Open ``path`` with the OS default MIDI player.
+    """Launch ``path`` asynchronously with the system's default MIDI player."""
 
-    The command runs in a background thread so the caller does not block.
-    When ``delete_after`` is ``True`` the file is removed once the player
-    command has finished launching. On Linux the function attempts to use
-    ``xdg-open --wait`` so that temporary files persist until the external
-    player closes.
-    """
+    from .playback import open_default_player
 
     def runner() -> None:
-        """Execute the player command and optionally delete ``path``."""
         try:
-            player = os.environ.get("MELODY_PLAYER")
-            if sys.platform.startswith("win"):
-                if player:
-                    cmd = [player, path]
-                    subprocess.run(cmd, check=False)
-                else:
-                    # ``start`` returns immediately unless ``/wait`` is used.
-                    subprocess.run(
-                        [
-                            "cmd",
-                            "/c",
-                            "start",
-                            "/wait",
-                            "",
-                            path,
-                        ],
-                        check=False,
-                    )
-            elif sys.platform == "darwin":
-                if player:
-                    subprocess.run(["open", "-W", "-a", player, path], check=False)
-                else:
-                    subprocess.run(["open", "-W", path], check=False)
-            else:
-                if player:
-                    subprocess.run([player, path], check=False)
-                else:
-                    # On Linux ``xdg-open" typically returns immediately after
-                    # launching the associated application which leads to
-                    # premature deletion when ``delete_after`` is ``True``.
-                    # Modern versions support ``--wait`` so attempt to use it
-                    # and fall back to the standard behaviour on failure.
-                    proc = subprocess.run(["xdg-open", "--wait", path], check=False)
-                    if proc.returncode != 0:
-                        subprocess.run(["xdg-open", path], check=False)
+            open_default_player(path, delete_after=delete_after)
         except Exception as exc:  # pragma: no cover - platform dependent
             logging.error("Could not open MIDI file: %s", exc)
-        finally:
-            if delete_after:
-                try:
-                    os.remove(path)
-                except OSError:
-                    pass
 
     threading.Thread(target=runner, daemon=True).start()
 

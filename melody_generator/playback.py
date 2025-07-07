@@ -21,9 +21,15 @@ from __future__ import annotations
 
 import os
 import subprocess
+import sys
 from typing import Optional
 
-__all__ = ["MidiPlaybackError", "play_midi", "render_midi_to_wav"]
+__all__ = [
+    "MidiPlaybackError",
+    "play_midi",
+    "render_midi_to_wav",
+    "open_default_player",
+]
 
 
 class MidiPlaybackError(RuntimeError):
@@ -111,3 +117,46 @@ def render_midi_to_wav(midi_path: str, wav_path: str, soundfont: Optional[str] =
         subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except Exception as exc:
         raise MidiPlaybackError(f"Failed to render MIDI: {exc}") from exc
+
+
+def open_default_player(path: str, *, delete_after: bool = False) -> None:
+    """Launch ``path`` with the operating system's default MIDI player.
+
+    This function contains the platform-specific logic used by both the
+    command line and GUI helpers. It blocks until the player command
+    completes, removing ``path`` afterwards when ``delete_after`` is ``True``.
+
+    Parameters
+    ----------
+    path:
+        File to open in the default player.
+    delete_after:
+        Delete ``path`` once playback finishes.
+
+    Raises
+    ------
+    Exception
+        Propagates any errors raised by ``subprocess.run`` or ``os.remove``.
+    """
+
+    player = os.environ.get("MELODY_PLAYER")
+    if sys.platform.startswith("win"):
+        if player:
+            subprocess.run([player, path], check=False)
+        else:
+            subprocess.run(["cmd", "/c", "start", "/wait", "", path], check=False)
+    elif sys.platform == "darwin":
+        if player:
+            subprocess.run(["open", "-W", "-a", player, path], check=False)
+        else:
+            subprocess.run(["open", "-W", path], check=False)
+    else:
+        if player:
+            subprocess.run([player, path], check=False)
+        else:
+            proc = subprocess.run(["xdg-open", "--wait", path], check=False)
+            if proc.returncode != 0:
+                subprocess.run(["xdg-open", path], check=False)
+
+    if delete_after:
+        os.remove(path)

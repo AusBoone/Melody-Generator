@@ -32,8 +32,6 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from typing import Callable, List, Tuple, Dict, Optional
 import os
-import subprocess
-import sys
 import threading
 from tempfile import NamedTemporaryFile
 
@@ -44,7 +42,7 @@ from .style_embeddings import STYLE_VECTORS, get_style_vector
 # ``MidiPlaybackError`` signals that preview playback failed within the
 # ``playback`` helper module. Catching it allows the GUI to fall back to the
 # system default player without masking unrelated errors.
-from .playback import MidiPlaybackError
+from .playback import MidiPlaybackError, open_default_player
 
 # Mapping of display names to General MIDI program numbers used by the
 # instrument selector. Only a small subset is provided for demonstration
@@ -742,38 +740,7 @@ class MelodyGeneratorGUI:
 
         def runner() -> None:
             try:
-                player = os.environ.get("MELODY_PLAYER")
-                if sys.platform.startswith("win"):
-                    if player:
-                        subprocess.run([player, path], check=False)
-                    else:
-                        subprocess.run(
-                            [
-                                "cmd",
-                                "/c",
-                                "start",
-                                "/wait",
-                                "",
-                                path,
-                            ],
-                            check=False,
-                        )
-                elif sys.platform == "darwin":
-                    if player:
-                        subprocess.run(["open", "-W", "-a", player, path], check=False)
-                    else:
-                        subprocess.run(["open", "-W", path], check=False)
-                else:
-                    if player:
-                        subprocess.run([player, path], check=False)
-                    else:
-                        # ``xdg-open`` typically returns immediately which may
-                        # delete temporary files too early when ``delete_after``
-                        # is ``True``. Try ``--wait`` first and fall back on
-                        # failure for broader compatibility.
-                        proc = subprocess.run(["xdg-open", "--wait", path], check=False)
-                        if proc.returncode != 0:
-                            subprocess.run(["xdg-open", path], check=False)
+                open_default_player(path, delete_after=delete_after)
             except Exception as exc:  # pragma: no cover - platform dependent
                 # Tkinter widgets must be updated from the main thread. Use
                 # ``after`` to schedule the error dialog so it runs safely.
@@ -783,13 +750,6 @@ class MelodyGeneratorGUI:
                     "Preview Error",
                     f"Could not open MIDI file: {exc}",
                 )
-            finally:
-                if delete_after:
-                    try:
-                        os.remove(path)
-                    except OSError:
-                        pass
-
         threading.Thread(target=runner, daemon=True).start()
 
     def _browse_soundfont(self) -> None:
