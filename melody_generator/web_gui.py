@@ -33,6 +33,10 @@ infrastructure.
 # ``index`` view now dispatches ``generate_preview_task`` using
 # ``delay(**params)`` so that asynchronous workers get the same named
 # parameters as the synchronous path.
+#
+# This update also detects Celery broker connection failures. When a
+# ``delay`` call cannot reach the broker the exception is logged and the
+# preview is generated synchronously so the request still succeeds.
 
 from __future__ import annotations
 
@@ -319,10 +323,17 @@ def index():
 
         try:
             if celery_app is not None:
-                # ``delay`` passes the parameters to the Celery worker using
-                # keyword arguments so the task receives the same structure as
-                # the direct function call.
-                result = generate_preview_task.delay(**params).get()
+                try:
+                    # ``delay`` passes the parameters to the Celery worker using
+                    # keyword arguments so the task receives the same structure as
+                    # the direct function call. Connection failures fall back to
+                    # synchronous generation so the request still completes.
+                    result = generate_preview_task.delay(**params).get()
+                except Exception:  # pragma: no cover - triggered via tests
+                    logger.exception(
+                        "Celery broker unavailable; running preview synchronously"
+                    )
+                    result = _generate_preview(**params)
             else:
                 # Execute synchronously when Celery is unavailable.
                 result = _generate_preview(**params)
