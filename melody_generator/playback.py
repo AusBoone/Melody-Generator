@@ -93,6 +93,12 @@ def render_midi_to_wav(midi_path: str, wav_path: str, soundfont: Optional[str] =
     """
 
     sf_path = _resolve_soundfont(soundfont)
+
+    # Fail fast when the input file does not exist to avoid spawning
+    # ``fluidsynth`` with an invalid path which would result in a cryptic
+    # error message from the subprocess.
+    if not os.path.isfile(midi_path):
+        raise MidiPlaybackError("MIDI file not found")
     cmd = [
         "fluidsynth",
         "-ni",
