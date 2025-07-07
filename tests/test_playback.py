@@ -152,3 +152,40 @@ def test_open_default_player_commands(monkeypatch, tmp_path, platform, expected_
     assert calls[0][: len(expected_prefix)] == expected_prefix
     assert calls[0][-1] == str(midi)
     assert not midi.exists()
+
+
+def test_render_midi_missing_fluidsynth(monkeypatch, tmp_path):
+    """Missing ``fluidsynth`` executable should yield a clear error message."""
+
+    midi = tmp_path / "song.mid"
+    wav = tmp_path / "out.wav"
+    midi.write_text("midi")
+    wav.write_text("")
+
+    monkeypatch.setattr(playback, "_resolve_soundfont", lambda sf: "font.sf2")
+
+    def fake_run(*_a, **_k):
+        raise FileNotFoundError("fluidsynth")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    with pytest.raises(MidiPlaybackError, match="fluidsynth not installed"):
+        render_midi_to_wav(str(midi), str(wav))
+
+
+def test_play_midi_missing_fluidsynth(monkeypatch, tmp_path):
+    """``play_midi`` should report missing FluidSynth library via a specific message."""
+
+    midi = tmp_path / "song.mid"
+    midi.write_text("data")
+
+    monkeypatch.setattr(playback, "_resolve_soundfont", lambda sf: "font.sf2")
+
+    class Dummy:
+        def __init__(self) -> None:
+            raise FileNotFoundError("libfluidsynth")
+
+    monkeypatch.setitem(sys.modules, "fluidsynth", types.SimpleNamespace(Synth=Dummy))
+
+    with pytest.raises(MidiPlaybackError, match="fluidsynth not installed"):
+        playback.play_midi(str(midi))
