@@ -231,6 +231,16 @@ def index():
         motif_length = int(request.form.get('motif_length') or 4)
         base_octave = int(request.form.get('base_octave') or 4)
         instrument = request.form.get('instrument') or 'Piano'
+        # Validate the selected instrument against the known General MIDI
+        # mapping. Unknown values likely mean the form was tampered with.
+        if instrument not in INSTRUMENTS:
+            flash("Unknown instrument")
+            return render_template(
+                'index.html',
+                scale=sorted(SCALE.keys()),
+                instruments=INSTRUMENTS.keys(),
+                styles=STYLE_VECTORS.keys(),
+            )
         harmony = bool(request.form.get('harmony'))
         random_rhythm = bool(request.form.get('random_rhythm'))
         counterpoint = bool(request.form.get('counterpoint'))

@@ -181,6 +181,28 @@ def test_invalid_chord_flash():
     assert b"Unknown chord" in resp.data
 
 
+def test_invalid_instrument_flash():
+    """Posting an instrument not in ``INSTRUMENTS`` shows an error."""
+
+    client = app.test_client()
+
+    resp = client.post(
+        "/",
+        data={
+            "key": "C",
+            "chords": "C",
+            "bpm": "120",
+            "timesig": "4/4",
+            "notes": "8",
+            "motif_length": "4",
+            "base_octave": "4",
+            "instrument": "Banjo",
+        },
+    )
+
+    assert b"Unknown instrument" in resp.data
+
+
 def test_include_chords_flag():
     """Setting the ``include_chords`` checkbox should be accepted."""
     client = app.test_client()
