@@ -1,4 +1,25 @@
-"""Helpers for computing and applying musical tension."""
+"""Helpers for computing and applying musical tension.
+
+This module defines lightweight utilities used to weight candidate notes
+based on their perceived tension relative to the previous pitch.  The
+functions here provide a simple mapping from interval sizes to tension
+values and expose helpers for adjusting selection weights during melody
+generation.
+
+Example
+-------
+>>> weights = [1.0, 1.0, 1.0]
+>>> tens = [0.2, 0.8, 0.4]
+>>> apply_tension_weights(weights, tens, 0.5)
+[0.8333333333333334, 0.5555555555555556, 1.0]
+
+Design Notes
+------------
+- ``numpy`` is optional and the routines fall back to pure Python when the
+  library is unavailable.
+- The interval-to-tension mapping is intentionally coarse so the computation
+  remains fast and easily adjustable.
+"""
 
 from __future__ import annotations
 

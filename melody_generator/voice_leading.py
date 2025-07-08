@@ -1,4 +1,24 @@
-"""Utilities for detecting basic counterpoint issues."""
+"""Utilities for detecting basic counterpoint issues.
+
+This module contains helpers used by the melody generator to discourage
+problematic motion such as parallel fifths or octaves.  The primary
+functions are ``counterpoint_penalty`` and ``parallel_fifths_mask`` which
+return weighting adjustments and boolean masks respectively.  All inputs are
+provided as note names (e.g. ``"C4"``) so the routines remain agnostic to the
+rest of the system.
+
+Example
+-------
+>>> counterpoint_penalty("C4", "D4", prev_dir=1, prev_interval=7)
+0.2
+
+Design Notes
+------------
+- ``numpy`` is used for vectorized computation when available but the code
+  falls back to pure Python for simplicity and testability.
+- Only minimal music theory is encoded—these checks are meant as gentle
+  nudges rather than strict rules.
+"""
 
 from __future__ import annotations
 
