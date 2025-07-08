@@ -30,6 +30,8 @@ musician's perspective
 - Optional base octave parameter to constrain the melody's register with
   occasional octave shifts.
 - Variations when motifs repeat so phrases remain interesting.
+- Style embeddings and an optional sequence model bias note selection for
+  genre-specific melodies.
 - Web interface now previews the generated melody using a WAV rendering created
   with FluidSynth.
 - Batch export helper uses ``ProcessPoolExecutor`` and Celery for parallel
@@ -124,6 +126,16 @@ The `--instrument` option selects the General MIDI program number used for the m
 Pass `--no-humanize` if you want deterministic timing so events align exactly on the beat.
 Use `--play` to automatically preview the file once it is written.
 
+Another short example enabling the sequence model and selecting a style:
+
+```bash
+melody-generator --key Em --chords Em,G,D,A --bpm 100 --timesig 4/4 \
+  --notes 32 --enable-ml --style blues --output jam.mid
+```
+
+This command biases note probabilities toward the *blues* style using the
+lightweight sequence model.
+
 ### GUI
 
 Simply run `melody-generator` with no arguments:
@@ -133,10 +145,11 @@ melody-generator
 ```
 
 1. Choose a key, BPM, time signature and chord progression.
-2. Check the **Harmony** or **Counterpoint** boxes to add extra tracks.
-3. Leave **Humanize Performance** enabled for natural timing or untick it for strict quantization.
-3. Click **Preview Melody** to hear the result without saving.
-4. Click **Generate Melody** and select where to save the MIDI file.
+2. Optionally tick **Use ML Model** and pick a **Style** to bias note choices.
+3. Check the **Harmony** or **Counterpoint** boxes to add extra tracks.
+4. Leave **Humanize Performance** enabled for natural timing or untick it for strict quantization.
+5. Click **Preview Melody** to hear the result without saving.
+6. Click **Generate Melody** and select where to save the MIDI file.
 
 
 ### Web Interface
@@ -148,7 +161,8 @@ python -m melody_generator.web_gui
 ```
 
 1. Open `http://localhost:5000` in your browser.
-2. Fill out the form just like the GUI version.
+2. Fill out the form just like the GUI version. Use **Use ML Model** and the
+   **Style** drop-down to influence the melody.
 3. Keep **Humanize Performance** checked for more realism or uncheck for exact timing.
 4. Submit to preview and download the generated file.
 5. Set the `FLASK_SECRET` environment variable to a persistent secret. If it
@@ -196,6 +210,10 @@ When running from the command line you can supply optional flags:
   falls back to the system player otherwise.
 - `--soundfont PATH` uses the specified SoundFont when playing the file with
   `--play`.
+- `--enable-ml` loads the lightweight sequence model so note weighting is
+  informed by training data.
+- `--style NAME` selects a predefined style embedding to bias the melody toward
+  a genre such as blues or chiptune.
 
 ## Development
 
