@@ -642,3 +642,29 @@ def test_generate_melody_custom_rhythm_generator():
     generate_melody("C", 4, ["C"], motif_length=2, rhythm_generator=gen)
     assert gen.called == 1
 
+
+def test_generate_melody_accepts_lowercase():
+    """Lowercase key and chord names are canonicalised automatically."""
+
+    melody = generate_melody("c", 4, ["c", "am"], motif_length=2)
+    assert len(melody) == 4
+
+
+def test_create_midi_file_accepts_lowercase(tmp_path):
+    """Chord names in lowercase should be processed without errors."""
+
+    melody = ["C4"] * 4
+    out = tmp_path / "lower.mid"
+    create_midi_file(
+        melody,
+        120,
+        (4, 4),
+        str(out),
+        pattern=[0.25],
+        chord_progression=["c", "g"],
+    )
+
+    mid = DummyMidiFile.last_instance
+    assert mid is not None
+    assert len(mid.tracks) == 2
+

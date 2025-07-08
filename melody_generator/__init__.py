@@ -121,6 +121,8 @@ __version__ = "0.1.0"
 #   preloading every combination at import time.
 # * ``create_midi_file`` accepts a ``humanize`` flag so unit tests can
 #   disable timing jitter for deterministic output.
+# * ``generate_melody`` and ``create_midi_file`` now canonicalise keys and
+#   chords so lowercase input is accepted by the public API.
 # ---------------------------------------------------------------
 
 import random
@@ -802,11 +804,13 @@ def generate_melody(
     9.  The final note is forced to the root of the last chord to create a
         simple cadence.
 
-    @param key (str): Musical key for the melody. ``ValueError`` is raised
-        when the key does not exist in :data:`SCALE` so that invalid input is
-        detected early.
+    @param key (str): Musical key for the melody. The value is canonicalised
+        using :func:`canonical_key` so lowercase names are accepted. A
+        ``ValueError`` is raised when the key does not exist in
+        :data:`SCALE`.
     @param num_notes (int): Total number of notes to generate.
-    @param chord_progression (List[str]): Chords guiding note choice.
+    @param chord_progression (List[str]): Chords guiding note choice. Each name
+        is canonicalised via :func:`canonical_chord` to allow any casing.
     @param motif_length (int): Length of the initial motif.
     @param time_signature (Tuple[int, int]): Meter as ``(numerator, denominator)``.
         The denominator must be one of ``1, 2, 4, 8`` or ``16`` so note
@@ -847,14 +851,19 @@ def generate_melody(
     # chords.
     if not chord_progression:
         raise ValueError("chord_progression must contain at least one chord")
+
+    # Normalise ``key`` and each chord so callers may pass any capitalization.
+    # ``canonical_key`` and ``canonical_chord`` raise ``ValueError`` for unknown
+    # values which keeps the later lookup operations safe.
+    key = canonical_key(key)
+    chord_progression = [canonical_chord(ch) for ch in chord_progression]
+
     # ``motif_length`` represents the number of notes in the initial idea that
     # will be repeated.  It cannot exceed the total number of notes requested or
     # the function would be unable to fill the melody.
     if num_notes < motif_length:
         raise ValueError("num_notes must be greater than or equal to motif_length")
 
-    if key not in SCALE:
-        raise ValueError(f"Unknown key '{key}'")
     notes_in_key = SCALE[key]
     indices_in_key = _SCALE_INDICES[key]
 

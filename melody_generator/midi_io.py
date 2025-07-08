@@ -17,7 +17,13 @@ from typing import List, Optional, Tuple
 import mido
 from mido import Message, MidiFile, MidiTrack
 
-from . import CHORDS, generate_rhythm, humanize_events, note_to_midi
+from . import (
+    CHORDS,
+    canonical_chord,
+    generate_rhythm,
+    humanize_events,
+    note_to_midi,
+)
 
 __all__ = ["create_midi_file", "_open_default_player"]
 
@@ -35,10 +41,19 @@ def create_midi_file(
     program: int = 0,
     humanize: bool = True,
 ) -> None:
-    """Write ``melody`` to ``output_file`` as a MIDI file."""
+    """Write ``melody`` to ``output_file`` as a MIDI file.
+
+    Chord names supplied via ``chord_progression`` are canonicalised using
+    :func:`canonical_chord` so case-insensitive input is accepted. Unknown
+    chords raise ``ValueError`` before any MIDI events are created.
+    """
 
     if chord_progression is not None and not chord_progression:
         raise ValueError("chord_progression must contain at least one chord")
+    # Normalize chord names so callers can pass lowercase values. Unknown names
+    # trigger ``ValueError`` here before any MIDI events are generated.
+    if chord_progression is not None:
+        chord_progression = [canonical_chord(ch) for ch in chord_progression]
     valid_denoms = {1, 2, 4, 8, 16}
     if (time_signature[0] <= 0 or time_signature[1] <= 0 or
             time_signature[1] not in valid_denoms):
