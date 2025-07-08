@@ -13,6 +13,12 @@ Example
 >>> gen.to_midi(parts, 120, (4, 4), 'polyphony.mid')
 """
 
+# Summary
+# -------
+# This module's voice-leading helper now includes a detailed explanation
+# and example usage. Inline comments clarify how octave shifts prevent
+# crossing and excessive spacing.
+
 from __future__ import annotations
 
 from typing import Dict, List, Optional, Tuple
@@ -126,16 +132,39 @@ class PolyphonicGenerator:
         )
 
     def _enforce_voice_leading(self, voices: Dict[str, List[str]]) -> None:
-        """Adjust voices in place to avoid crossing and wide spacing."""
+        """Adjust voices in place to avoid crossing and wide spacing.
+
+        The function walks through each note position and compares adjacent
+        voices from top to bottom. If the pitch order is incorrect, the lower
+        part is shifted down an octave or the upper part is shifted up to
+        restore the expected hierarchy. After crossings are corrected, adjacent
+        voices are kept within a single octave by raising the lower voice when
+        it sits more than 12 semitones below its neighbour.
+
+        Example
+        -------
+        >>> voices = {
+        ...     "soprano": ["C4"],
+        ...     "alto": ["E4"],
+        ...     "tenor": ["C3"],
+        ...     "bass": ["C2"],
+        ... }
+        >>> PolyphonicGenerator()._enforce_voice_leading(voices)
+        >>> [v[0] for v in voices.values()]
+        ['C5', 'E4', 'C4', 'C3']
+        """
 
         length = len(next(iter(voices.values())))
         from . import note_to_midi, midi_to_note  # Local import avoids circular deps
+
         for i in range(length):
             for hi, lo in zip(self.voices, self.voices[1:]):
                 up = note_to_midi(voices[hi][i])
                 low = note_to_midi(voices[lo][i])
-                # Prevent voice crossing by moving the lower voice down or the
-                # upper voice up by an octave as needed.
+
+                # Step 1: check for voice crossing. If the lower part is above the
+                # upper part, try moving the upper voice up an octave. If the MIDI
+                # range would be exceeded, shift the lower voice down instead.
                 if up < low:
                     if up + 12 <= 127:
                         up += 12
@@ -143,7 +172,9 @@ class PolyphonicGenerator:
                     elif low - 12 >= 0:
                         low -= 12
                         voices[lo][i] = midi_to_note(low)
-                # Keep adjacent voices within one octave.
+
+                # Step 2: ensure neighbouring voices remain within one octave of
+                # each other by raising the lower note when necessary.
                 if up - low > 12 and low + 12 <= 127:
                     low += 12
                     voices[lo][i] = midi_to_note(low)
