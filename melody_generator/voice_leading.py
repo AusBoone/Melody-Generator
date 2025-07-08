@@ -132,6 +132,8 @@ def counterpoint_penalties(
     """
 
     if np is None:
+        # Use a Python loop when numpy is unavailable. Each candidate is scored
+        # individually which is slower but keeps the dependency optional.
         return [
             counterpoint_penalty(
                 prev_note,
@@ -175,6 +177,8 @@ def parallel_fifths_mask(
     """
 
     if np is None:
+        # Without numpy fall back to a comprehension calling the scalar helper
+        # for each candidate note.
         return [parallel_fifth_or_octave(prev_a, prev_b, c, next_b) for c in candidates]
 
     prev_a_m = note_to_midi(prev_a)
@@ -185,10 +189,16 @@ def parallel_fifths_mask(
     if interval1 not in {0, 7}:
         return np.zeros(len(candidates), dtype=bool)
 
+    # Vectorised conversion of candidate notes to MIDI numbers allows
+    # broadcasting for interval checks.
     cand_m = np.fromiter((note_to_midi(c) for c in candidates), dtype=np.int16)
     interval2 = np.abs(cand_m - next_b_m) % 12
     dir_a = cand_m - prev_a_m
     dir_b = next_b_m - prev_b_m
 
-    mask = (interval2 == interval1) & (((dir_a > 0) & (dir_b > 0)) | ((dir_a < 0) & (dir_b < 0)))
+    mask = (interval2 == interval1) & (
+        ((dir_a > 0) & (dir_b > 0)) | ((dir_a < 0) & (dir_b < 0))
+    )
+    # ``mask`` marks candidates that continue parallel motion at a fifth or
+    # octave with the bass, which classical voice leading treats as poor style.
     return mask
