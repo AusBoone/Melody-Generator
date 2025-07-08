@@ -524,3 +524,48 @@ def test_celery_failure_falls_back_to_sync(monkeypatch):
     assert resp.status_code == 200
     assert called.get("delay")
     assert called_sync.get("called")
+
+
+def test_random_rhythm_length_matches_notes(monkeypatch):
+    """Random rhythm option should produce a pattern equal to the note count."""
+
+    captured = {}
+
+    # Stub heavy generation functions to keep the test fast and predictable.
+    monkeypatch.setattr(web_gui, "generate_melody", lambda *a, **k: ["C4"] * 4)
+
+    def fake_pattern(n):
+        captured["length"] = n
+        return [0.25] * n
+
+    monkeypatch.setattr(web_gui, "generate_random_rhythm_pattern", fake_pattern)
+
+    def fake_create(mel, bpm, ts, path, *, pattern=None, **_kw):
+        captured["pattern"] = pattern
+        Path(path).write_text("midi")
+
+    monkeypatch.setattr(web_gui, "create_midi_file", fake_create)
+    monkeypatch.setattr(web_gui.playback, "render_midi_to_wav", lambda *a, **k: None)
+
+    web_gui._generate_preview(
+        key="C",
+        bpm=120,
+        timesig=(4, 4),
+        notes=4,
+        motif_length=2,
+        base_octave=4,
+        instrument="Piano",
+        harmony=False,
+        random_rhythm=True,
+        counterpoint=False,
+        harmony_lines=0,
+        include_chords=False,
+        chords_same=False,
+        enable_ml=False,
+        style=None,
+        chords=["C"],
+        humanize=False,
+    )
+
+    assert captured.get("length") == 4
+    assert captured.get("pattern") == [0.25] * 4

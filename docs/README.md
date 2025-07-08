@@ -18,3 +18,12 @@ additional background on how the system works or how to configure audio playback
 
 Each document is self-contained so you can jump directly to the topic that
 interests you.
+
+### Web Interface
+
+Launch the Flask application with `python -m melody_generator.web_gui` and open
+`http://localhost:5000` in your browser. The form mirrors the desktop GUI so you
+can choose a key, tempo and chord progression. Selecting **Random Rhythm** now
+generates the pattern using the full note count. Internally the server calls
+`generate_random_rhythm_pattern(notes)` so the rhythm list length matches the
+melody.

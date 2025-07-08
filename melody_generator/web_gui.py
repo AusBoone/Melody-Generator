@@ -37,6 +37,11 @@ infrastructure.
 # This update also detects Celery broker connection failures. When a
 # ``delay`` call cannot reach the broker the exception is logged and the
 # preview is generated synchronously so the request still succeeds.
+#
+# Rhythm generation now honors the requested number of notes. When the
+# "Random Rhythm" option is enabled the backend invokes
+# ``generate_random_rhythm_pattern`` with ``notes`` so the durations list
+# matches the melody length.
 
 from __future__ import annotations
 
@@ -133,7 +138,12 @@ def _generate_preview(
     chords: List[str],
     humanize: bool,
 ) -> tuple[str, str]:
-    """Return ``(audio_b64, midi_b64)`` for the requested melody."""
+    """Render a short preview of the requested melody to audio and MIDI.
+
+    The ``random_rhythm`` option now calls ``generate_random_rhythm_pattern``
+    with ``notes`` so the resulting duration list matches the melody length.
+    Returns a base64 encoded WAV preview and MIDI file.
+    """
 
     seq_model = None
     if enable_ml:
@@ -152,7 +162,9 @@ def _generate_preview(
         sequence_model=seq_model,
         style=style or None,
     )
-    rhythm = generate_random_rhythm_pattern() if random_rhythm else None
+    # When random rhythmic patterns are requested, generate a list of durations
+    # equal in length to ``notes`` so each pitch receives a corresponding value.
+    rhythm = generate_random_rhythm_pattern(notes) if random_rhythm else None
     extra: List[List[str]] = []
     for _ in range(max(0, harmony_lines)):
         extra.append(generate_harmony_line(melody))
