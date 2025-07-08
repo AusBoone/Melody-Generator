@@ -91,3 +91,21 @@ def test_generate_invalid_octave_high():
         gen.generate("C", 4, ["C"], base_octaves={"alto": MAX_OCTAVE + 1})
 
 
+def test_enforce_voice_leading_corrects_crossing_and_spacing():
+    """Lower voices should never rise above higher ones after adjustment."""
+
+    gen = PolyphonicGenerator()
+    voices = {
+        "soprano": ["C4"],
+        "alto": ["E4"],
+        "tenor": ["C3"],
+        "bass": ["C2"],
+    }
+    gen._enforce_voice_leading(voices)
+
+    mids = [note_to_midi(voices[v][0]) for v in gen.voices]
+    assert mids == sorted(mids, reverse=True)
+    assert voices["soprano"][0] == "C5"
+    assert voices["tenor"][0] == "C4"
+
+
