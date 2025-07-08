@@ -79,10 +79,33 @@ def augment_sequences(
 ) -> List[List[int]]:
     """Return augmented copies of ``sequences``.
 
-    Each input sequence is transposed by every value in ``transpose_range``.
-    When ``invert`` is ``True`` the inverted form is added as well using the
-    first pitch as the pivot.
+    Each sequence is duplicated for every value in ``transpose_range``. When
+    ``invert`` is ``True`` the inverted form is appended alongside each
+    transposition using the sequence's first note as the pivot.
+
+    Parameters
+    ----------
+    sequences:
+        Iterable of pitch sequences to augment. Must not be empty.
+    transpose_range:
+        Collection of semitone offsets applied to each sequence. Defaults to
+        ``range(-2, 3)`` yielding five transpositions.
+    invert:
+        When ``True`` append an inverted version for each transposition.
+
+    Returns
+    -------
+    list[list[int]]
+        Augmented pitch sequences.
+
+    Raises
+    ------
+    ValueError
+        If ``sequences`` is empty.
     """
+    sequences = list(sequences)
+    if not sequences:
+        raise ValueError("sequences must not be empty")
 
     augmented: List[List[int]] = []
     for seq in sequences:
