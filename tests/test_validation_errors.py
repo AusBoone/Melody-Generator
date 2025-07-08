@@ -1,0 +1,92 @@
+"""Input validation tests for core melody generation helpers.
+
+This module checks that high-level APIs raise informative errors when called with
+invalid parameters. A lightweight ``mido`` stub avoids external dependencies so
+only the validation logic is exercised.
+"""
+
+from __future__ import annotations
+
+import importlib
+import sys
+import types
+from pathlib import Path
+
+import pytest
+
+# Minimal 'mido' stub so the package imports without the real library.
+stub_mido = types.ModuleType("mido")
+
+class DummyMessage:
+    """Simple MIDI message representation used during tests."""
+
+    def __init__(self, _type: str, **kw) -> None:
+        self.type = _type
+        self.time = kw.get("time", 0)
+        self.note = kw.get("note")
+        self.velocity = kw.get("velocity")
+        self.program = kw.get("program")
+
+
+class DummyMidiFile:
+    """Collects MIDI tracks written by the functions under test."""
+
+    def __init__(self, *args, **kwargs) -> None:
+        self.tracks = []
+
+    def save(self, _path: str) -> None:  # pragma: no cover - no disk IO
+        pass
+
+
+class DummyMidiTrack(list):
+    """Container for MIDI events in lieu of ``mido.MidiTrack``."""
+
+
+stub_mido.Message = DummyMessage
+stub_mido.MidiFile = DummyMidiFile
+stub_mido.MidiTrack = DummyMidiTrack
+stub_mido.MetaMessage = lambda *args, **kwargs: DummyMessage("meta", **kwargs)
+stub_mido.bpm2tempo = lambda bpm: bpm
+sys.modules.setdefault("mido", stub_mido)
+
+# Stub 'tkinter' for modules that reference the GUI library.
+tk_stub = types.ModuleType("tkinter")
+tk_stub.filedialog = types.ModuleType("filedialog")
+tk_stub.messagebox = types.ModuleType("messagebox")
+tk_stub.ttk = types.ModuleType("ttk")
+sys.modules.setdefault("tkinter", tk_stub)
+sys.modules.setdefault("tkinter.filedialog", tk_stub.filedialog)
+sys.modules.setdefault("tkinter.messagebox", tk_stub.messagebox)
+sys.modules.setdefault("tkinter.ttk", tk_stub.ttk)
+
+# Import the package after installing stubs so initialization succeeds.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+mg = importlib.import_module("melody_generator")
+create_midi_file = mg.create_midi_file
+MIN_OCTAVE = mg.MIN_OCTAVE
+MAX_OCTAVE = mg.MAX_OCTAVE
+PolyphonicGenerator = importlib.import_module("melody_generator.polyphony").PolyphonicGenerator
+
+
+def test_create_midi_file_empty_chord_progression(tmp_path) -> None:
+    """``create_midi_file`` should reject an empty ``chord_progression`` list."""
+
+    melody = ["C4"] * 4
+    out = tmp_path / "out.mid"
+    # A zero-length chord progression provides no harmonic context; the helper
+    # explicitly checks for this and raises ``ValueError`` so callers can fix
+    # their input before any MIDI is produced.
+    with pytest.raises(ValueError):
+        create_midi_file(melody, 120, (4, 4), str(out), chord_progression=[])
+
+
+def test_generate_base_octaves_out_of_range() -> None:
+    """``generate`` should validate octave overrides for each voice."""
+
+    gen = PolyphonicGenerator()
+    # Each invalid entry is checked independently; using an out-of-range octave
+    # for any voice should cause ``ValueError``.
+    with pytest.raises(ValueError):
+        gen.generate("C", 4, ["C"], base_octaves={"soprano": MIN_OCTAVE - 1})
+    with pytest.raises(ValueError):
+        gen.generate("C", 4, ["C"], base_octaves={"alto": MAX_OCTAVE + 1})
