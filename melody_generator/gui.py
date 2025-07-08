@@ -118,6 +118,7 @@ class MelodyGeneratorGUI:
 
         self.rhythm_pattern: Optional[List[float]] = None
         self.ml_var = tk.BooleanVar(value=False)
+        self.humanize_var = tk.BooleanVar(value=True)
         self.style_var = tk.StringVar(value="")
         self.styles = sorted(STYLE_VECTORS.keys())
 
@@ -452,42 +453,48 @@ class MelodyGeneratorGUI:
             variable=self.chords_same_var,
         ).grid(row=14, column=0, columnspan=2)
 
+        ttk.Checkbutton(
+            frame,
+            text="Humanize Performance",
+            variable=self.humanize_var,
+        ).grid(row=15, column=0, columnspan=2)
+
         # Randomize buttons
         ttk.Button(
             frame,
             text="Randomize Chords",
             command=self._randomize_chords,
-        ).grid(row=15, column=0, columnspan=2, pady=(5, 0))
+        ).grid(row=16, column=0, columnspan=2, pady=(5, 0))
         ttk.Button(
             frame,
             text="Randomize Rhythm",
             command=self._randomize_rhythm,
-        ).grid(row=16, column=0, columnspan=2, pady=(5, 0))
+        ).grid(row=17, column=0, columnspan=2, pady=(5, 0))
 
         ttk.Button(
             frame,
             text="Load Preferences",
             command=self._load_preferences,
-        ).grid(row=17, column=0, columnspan=2, pady=(5, 0))
+        ).grid(row=18, column=0, columnspan=2, pady=(5, 0))
 
         ttk.Button(
             frame,
             text="Preview Melody",
             command=self._preview_button_click,
-        ).grid(row=18, column=0, columnspan=2, pady=(5, 0))
+        ).grid(row=19, column=0, columnspan=2, pady=(5, 0))
         self.preview_notice = ttk.Label(
             frame,
             text="",
             foreground="yellow",
         )
-        self.preview_notice.grid(row=18, column=2, sticky="w")
+        self.preview_notice.grid(row=19, column=2, sticky="w")
 
         # Generate button
         ttk.Button(
             frame,
             text="Generate Melody",
             command=self._generate_button_click,
-        ).grid(row=19, column=0, columnspan=2, pady=10)
+        ).grid(row=20, column=0, columnspan=2, pady=10)
 
         self.theme_var = tk.BooleanVar(value=self.dark_mode)
         ttk.Checkbutton(
@@ -495,7 +502,7 @@ class MelodyGeneratorGUI:
             text="Toggle Dark Mode",
             command=self._toggle_theme,
             variable=self.theme_var,
-        ).grid(row=20, column=0, columnspan=2, pady=(5, 0))
+        ).grid(row=21, column=0, columnspan=2, pady=(5, 0))
 
         # Apply persisted settings if available
         if self.load_settings is not None:
@@ -606,6 +613,9 @@ class MelodyGeneratorGUI:
                 ),
                 chords_separate=not self.chords_same_var.get(),
                 program=INSTRUMENTS.get(self.instrument_var.get(), 0),
+                humanize=self.humanize_var.get()
+                if hasattr(self, "humanize_var")
+                else True,
             )
             messagebox.showinfo("Success", f"MIDI file saved to {output_file}")
             if self.save_settings is not None and messagebox.askyesno(
@@ -708,6 +718,9 @@ class MelodyGeneratorGUI:
             chord_progression=chords if self.include_chords_var.get() else None,
             chords_separate=not self.chords_same_var.get(),
             program=INSTRUMENTS.get(self.instrument_var.get(), 0),
+            humanize=self.humanize_var.get()
+            if hasattr(self, "humanize_var")
+            else True,
         )
         playback_succeeded = False
         try:
@@ -827,6 +840,7 @@ class MelodyGeneratorGUI:
             "chords_same": self.chords_same_var.get(),
             "instrument": self.instrument_var.get(),
             "soundfont": self.soundfont_var.get(),
+            "humanize": self.humanize_var.get(),
         }
 
     def _apply_settings(self, settings: Dict) -> None:
@@ -859,6 +873,8 @@ class MelodyGeneratorGUI:
             self.include_chords_var.set(settings["include_chords"])
         if "chords_same" in settings:
             self.chords_same_var.set(settings["chords_same"])
+        if "humanize" in settings:
+            self.humanize_var.set(settings["humanize"])
         if "instrument" in settings and settings["instrument"] in INSTRUMENTS:
             self.instrument_var.set(settings["instrument"])
         if "soundfont" in settings:

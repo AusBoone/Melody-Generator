@@ -131,6 +131,7 @@ def _generate_preview(
     enable_ml: bool,
     style: str | None,
     chords: List[str],
+    humanize: bool,
 ) -> tuple[str, str]:
     """Return ``(audio_b64, midi_b64)`` for the requested melody."""
 
@@ -176,6 +177,7 @@ def _generate_preview(
         chord_progression=chords if include_chords else None,
         chords_separate=not chords_same,
         program=INSTRUMENTS.get(instrument, 0),
+        humanize=humanize,
     )
 
     wav_tmp = NamedTemporaryFile(suffix=".wav", delete=False)
@@ -251,6 +253,7 @@ def index():
         harmony_lines = int(request.form.get('harmony_lines') or 0)
         include_chords = bool(request.form.get('include_chords'))
         chords_same = bool(request.form.get('chords_same'))
+        humanize = bool(request.form.get('humanize', '1'))
         enable_ml = bool(request.form.get('enable_ml'))
         style = request.form.get('style') or None
 
@@ -316,6 +319,7 @@ def index():
             harmony_lines=harmony_lines,
             include_chords=include_chords,
             chords_same=chords_same,
+            humanize=humanize,
             enable_ml=enable_ml,
             style=style,
             chords=chords,

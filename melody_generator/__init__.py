@@ -119,6 +119,8 @@ __version__ = "0.1.0"
 #   ``numpy.random.choice`` when available for faster vector operations.
 # * Candidate note pools are created lazily on first use rather than
 #   preloading every combination at import time.
+# * ``create_midi_file`` accepts a ``humanize`` flag so unit tests can
+#   disable timing jitter for deterministic output.
 # ---------------------------------------------------------------
 
 import mido
@@ -1484,6 +1486,7 @@ def create_midi_file(
     chord_progression: Optional[List[str]] = None,
     chords_separate: bool = True,
     program: int = 0,
+    humanize: bool = True,
 ) -> None:
     """Create a MIDI file for the given melody and optional chord progression.
 
@@ -1506,6 +1509,7 @@ def create_midi_file(
     @param chord_progression (List[str]|None): Chords rendered as blocks.
     @param chords_separate (bool): Write chords to a new track when ``True``.
     @param program (int): General MIDI instrument program for the melody.
+    @param humanize (bool): Randomly adjust note timing and velocity when ``True``.
     @returns None: MIDI data is written to ``output_file``.
     """
     # ``chord_progression`` must contain at least one chord when provided.
@@ -1704,9 +1708,12 @@ def create_midi_file(
                 track.append(msg)
                 last = tick
 
-    # Apply humanization to the primary melody track only so tests relying on
-    # exact chord timings remain deterministic.
-    humanize_events(mid.tracks[0])
+    # Apply humanization only when requested so callers can produce fully
+    # quantized output for deterministic unit tests or strict sequencing.
+    if humanize:
+        # Operate on the primary melody track; chord tracks remain untouched so
+        # their timing stays predictable when tests assert exact values.
+        humanize_events(mid.tracks[0])
 
     # Write all tracks to disk
     mid.save(output_file)
@@ -1825,6 +1832,12 @@ def run_cli() -> None:
         type=int,
         default=0,
         help="MIDI program number for the melody instrument",
+    )
+    parser.add_argument(
+        "--no-humanize",
+        dest="humanize",
+        action="store_false",
+        help="Disable timing and velocity randomization",
     )
     parser.add_argument(
         "--enable-ml",
@@ -1959,6 +1972,7 @@ def run_cli() -> None:
         chord_progression=chord_progression if args.include_chords else None,
         chords_separate=not args.chords_same_track,
         program=args.instrument,
+        humanize=args.humanize,
     )
     if args.play:
         try:
