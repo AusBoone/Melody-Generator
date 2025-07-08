@@ -623,8 +623,12 @@ def _candidate_pool(key: str, chord: str, root_octave: int, *, strong: bool) -> 
     """
 
     cache_key = (key, chord, strong, root_octave)
+    # ``_CANDIDATE_CACHE`` is keyed by ``cache_key`` so the expensive note list
+    # is computed only once for each harmonic context.
     if cache_key not in _CANDIDATE_CACHE:
         notes = get_chord_notes(chord) if strong else scale_for_chord(key, chord)
+        # Build notes across two adjacent octaves so the melodic search space
+        # stays small while still allowing modest leaps.
         _CANDIDATE_CACHE[cache_key] = [
             f"{n}{oct}"
             for n in notes
@@ -904,11 +908,14 @@ def generate_melody(
     if structure is not None:
         if not structure.isalpha():
             raise ValueError("structure must only contain letters A-Z")
+        # Divide the requested length among the labelled sections. Any
+        # remainder is distributed one note at a time from the start so the
+        # phrase covers ``num_notes`` exactly.
         seg_len = num_notes // len(structure)
         remainder = num_notes % len(structure)
 
         def _mutate(n: str) -> str:
-            """Return ``n`` shifted by a scale step with small probability."""
+            """Return ``n`` shifted by one scale step about a third of the time."""
 
             if random.random() < 0.3:
                 name, octv = n[:-1], int(n[-1])
@@ -921,6 +928,8 @@ def generate_melody(
         sections: dict[str, List[str]] = {}
         final: List[str] = []
         for i, label in enumerate(structure):
+            # ``length`` for this segment equals the base size plus one if any
+            # leftover notes remain to be distributed.
             length = seg_len + (1 if i < remainder else 0)
             if label not in sections:
                 seg = generate_melody(
@@ -951,6 +960,7 @@ def generate_melody(
     for j in range(1, motif_length):
         prev = melody[j - 1]
         curr = melody[j]
+        # Ensure the opening motif ascends to establish a clear direction.
         if note_to_midi(curr) <= note_to_midi(prev):
             name, octave = prev[:-1], int(prev[-1])
             idx = indices_in_key[name]
@@ -963,7 +973,8 @@ def generate_melody(
             octave = max(allowed_min, min(allowed_max, octave))
             melody[j] = notes_in_key[idx] + str(octave)
 
-    # Align motif notes with the underlying harmony on strong beats
+    # Align motif notes with the underlying harmony on strong beats so the
+    # phrase begins solidly over the chord changes.
     for j in range(motif_length):
         strong = abs(start_beat - round(start_beat)) < 1e-6
         chord = chord_progression[j % len(chord_progression)]
@@ -1004,6 +1015,8 @@ def generate_melody(
         # scale degree in the current direction so the line gradually moves
         # upward then downward.
         if i % motif_length == 0:
+            # Reintroduce the motif but possibly shifted in octave to keep the
+            # phrase from sounding monotonous.
             # Occasionally shift the register by an octave to add variety
             diff = 0
             if random.random() < 0.1:
@@ -1067,15 +1080,23 @@ def generate_melody(
 
         prev_midi = note_to_midi(prev_note)
         if np is not None and source_pool:
+            # Vectorised search for notes within one semitone of the smallest
+            # possible leap from ``prev_note``. ``intervals_all`` holds the
+            # absolute difference to every note in ``source_pool`` so the
+            # minimal interval can be found in one pass.
             pool_midis = np.fromiter((note_to_midi(n) for n in source_pool), dtype=np.int16)
             intervals_all = np.abs(pool_midis - prev_midi)
             min_interval = float(intervals_all.min())
             mask = intervals_all <= (min_interval + 1)
             cand_midis = pool_midis[mask]
-            # ``mask`` is applied to both the MIDI values and the original note
-            # strings via vectorised indexing so no Python loop is required.
+            # ``mask`` filters both MIDI values and strings via vectorised
+            # indexing, avoiding an explicit Python loop.
             candidates = np.asarray(source_pool, dtype=object)[mask].tolist()
         else:
+            # ``numpy`` is unavailable so compute the nearest interval using a
+            # standard loop. Two passes are used: first to find the minimum
+            # distance, then to collect all notes within one semitone of that
+            # minimum.
             for candidate_note in source_pool:
                 interval = get_interval(prev_note, candidate_note)
                 if min_interval is None or interval < min_interval:
@@ -1088,7 +1109,8 @@ def generate_melody(
                         candidates.append(candidate_note)
             cand_midis = [note_to_midi(c) for c in candidates]
 
-        # Fallback: If no candidates are found, choose a random note from the key.
+        # Fallback: if filtering removes every candidate, pick a random note
+        # from the same chord pool so the melody always progresses.
         if not candidates:
             logging.warning(
                 f"No candidate found for chord {chord} with previous note {prev_note}. Using fallback."
@@ -1111,7 +1133,8 @@ def generate_melody(
                 mask = np.abs(cand_midis - prev_midi) != 6
                 if mask.any():
                     cand_midis = cand_midis[mask]
-                    # Filter notes using the boolean mask with vectorised indexing.
+                    # Filter notes using the boolean mask with vectorised indexing
+                    # so rejected notes never influence subsequent weighting.
                     candidates = np.asarray(candidates, dtype=object)[mask].tolist()
             else:
                 filtered = [
@@ -1123,8 +1146,9 @@ def generate_melody(
                     candidates = filtered
                 cand_midis = [note_to_midi(c) for c in candidates]
 
-        # If the previous interval was a leap, favour notes that move back
-        # toward the origin by a small step.
+        # If the previous interval was a leap, favour notes that reverse
+        # direction by a small step. Resetting ``leap_dir`` after applying the
+        # filter ensures only one compensating note is enforced.
         if leap_dir is not None and candidates:
             if np is not None:
                 diff = cand_midis - prev_midi
@@ -1147,7 +1171,10 @@ def generate_melody(
                 cand_midis = [note_to_midi(c) for c in candidates]
             leap_dir = None
 
-        # Bias overall motion toward the current direction when possible.
+        # Bias overall motion toward ``direction`` so the long-term contour
+        # continues rising or falling. When no note matches the desired
+        # direction during the descent, choose the lowest candidate to emphasise
+        # closure.
         if candidates:
             if np is not None:
                 diff = cand_midis - prev_midi
@@ -1180,12 +1207,21 @@ def generate_melody(
             cand_midis = [note_to_midi(c) for c in candidates]
             intervals = [abs(m - prev_midi_val) for m in cand_midis]
             chord_mask = [c[:-1] in chord_notes for c in candidates] if strong else [False] * len(candidates)
-        weights = compute_base_weights(intervals, chord_mask, prev_interval_size if prev_interval_size is not None else -1)
+        # ``compute_base_weights`` encodes interval preferences as a rudimentary
+        # Markov process. Passing in the previous interval reduces the weight of
+        # repeating large leaps so phrases remain singable.
+        weights = compute_base_weights(
+            intervals,
+            chord_mask,
+            prev_interval_size if prev_interval_size is not None else -1,
+        )
 
         if sequence_model is not None:
             # Query the sequence model for logit scores of the next scale degree
             # and add them to the heuristic weights. This allows learned
             # statistics to bias the otherwise rule-based process.
+            # Build a short history of scale degrees for the model. Only the
+            # four most recent notes are used so predictions remain local.
             hist = [indices_in_key[n[:-1]] for n in melody[max(0, i - 4) : i]]
             if hist:
                 logits = sequence_model.predict_logits(hist)
@@ -1201,8 +1237,9 @@ def generate_melody(
                         weights[idx] += float(logits[deg])
 
         if style_vec is not None:
-            # Add style embedding values to each candidate weight. Vectorized
-            # indexing is used when ``numpy`` is available.
+            # Add style embedding values to each candidate weight so different
+            # genres emphasise characteristic scale degrees. Vectorised indexing
+            # is used when ``numpy`` is available.
             idxs = [indices_in_key[c[:-1]] % len(style_vec) for c in candidates]
             if np is not None:
                 weights = np.asarray(weights, dtype=float)
@@ -1212,13 +1249,24 @@ def generate_melody(
 
         # Penalize parallel fifths and octaves with the chord roots to maintain
         # smoother voice leading against the underlying harmony.
-        prev_root = get_chord_notes(chord_progression[(i - 1) % len(chord_progression)])[0] + str(base_octave)
+        # Evaluate counterpoint against the bass line by comparing the previous
+        # and current chord roots. We only need the root note of each chord to
+        # detect parallel motion.
+        prev_root = (
+            get_chord_notes(chord_progression[(i - 1) % len(chord_progression)])[0]
+            + str(base_octave)
+        )
         curr_root = get_chord_notes(chord)[0] + str(base_octave)
         if np is not None:
+            # ``parallel_fifths_mask`` returns True for candidates forming
+            # parallel motion with the bass. Halve their weights so they are
+            # unlikely but still possible when no alternatives exist.
             mask = parallel_fifths_mask(prev_note, prev_root, candidates, curr_root)
             if np.any(mask):
                 weights = np.asarray(weights, dtype=float)
                 weights[mask] *= 0.5
+            # ``counterpoint_penalties`` gently discourages consecutive leaps in
+            # the same direction or repeated perfect intervals.
             penalties = counterpoint_penalties(
                 prev_note,
                 candidates,
@@ -1250,6 +1298,8 @@ def generate_melody(
             weights = weights.astype(float)
             weights = weights.tolist()
         else:
+            # Pure-Python implementation behaves the same but operates on lists
+            # to avoid a mandatory numpy dependency.
             weights = apply_tension_weights(weights, tensions, target_tension)
 
         next_note = pick_note(candidates, weights)
@@ -1298,7 +1348,11 @@ def generate_melody(
             base_octave,
         )
 
+    # Always clamp the final melody when refinement is active so octave shifts
+    # never push notes outside the planned range.
     if refine:
+        # After refinement clamp notes to the planned pitch range so the
+        # sequence never wanders outside the intended register.
         low, high = phrase_plan.pitch_range
         for idx, n in enumerate(melody):
             octv = int(n[-1])
@@ -1375,9 +1429,9 @@ def generate_counterpoint_melody(melody: List[str], key: str) -> List[str]:
         choice = random.choice(candidates)
         if prev_note and prev_base:
             # Compare the motion of the melody and the tentative counterpoint
-            # note.  When both move in the same direction we look for an
-            # alternative that moves the opposite way to emphasise contrary
-            # motion.
+            # note. When both move in the same direction we search for an
+            # alternative moving opposite to highlight contrary motion, a
+            # hallmark of species counterpoint.
             base_int = note_to_midi(base_note) - note_to_midi(prev_base)
             cand_int = note_to_midi(choice) - note_to_midi(prev_note)
             if base_int * cand_int > 0:
