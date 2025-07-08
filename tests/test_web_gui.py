@@ -203,6 +203,83 @@ def test_invalid_instrument_flash():
     assert b"Unknown instrument" in resp.data
 
 
+def test_non_positive_bpm_flash():
+    """Zero or negative tempo should trigger a validation message."""
+
+    client = app.test_client()
+    resp = client.post(
+        "/",
+        data={
+            "key": "C",
+            "chords": "C",
+            "bpm": "0",
+            "timesig": "4/4",
+            "notes": "8",
+            "motif_length": "4",
+            "base_octave": "4",
+        },
+    )
+    assert b"BPM must be greater than 0" in resp.data
+
+
+def test_non_positive_notes_flash():
+    """A note count of zero should be rejected with a flash message."""
+
+    client = app.test_client()
+    resp = client.post(
+        "/",
+        data={
+            "key": "C",
+            "chords": "C",
+            "bpm": "120",
+            "timesig": "4/4",
+            "notes": "0",
+            "motif_length": "4",
+            "base_octave": "4",
+        },
+    )
+    assert b"Number of notes must be greater than 0" in resp.data
+
+
+def test_non_positive_motif_length_flash():
+    """Motif length should be validated as a positive integer."""
+
+    client = app.test_client()
+    resp = client.post(
+        "/",
+        data={
+            "key": "C",
+            "chords": "C",
+            "bpm": "120",
+            "timesig": "4/4",
+            "notes": "8",
+            "motif_length": "0",
+            "base_octave": "4",
+        },
+    )
+    assert b"Motif length must be greater than 0" in resp.data
+
+
+def test_non_positive_harmony_lines_flash():
+    """Requesting zero harmony lines should raise a validation error."""
+
+    client = app.test_client()
+    resp = client.post(
+        "/",
+        data={
+            "key": "C",
+            "chords": "C",
+            "bpm": "120",
+            "timesig": "4/4",
+            "notes": "8",
+            "motif_length": "4",
+            "base_octave": "4",
+            "harmony_lines": "0",
+        },
+    )
+    assert b"Harmony lines must be greater than 0" in resp.data
+
+
 def test_include_chords_flag():
     """Setting the ``include_chords`` checkbox should be accepted."""
     client = app.test_client()
@@ -245,6 +322,7 @@ def test_successful_post_returns_audio(monkeypatch):
             "notes": "1",
             "motif_length": "1",
             "base_octave": "4",
+            "harmony_lines": "1",
         },
     )
     assert b"audio/wav" in resp.data
@@ -300,6 +378,7 @@ def test_playback_failure_flash(monkeypatch):
             "notes": "1",
             "motif_length": "1",
             "base_octave": "4",
+            "harmony_lines": "1",
         },
     )
 
@@ -383,6 +462,7 @@ def test_generation_dispatched_to_celery(monkeypatch):
             "notes": "1",
             "motif_length": "1",
             "base_octave": "4",
+            "harmony_lines": "1",
         },
     )
 
@@ -442,6 +522,7 @@ def test_delay_arguments_match_preview_parameters(monkeypatch):
             "notes": "1",
             "motif_length": "1",
             "base_octave": "4",
+            "harmony_lines": "1",
         },
     )
 
@@ -456,7 +537,7 @@ def test_delay_arguments_match_preview_parameters(monkeypatch):
         "harmony": False,
         "random_rhythm": False,
         "counterpoint": False,
-        "harmony_lines": 0,
+        "harmony_lines": 1,
         "include_chords": False,
         "chords_same": False,
         # The web GUI forwards the humanize option to ``create_midi_file``.
