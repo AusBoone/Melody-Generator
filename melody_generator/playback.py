@@ -17,6 +17,13 @@ CLI helpers to locate the same instrument bank without additional
 configuration.
 """
 
+# Revision note
+# -------------
+# ``_resolve_soundfont`` was extended to check standard SoundFont locations on
+# Windows and macOS before falling back to the previous Linux path. This ensures
+# playback works out-of-the-box on those systems when the default files are
+# present.
+
 from __future__ import annotations
 
 import os
@@ -37,16 +44,52 @@ class MidiPlaybackError(RuntimeError):
 
 
 def _resolve_soundfont(sf: Optional[str]) -> str:
-    """Return the path to the soundfont to use for synthesis."""
+    """Return the path to the soundfont to use for synthesis.
 
-    candidate = sf or os.environ.get("SOUND_FONT") or "/usr/share/sounds/sf2/TimGM6mb.sf2"
-    # Expand ``~`` and environment variables so user-supplied paths work
-    # regardless of how they are specified.
+    Parameters
+    ----------
+    sf:
+        Optional path supplied directly by the caller. When ``None`` the
+        ``SOUND_FONT`` environment variable is consulted followed by
+        platform-specific defaults.
+
+    Returns
+    -------
+    str
+        Absolute path to an existing SoundFont or DLS file.
+
+    Raises
+    ------
+    MidiPlaybackError
+        If no valid file can be located.
+    """
+
+    # Prefer the explicit argument first then the environment variable. If
+    # neither are provided choose a sensible default based on the current
+    # operating system.
+    if sf:
+        candidate = sf
+    else:
+        candidate = os.environ.get("SOUND_FONT")
+        if not candidate:
+            if sys.platform.startswith("win"):
+                candidate = r"C:\\Windows\\System32\\drivers\\gm.dls"
+            elif sys.platform == "darwin":
+                candidate = "/Library/Audio/Sounds/Banks/FluidR3_GM.sf2"
+            else:
+                candidate = "/usr/share/sounds/sf2/TimGM6mb.sf2"
+
+    # Expand user home and environment variables to support ``~`` and
+    # variables inside the provided path.
     candidate = os.path.expanduser(os.path.expandvars(candidate))
+
+    # Bail out early with a clear error if the file is absent so callers know
+    # precisely why playback failed.
     if not os.path.isfile(candidate):
         raise MidiPlaybackError(
             "SoundFont not found. Provide path via argument or SOUND_FONT env var."
         )
+
     return candidate
 
 
