@@ -603,12 +603,17 @@ def test_celery_failure_falls_back_to_sync(monkeypatch):
             "notes": "1",
             "motif_length": "1",
             "base_octave": "4",
+            "harmony_lines": "1",
         },
     )
 
     assert resp.status_code == 200
     assert called.get("delay")
     assert called_sync.get("called")
+    # The user should be notified that asynchronous dispatch failed so
+    # the preview was generated synchronously instead of silently falling
+    # back.
+    assert b"background worker" in resp.data
 
 
 def test_random_rhythm_length_matches_notes(monkeypatch):

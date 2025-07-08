@@ -35,8 +35,8 @@ infrastructure.
 # parameters as the synchronous path.
 #
 # This update also detects Celery broker connection failures. When a
-# ``delay`` call cannot reach the broker the exception is logged and the
-# preview is generated synchronously so the request still succeeds.
+# ``delay`` call cannot reach the broker a flash message informs the user
+# and the preview is generated synchronously so the request still succeeds.
 #
 # Rhythm generation now honors the requested number of notes. When the
 # "Random Rhythm" option is enabled the backend invokes
@@ -386,14 +386,15 @@ def index():
         try:
             if celery_app is not None:
                 try:
-                    # ``delay`` passes the parameters to the Celery worker using
-                    # keyword arguments so the task receives the same structure as
-                    # the direct function call. Connection failures fall back to
-                    # synchronous generation so the request still completes.
-                    result = generate_preview_task.delay(**params).get()
+                    # ``delay`` may raise immediately if the broker cannot be
+                    # reached.  Wrapping the call ensures we handle that case
+                    # and still generate the preview in-process so the user sees
+                    # a result instead of an error page.
+                    async_result = generate_preview_task.delay(**params)
+                    result = async_result.get()
                 except Exception:  # pragma: no cover - triggered via tests
-                    logger.exception(
-                        "Celery broker unavailable; running preview synchronously"
+                    flash(
+                        "Could not connect to the background worker; generating preview synchronously."
                     )
                     result = _generate_preview(**params)
             else:
