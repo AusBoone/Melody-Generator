@@ -459,6 +459,9 @@ def test_delay_arguments_match_preview_parameters(monkeypatch):
         "harmony_lines": 0,
         "include_chords": False,
         "chords_same": False,
+        # The web GUI forwards the humanize option to ``create_midi_file``.
+        # When the checkbox is unchecked the default ``False`` should be sent.
+        "humanize": False,
         "enable_ml": False,
         "style": None,
         "chords": ["C"],

@@ -30,6 +30,7 @@ dependencies = [
     "mido==1.2.10",
     "Flask",
     "pyfluidsynth",
+    "numpy<2",
 ]
 
 [project.urls]
