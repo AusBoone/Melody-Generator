@@ -2,6 +2,7 @@ import importlib
 import sys
 import types
 from pathlib import Path
+import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -80,3 +81,16 @@ def test_generate_batch_uses_process_pool(monkeypatch):
 
     assert calls["workers"] == 2
     assert res == [["C", "C"], ["D", "D"]]
+
+
+def test_generate_batch_negative_workers(monkeypatch):
+    """Negative worker counts should raise ``ValueError``."""
+
+    batch = importlib.import_module("melody_generator.batch_generation")
+
+    # ``generate_melody`` is a lightweight stub so the test focuses solely on
+    # argument validation inside ``generate_batch``.
+    monkeypatch.setattr(batch, "generate_melody", lambda **kw: [])
+
+    with pytest.raises(ValueError):
+        batch.generate_batch([], workers=-1)

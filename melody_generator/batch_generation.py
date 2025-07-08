@@ -41,7 +41,9 @@ def generate_batch(
         Iterable of argument dictionaries accepted by :func:`generate_melody`.
     workers:
         Optional number of worker processes. When ``None`` the CPU count is
-        used. ``1`` disables multiprocessing and runs serially.
+        used. ``1`` disables multiprocessing and runs serially. ``ValueError``
+        is raised when a negative value is supplied so callers receive
+        immediate feedback about invalid input.
 
     Returns
     -------
@@ -50,6 +52,10 @@ def generate_batch(
     """
 
     cfg_list = list(configs)
+    if workers is not None and workers < 0:
+        # Negative worker counts are nonsensical. Reject them early so callers
+        # do not mistakenly spawn an empty process pool.
+        raise ValueError("workers must be non-negative")
     if workers is None:
         workers = os.cpu_count() or 1
     if workers <= 1:

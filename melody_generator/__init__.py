@@ -741,15 +741,22 @@ def pick_note(candidates: List[str], weights: Sequence[float]) -> str:
 def generate_motif(length: int, key: str, base_octave: int = 4) -> List[str]:
     """Generate a motif (short, recurring musical idea) in the specified key.
 
-    @param length (int): Number of notes in the motif.
+    @param length (int): Number of notes in the motif. Must be positive or a
+        ``ValueError`` is raised.
     @param key (str): Musical key for the motif. A ``ValueError`` is raised if
         ``key`` is not present in :data:`SCALE` so callers receive a clear error
         instead of ``KeyError``.
-    @param base_octave (int): Starting octave, usually ``4``.
+    @param base_octave (int): Starting octave, usually ``4``. The value must be
+        within ``MIN_OCTAVE`` and ``MAX_OCTAVE`` otherwise a ``ValueError`` is
+        raised so generated notes always map to valid MIDI numbers.
     @returns List[str]: List of note names forming the motif.
     """
     if key not in SCALE:
         raise ValueError(f"Unknown key '{key}'")
+    if length <= 0:
+        raise ValueError("length must be positive")
+    if not MIN_OCTAVE <= base_octave <= MAX_OCTAVE:
+        raise ValueError(f"base_octave must be between {MIN_OCTAVE} and {MAX_OCTAVE}")
     notes_in_key = SCALE[key]
     # Choose random notes within the key and place them in the requested octave range
     return [

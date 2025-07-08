@@ -427,6 +427,22 @@ def test_generate_motif_invalid_key():
         melody_generator.generate_motif(4, "H")
 
 
+def test_generate_motif_invalid_length():
+    """Zero or negative motif lengths should raise ``ValueError``."""
+
+    with pytest.raises(ValueError):
+        melody_generator.generate_motif(0, "C")
+
+
+def test_generate_motif_invalid_octave():
+    """Out-of-range ``base_octave`` values should raise ``ValueError``."""
+
+    with pytest.raises(ValueError):
+        melody_generator.generate_motif(4, "C", base_octave=MIN_OCTAVE - 1)
+    with pytest.raises(ValueError):
+        melody_generator.generate_motif(4, "C", base_octave=MAX_OCTAVE + 1)
+
+
 def test_generate_melody_invalid_key():
     """``generate_melody`` should validate the ``key`` argument."""
 
