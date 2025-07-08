@@ -1,4 +1,23 @@
-"""Performance helpers and optional profiling utilities."""
+"""Performance helpers and optional profiling utilities.
+
+This file defines ``compute_base_weights`` which generates Markov-style
+transition weights for melody intervals and a :func:`profile` context manager
+for collecting ``cProfile`` statistics.  ``NumPy`` and ``Numba`` are detected
+at runtime so the algorithms can accelerate themselves transparently when
+available without adding hard dependencies.
+
+Example
+-------
+>>> compute_base_weights([2, 4], [True, False], 2)
+[1.7999999999999998, 0.48]
+
+Design Notes
+------------
+- The Numba ``jit`` function is optional; pure Python fallbacks are used when
+  the import fails so unit tests remain fast.
+- Transition and similarity lookup tables are stored as arrays for speed but
+  plain lists are substituted when ``numpy`` is missing.
+"""
 
 from __future__ import annotations
 
