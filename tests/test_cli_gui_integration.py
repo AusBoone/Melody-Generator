@@ -55,6 +55,8 @@ def load_module():
 
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+    if "melody_generator.midi_io" in sys.modules:
+        del sys.modules["melody_generator.midi_io"]
     if "melody_generator" in sys.modules:
         del sys.modules["melody_generator"]
     module = importlib.import_module("melody_generator")
