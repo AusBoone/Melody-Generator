@@ -650,9 +650,17 @@ def generate_random_rhythm_pattern(length: int = 3) -> List[float]:
     small variation may be applied after the first full repetition by replacing
     one value with an eighth note (``0.125``).
 
-    @param length (int): Number of durations to produce.
+    ``ValueError`` is raised when ``length`` is ``0`` or negative so callers
+    cannot request an empty pattern.
+
+    @param length (int): Number of durations to produce. Must be positive.
     @returns List[float]: Pattern of note lengths in fractions of a whole note.
     """
+
+    if length <= 0:
+        # Guard against nonsensical or empty requests. The rhythm engine relies
+        # on a positive number of durations to schedule MIDI events.
+        raise ValueError("length must be positive")
 
     allowed = [0.25, 0.5, 0.75, 0.125, 0.0625, 0]
     motifs = [

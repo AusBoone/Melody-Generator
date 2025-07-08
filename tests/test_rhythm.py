@@ -4,6 +4,7 @@ import importlib
 import sys
 import types
 from pathlib import Path
+import pytest
 
 # Stub out optional dependencies so ``melody_generator`` imports cleanly.
 stub_mido = types.ModuleType("mido")
@@ -35,3 +36,17 @@ def test_generate_random_rhythm_pattern_valid_lengths():
     allowed = {0.25, 0.5, 0.75, 0.125, 0.0625, 0}
     assert len(pattern) == length
     assert all(val in allowed for val in pattern)
+
+
+def test_generate_random_rhythm_pattern_zero_length():
+    """A ``length`` of ``0`` should raise ``ValueError``."""
+
+    with pytest.raises(ValueError):
+        melody_generator.generate_random_rhythm_pattern(0)
+
+
+def test_generate_random_rhythm_pattern_negative_length():
+    """Negative ``length`` values are invalid and should raise ``ValueError``."""
+
+    with pytest.raises(ValueError):
+        melody_generator.generate_random_rhythm_pattern(-5)
