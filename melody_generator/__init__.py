@@ -608,11 +608,18 @@ def scale_for_chord(key: str, chord: str) -> List[str]:
 def _candidate_pool(key: str, chord: str, root_octave: int, *, strong: bool) -> List[str]:
     """Return candidate notes for ``chord`` within ``key``.
 
-    Candidate pools are created on demand and cached for reuse.  The
-    ``strong`` flag determines whether only chord tones are included or the
-    full scale associated with ``chord``.  Subsequent calls with the same
-    parameters reuse the previously constructed list to avoid repeated
-    allocations.
+    Each pool is generated lazily and stored in ``_CANDIDATE_CACHE`` keyed by
+    ``(key, chord, strong, root_octave)``.  This memoization means the list of
+    possible notes for a given harmonic context only needs to be built once.
+
+    ``root_octave`` defines the lowest octave allowed for the pool.  Notes are
+    produced for ``root_octave`` and ``root_octave + 1`` which keeps the search
+    within two octaves.  Callers must pass values that fall within
+    ``MIN_OCTAVE`` and ``MAX_OCTAVE`` so all generated MIDI notes remain valid.
+
+    The ``strong`` flag controls whether only chord tones are included or the
+    full scale derived from ``chord``.  Reusing the cached list avoids repeated
+    allocations during melody generation.
     """
 
     cache_key = (key, chord, strong, root_octave)

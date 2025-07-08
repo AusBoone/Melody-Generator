@@ -199,7 +199,15 @@ def create_midi_file(
 
 
 def _open_default_player(path: str, *, delete_after: bool = False) -> None:
-    """Launch ``path`` asynchronously with the system default MIDI player."""
+    """Launch ``path`` asynchronously with the system default MIDI player.
+
+    ``open_default_player`` blocks until the external program exits, so this
+    helper spawns the call in a daemon thread to avoid freezing the caller's
+    UI.  The thread removes ``path`` after playback when ``delete_after`` is
+    ``True``.  Concurrent calls create separate threads, so they are thread
+    safe as long as distinct file paths are used.  Reusing the same temporary
+    file could result in one thread deleting it while another still needs it.
+    """
 
     from .playback import open_default_player
 
