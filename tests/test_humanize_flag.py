@@ -1,7 +1,6 @@
 import importlib
 import sys
 import types
-from pathlib import Path
 
 
 def _setup_module():

@@ -1745,7 +1745,9 @@ def run_cli() -> None:
     The ``--soundfont`` argument allows supplying a custom ``.sf2`` file
     used when previewing the result via ``--play``. ``--enable-ml`` loads
     a small LSTM so note weighting uses learned statistics. ``--style``
-    selects a predefined style embedding.
+    selects a predefined style embedding.  Pass ``--no-humanize`` to
+    disable timing adjustments so output remains fully quantized for
+    deterministic tests or sequencer import.
 
     @returns None: Exits via ``sys.exit`` on failure.
     """
