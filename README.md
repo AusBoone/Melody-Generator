@@ -20,6 +20,8 @@ musician's perspective
 - Cross-platform setup scripts now ship with executable permissions for one-step
   installation.
 - Dynamic velocity in the MIDI output for a more natural sound.
+- Optional performance humanization adds slight timing and velocity
+  variations. This can be disabled for fully quantized output.
 - Expanded rhythmic patterns including eighth- and sixteenth-note figures.
 - GUI button to reload saved preferences at any time.
 - GUI can preview the generated melody before saving.
@@ -111,11 +113,13 @@ melody-generator \
   --instrument 0 \
   --soundfont /path/to/font.sf2 \
   --output song.mid \
+  --no-humanize \
   --harmony --counterpoint --harmony-lines 1
 ```
 
 This command creates `song.mid` with one harmony line and an additional counterpoint track.
 The `--instrument` option selects the General MIDI program number used for the melody.
+Pass `--no-humanize` if you want deterministic timing so events align exactly on the beat.
 Use `--play` to automatically preview the file once it is written.
 
 ### GUI
@@ -128,6 +132,7 @@ melody-generator
 
 1. Choose a key, BPM, time signature and chord progression.
 2. Check the **Harmony** or **Counterpoint** boxes to add extra tracks.
+3. Leave **Humanize Performance** enabled for natural timing or untick it for strict quantization.
 3. Click **Preview Melody** to hear the result without saving.
 4. Click **Generate Melody** and select where to save the MIDI file.
 
@@ -142,11 +147,12 @@ python -m melody_generator.web_gui
 
 1. Open `http://localhost:5000` in your browser.
 2. Fill out the form just like the GUI version.
-3. Submit to preview and download the generated file.
-4. Set the `FLASK_SECRET` environment variable to a persistent secret. If it
+3. Keep **Humanize Performance** checked for more realism or uncheck for exact timing.
+4. Submit to preview and download the generated file.
+5. Set the `FLASK_SECRET` environment variable to a persistent secret. If it
    is not provided a random key is generated on startup and a warning is
    logged.
-5. Optionally set `FLASK_DEBUG=1` to enable Flask debug mode during
+6. Optionally set `FLASK_DEBUG=1` to enable Flask debug mode during
    development.
 
 

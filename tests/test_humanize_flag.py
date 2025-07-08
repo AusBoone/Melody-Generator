@@ -1,3 +1,10 @@
+"""Unit tests validating the new humanization toggle.
+
+The module stubs out the ``mido`` dependency so tests can run without
+writing actual MIDI files. It reloads ``melody_generator`` with these
+stubs and verifies that events are unchanged when ``humanize=False``.
+"""
+
 import importlib
 import sys
 import types
@@ -48,6 +55,10 @@ def _setup_module():
 
 def test_no_humanize_preserves_events(tmp_path, monkeypatch):
     """Events remain unaltered when ``humanize`` is ``False``."""
+    # The DummyFile tracks list will hold the messages written by
+    # ``create_midi_file``. By calling the function twice—once with
+    # ``humanize`` disabled and once enabled—we can compare the resulting
+    # timings to confirm jitter only applies when requested.
     mod, DummyFile = _setup_module()
 
     def fake_humanize(msgs):
