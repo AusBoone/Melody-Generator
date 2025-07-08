@@ -23,6 +23,9 @@ configuration.
 # Windows and macOS before falling back to the previous Linux path. This ensures
 # playback works out-of-the-box on those systems when the default files are
 # present.
+#
+# Error reporting for missing dependencies was updated to include installation
+# hints so users can more easily resolve playback issues.
 
 from __future__ import annotations
 
@@ -87,7 +90,8 @@ def _resolve_soundfont(sf: Optional[str]) -> str:
     # precisely why playback failed.
     if not os.path.isfile(candidate):
         raise MidiPlaybackError(
-            "SoundFont not found. Provide path via argument or SOUND_FONT env var."
+            "SoundFont not found. Provide a valid path via the argument or "
+            "SOUND_FONT environment variable, or install a General MIDI soundfont."
         )
 
     return candidate
@@ -108,16 +112,21 @@ def play_midi(path: str, soundfont: Optional[str] = None) -> None:
     ------
     MidiPlaybackError
         If PyFluidSynth is unavailable, ``fluidsynth`` is missing, or playback
-        fails.  When the underlying executable is absent a
-        ``MidiPlaybackError`` with the message ``"fluidsynth not installed"``
-        is raised.
+        fails. When the underlying executable is absent a
+        ``MidiPlaybackError`` with the message
+        ``"fluidsynth not installed. Install the FluidSynth library and
+        pyFluidSynth package."`` is raised.
     """
 
     try:
         import fluidsynth  # type: ignore
     except FileNotFoundError as exc:  # type: ignore[attr-defined]
-        # ``fluidsynth`` C library not found; provide a clear error message
-        raise MidiPlaybackError("fluidsynth not installed") from exc
+        # ``fluidsynth`` C library not found; provide a clear error message with
+        # guidance on how to install the dependency.
+        raise MidiPlaybackError(
+            "fluidsynth not installed. Install the FluidSynth library and "
+            "pyFluidSynth package."
+        ) from exc
     except Exception as exc:  # type: ignore
         # Any other import failure indicates PyFluidSynth itself is missing
         raise MidiPlaybackError("PyFluidSynth is required for playback") from exc
@@ -130,7 +139,10 @@ def play_midi(path: str, soundfont: Optional[str] = None) -> None:
         # Raised when the underlying ``fluidsynth`` binary or library is
         # missing entirely. This provides a clearer message than the raw
         # exception text from the dependency.
-        raise MidiPlaybackError("fluidsynth not installed") from exc
+        raise MidiPlaybackError(
+            "fluidsynth not installed. Install the FluidSynth library and "
+            "pyFluidSynth package."
+        ) from exc
     try:
         synth.start()
     except Exception as exc:
@@ -159,8 +171,9 @@ def render_midi_to_wav(
     ------
     MidiPlaybackError
         If ``fluidsynth`` is missing, the MIDI file does not exist or the
-        subprocess fails for any other reason. When the executable is absent
-        the error message will be ``"fluidsynth not installed"``.
+        subprocess fails for any other reason. When the executable is absent the
+        error message will be ``"fluidsynth not installed. Install the FluidSynth
+        library and pyFluidSynth package."``.
     """
 
     sf_path = _resolve_soundfont(soundfont)
@@ -187,7 +200,10 @@ def render_midi_to_wav(
         )
     except FileNotFoundError as exc:
         # ``fluidsynth`` executable not present in ``PATH``
-        raise MidiPlaybackError("fluidsynth not installed") from exc
+        raise MidiPlaybackError(
+            "fluidsynth not installed. Install the FluidSynth library and "
+            "pyFluidSynth package."
+        ) from exc
     except Exception as exc:
         raise MidiPlaybackError(f"Failed to render MIDI: {exc}") from exc
 

@@ -84,7 +84,10 @@ def test_resolve_soundfont_missing_file(monkeypatch):
     """
     monkeypatch.setenv("SOUND_FONT", "/non/existent/path.sf2")
 
-    with pytest.raises(MidiPlaybackError):
+    with pytest.raises(
+        MidiPlaybackError,
+        match="install a General MIDI soundfont",
+    ):
         _resolve_soundfont(None)
 
 
@@ -193,7 +196,10 @@ def test_render_midi_missing_fluidsynth(monkeypatch, tmp_path):
 
     monkeypatch.setattr(subprocess, "run", fake_run)
 
-    with pytest.raises(MidiPlaybackError, match="fluidsynth not installed"):
+    with pytest.raises(
+        MidiPlaybackError,
+        match="Install the FluidSynth library",
+    ):
         render_midi_to_wav(str(midi), str(wav))
 
 
@@ -211,5 +217,8 @@ def test_play_midi_missing_fluidsynth(monkeypatch, tmp_path):
 
     monkeypatch.setitem(sys.modules, "fluidsynth", types.SimpleNamespace(Synth=Dummy))
 
-    with pytest.raises(MidiPlaybackError, match="fluidsynth not installed"):
+    with pytest.raises(
+        MidiPlaybackError,
+        match="Install the FluidSynth library",
+    ):
         playback.play_midi(str(midi))
