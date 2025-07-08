@@ -91,6 +91,14 @@ def test_generate_invalid_octave_high():
         gen.generate("C", 4, ["C"], base_octaves={"alto": MAX_OCTAVE + 1})
 
 
+def test_generate_invalid_num_notes():
+    """Non-positive ``num_notes`` should raise ``ValueError``."""
+
+    gen = PolyphonicGenerator()
+    with pytest.raises(ValueError):
+        gen.generate("C", 0, ["C"])  # num_notes must be positive
+
+
 def test_enforce_voice_leading_corrects_crossing_and_spacing():
     """Lower voices should never rise above higher ones after adjustment."""
 

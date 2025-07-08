@@ -65,7 +65,8 @@ class PolyphonicGenerator:
         key:
             Musical key for all voices.
         num_notes:
-            Number of notes per voice.
+            Number of notes per voice. Must be positive otherwise a
+            ``ValueError`` is raised.
         chord_progression:
             Harmony driving note choice.
         base_octaves:
@@ -81,6 +82,11 @@ class PolyphonicGenerator:
 
         if not chord_progression:
             raise ValueError("chord_progression must not be empty")
+        if num_notes <= 0:
+            # The generation loop expects to iterate ``num_notes`` times.
+            # Reject non-positive counts so callers receive immediate feedback
+            # rather than an empty or malformed result.
+            raise ValueError("num_notes must be positive")
         base_octaves = base_octaves or {}
         lines: Dict[str, List[str]] = {}
         for voice in self.voices:
