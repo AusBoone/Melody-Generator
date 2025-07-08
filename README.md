@@ -235,6 +235,16 @@ The linter is configured via `ruff.toml`, which enforces a 100 character
 line length and targets Python 3.8. Adjust this file if different rules
 are required.
 
+## Continuous Integration
+
+The project relies on GitHub Actions to run tests and lint checks on every
+pull request. The workflow defined in `.github/workflows/ci.yml` installs the
+package in editable mode along with optional dependencies such as `pyfluidsynth`
+and `numpy`. Ruff and pytest are executed to ensure consistent style and
+behavior across Python versions. If dependency resolution errors occur in CI,
+double-check version pins in `pyproject.toml` and clear any caching steps that
+may be present in the workflow configuration.
+
 To build the Docker image locally run:
 
 ```bash

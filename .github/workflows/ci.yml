@@ -37,8 +37,12 @@ jobs:
 
       - name: Install package
         run: |
+          # Upgrade pip to avoid resolution issues with optional dependencies
           python -m pip install --upgrade pip
-          pip install -e . ruff pytest
+          # Install project in editable mode along with tools and optional packages
+          # Explicitly listing pyfluidsynth and numpy ensures the CI environment
+          # mirrors a local developer setup where these are available.
+          pip install -e . ruff pytest pyfluidsynth numpy
 
       - name: Run Ruff
         run: ruff check .
