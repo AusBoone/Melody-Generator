@@ -10,6 +10,10 @@ import types
 from pathlib import Path
 import pytest
 
+# Ensure the repository root is on ``sys.path`` so ``melody_generator`` can be
+# imported when tests execute from arbitrary locations.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 pytest.importorskip("flask")
 
 # Stub mido and tkinter so the imports succeed
