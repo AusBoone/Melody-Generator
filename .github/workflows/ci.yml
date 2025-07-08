@@ -1,14 +1,15 @@
-# CI workflow runs linting and tests across multiple Python versions
-# Using GitHub Actions matrix strategy to ensure compatibility.
+# Melody Generator CI
+# This workflow performs linting and unit tests using multiple versions of
+# Python. A previous "test.yml" workflow duplicated this behavior. Both have now
+# been consolidated here to reduce redundancy and simplify maintenance.
 #
 # Steps:
-# 1. Checkout repository source.
-# 2. Set up Python interpreter for each version in matrix.
-# 3. Install the package in editable mode with pip.
-# 4. Run Ruff for style checks.
-# 5. Execute pytest to validate functionality.
-#
-# The workflow triggers on pushes and pull requests targeting the main branch.
+#   1. Checkout repository source.
+#   2. Install Python for each matrix entry.
+#   3. Install project and test dependencies.
+#   4. Run Ruff for style checks.
+#   5. Execute pytest for the test suite.
+
 name: Continuous Integration
 
 on:
