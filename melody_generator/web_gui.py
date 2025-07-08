@@ -42,6 +42,12 @@ infrastructure.
 # "Random Rhythm" option is enabled the backend invokes
 # ``generate_random_rhythm_pattern`` with ``notes`` so the durations list
 # matches the melody length.
+#
+# The latest revision validates numeric fields such as tempo and motif
+# length. ``bpm``, ``notes``, ``motif_length`` and ``harmony_lines`` must all
+# be positive integers. If the user submits a value less than or equal to
+# zero, the form re-renders with an explanatory flash message so invalid
+# input never reaches the melody generation helpers.
 
 from __future__ import annotations
 
@@ -249,6 +255,47 @@ def index():
         motif_length = int(request.form.get('motif_length') or 4)
         base_octave = int(request.form.get('base_octave') or 4)
         instrument = request.form.get('instrument') or 'Piano'
+        harmony_lines = int(request.form.get('harmony_lines') or 0)
+
+        # Basic sanity checks for numeric inputs. Values less than or equal to
+        # zero cannot produce a valid melody so the form is redisplayed with an
+        # informative message.
+        if bpm <= 0:
+            flash("BPM must be greater than 0.")
+            return render_template(
+                'index.html',
+                scale=sorted(SCALE.keys()),
+                instruments=INSTRUMENTS.keys(),
+                styles=STYLE_VECTORS.keys(),
+            )
+
+        if notes <= 0:
+            flash("Number of notes must be greater than 0.")
+            return render_template(
+                'index.html',
+                scale=sorted(SCALE.keys()),
+                instruments=INSTRUMENTS.keys(),
+                styles=STYLE_VECTORS.keys(),
+            )
+
+        if motif_length <= 0:
+            flash("Motif length must be greater than 0.")
+            return render_template(
+                'index.html',
+                scale=sorted(SCALE.keys()),
+                instruments=INSTRUMENTS.keys(),
+                styles=STYLE_VECTORS.keys(),
+            )
+
+        if harmony_lines <= 0:
+            flash("Harmony lines must be greater than 0.")
+            return render_template(
+                'index.html',
+                scale=sorted(SCALE.keys()),
+                instruments=INSTRUMENTS.keys(),
+                styles=STYLE_VECTORS.keys(),
+            )
+
         # Validate the selected instrument against the known General MIDI
         # mapping. Unknown values likely mean the form was tampered with.
         if instrument not in INSTRUMENTS:
@@ -262,7 +309,6 @@ def index():
         harmony = bool(request.form.get('harmony'))
         random_rhythm = bool(request.form.get('random_rhythm'))
         counterpoint = bool(request.form.get('counterpoint'))
-        harmony_lines = int(request.form.get('harmony_lines') or 0)
         include_chords = bool(request.form.get('include_chords'))
         chords_same = bool(request.form.get('chords_same'))
         humanize = bool(request.form.get('humanize', '1'))
