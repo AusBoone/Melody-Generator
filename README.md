@@ -89,9 +89,11 @@ summarized in the [Environment Variables](#environment-variables) section.
   CLI.
 - `MELODY_PLAYER` – Optional external MIDI player invoked when previewing files.
 - `SOUND_FONT` – Location of a SoundFont (`.sf2`) used for FluidSynth playback.
-  If unset the code falls back to `/usr/share/sounds/sf2/TimGM6mb.sf2` which is
-  provided by the optional `fluid-soundfont-gm` package on many Linux
-  distributions.
+  When unset the platform defaults are checked in the following order:
+  `C:\Windows\System32\drivers\gm.dls` on Windows,
+  `/Library/Audio/Sounds/Banks/FluidR3_GM.sf2` on macOS and
+  `/usr/share/sounds/sf2/TimGM6mb.sf2` on Linux (from the optional
+  `fluid-soundfont-gm` package).
 - `FLASK_SECRET` – Secret key for the web interface session. If omitted a
   random key is generated each run.
 

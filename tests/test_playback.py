@@ -1,8 +1,8 @@
 """Tests for the playback helper functions.
 
 This module focuses on verifying the behavior of ``_resolve_soundfont`` and
-``render_midi_to_wav``. The first must honour the ``SOUND_FONT`` environment
-variable and report missing files via ``MidiPlaybackError``. The latter should
+``render_midi_to_wav``. The former must honour the ``SOUND_FONT`` environment
+variable and fall back to sensible defaults on each platform. The latter should
 invoke ``subprocess.run`` with the correct command when rendering audio.
 """
 
@@ -86,6 +86,30 @@ def test_resolve_soundfont_missing_file(monkeypatch):
 
     with pytest.raises(MidiPlaybackError):
         _resolve_soundfont(None)
+
+
+@pytest.mark.parametrize(
+    "platform,expected",
+    [
+        ("win32", r"C:\\Windows\\System32\\drivers\\gm.dls"),
+        ("darwin", "/Library/Audio/Sounds/Banks/FluidR3_GM.sf2"),
+        ("linux", "/usr/share/sounds/sf2/TimGM6mb.sf2"),
+    ],
+)
+def test_resolve_soundfont_platform_defaults(monkeypatch, platform, expected):
+    """Ensure platform-specific fallback paths are respected."""
+
+    # Pretend none of the configurable sources are set
+    monkeypatch.delenv("SOUND_FONT", raising=False)
+    monkeypatch.setattr(playback.sys, "platform", platform, raising=False)
+
+    def fake_isfile(path):
+        # Only the expected default path should be considered existing
+        return path == expected
+
+    monkeypatch.setattr(playback.os.path, "isfile", fake_isfile)
+
+    assert _resolve_soundfont(None) == expected
 
 
 def test_render_midi_invokes_subprocess(tmp_path, monkeypatch):
