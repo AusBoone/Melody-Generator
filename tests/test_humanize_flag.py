@@ -8,6 +8,7 @@ stubs and verifies that events are unchanged when ``humanize=False``.
 import importlib
 import sys
 import types
+from pathlib import Path
 
 
 def _setup_module():
@@ -48,6 +49,10 @@ def _setup_module():
     sys.modules.setdefault("tkinter.messagebox", tk_stub.messagebox)
     sys.modules.setdefault("tkinter.ttk", tk_stub.ttk)
 
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+    if "melody_generator.midi_io" in sys.modules:
+        del sys.modules["melody_generator.midi_io"]
     if "melody_generator" in sys.modules:
         del sys.modules["melody_generator"]
     return importlib.import_module("melody_generator"), DummyFile
@@ -66,6 +71,7 @@ def test_no_humanize_preserves_events(tmp_path, monkeypatch):
             m.time += 99
 
     monkeypatch.setattr(mod, "humanize_events", fake_humanize)
+    monkeypatch.setattr(mod.midi_io, "humanize_events", fake_humanize)
 
     melody = ["C4", "D4"]
     out = tmp_path / "a.mid"
