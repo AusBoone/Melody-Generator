@@ -84,8 +84,9 @@ __version__ = "0.1.0"
 # * Applied `functools.lru_cache` to `canonical_key` and `canonical_chord` to
 #   avoid repeated dictionary lookups when these helpers are used frequently in
 #   batch melody generation.
-# * Added `lru_cache` memoization for `scale_for_chord` and `note_to_midi` and
-#   preloaded candidate note pools to eliminate repeated computations.
+# * Added `lru_cache` memoization for `scale_for_chord` and `note_to_midi`.
+#   Candidate note pools are generated lazily and cached to eliminate repeated
+#   computations.
 # * Melody generation now weights candidate notes to favour chord tones and
 #   smooth motion, filters tritone leaps and selects scales based on the active
 #   chord.
@@ -627,16 +628,6 @@ def _candidate_pool(key: str, chord: str, root_octave: int, *, strong: bool) -> 
             for oct in range(root_octave, root_octave + 2)
         ]
     return _CANDIDATE_CACHE[cache_key]
-
-
-def _preload_candidate_cache() -> None:
-    """Fill :data:`_CANDIDATE_CACHE` at import time."""
-
-    for key in SCALE:
-        for chord in CHORDS:
-            for strong in (True, False):
-                for octave in range(MIN_OCTAVE, MAX_OCTAVE + 1):
-                    _candidate_pool(key, chord, octave, strong=strong)
 
 
 

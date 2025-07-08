@@ -174,8 +174,8 @@ while keeping the algorithm efficient and deterministic.
   the web interface dispatches work to Celery so multiple melodies are created
   concurrently without blocking the UI.
 - **Caching and Memoization** – ``scale_for_chord`` and ``note_to_midi`` are
-  memoized with ``functools.lru_cache`` and candidate note pools are
-  precomputed at import for faster selection.
+  memoized with ``functools.lru_cache`` and candidate note pools are generated
+  lazily on first use for faster selection.
 
 ## Candidate Weighting in Depth
 
