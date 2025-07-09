@@ -26,12 +26,19 @@ configuration.
 #
 # Error reporting for missing dependencies was updated to include installation
 # hints so users can more easily resolve playback issues.
+#
+# Current revision introduces ``shlex.split`` to parse the ``MELODY_PLAYER``
+# environment variable. This ensures custom player commands containing spaces
+# (e.g. paths under ``Program Files``) are executed correctly. ``open_default_player``
+# now validates the target MIDI file before launching the subprocess so
+# erroneous paths raise ``FileNotFoundError`` immediately.
 
 from __future__ import annotations
 
 import os
 import subprocess
 import sys
+import shlex
 from typing import Optional
 
 __all__ = [
@@ -214,6 +221,9 @@ def open_default_player(path: str, *, delete_after: bool = False) -> None:
     This function contains the platform-specific logic used by both the
     command line and GUI helpers. It blocks until the player command
     completes, removing ``path`` afterwards when ``delete_after`` is ``True``.
+    The ``MELODY_PLAYER`` environment variable may specify a custom player
+    executable. When provided it is parsed with ``shlex.split`` so quoted
+    commands containing spaces are handled correctly.
 
     Parameters
     ----------
@@ -226,22 +236,35 @@ def open_default_player(path: str, *, delete_after: bool = False) -> None:
     ------
     Exception
         Propagates any errors raised by ``subprocess.run`` or ``os.remove``.
+        ``FileNotFoundError`` is raised when ``path`` does not exist.
     """
 
+    # Fail fast when the target MIDI file is missing so callers immediately know
+    # the provided path is incorrect.
+    if not os.path.isfile(path):
+        raise FileNotFoundError(f"MIDI file not found: {path}")
+
     player = os.environ.get("MELODY_PLAYER")
+    # ``shlex.split`` correctly handles quoted paths so custom player commands
+    # containing spaces are parsed into individual arguments.
+    player_args = shlex.split(player) if player else None
+
     if sys.platform.startswith("win"):
-        if player:
-            subprocess.run([player, path], check=False)
+        if player_args:
+            cmd = player_args + [path]
+            subprocess.run(cmd, check=False)
         else:
             subprocess.run(["cmd", "/c", "start", "/wait", "", path], check=False)
     elif sys.platform == "darwin":
-        if player:
-            subprocess.run(["open", "-W", "-a", player, path], check=False)
+        if player_args:
+            cmd = ["open", "-W", "-a"] + player_args + [path]
+            subprocess.run(cmd, check=False)
         else:
             subprocess.run(["open", "-W", path], check=False)
     else:
-        if player:
-            subprocess.run([player, path], check=False)
+        if player_args:
+            cmd = player_args + [path]
+            subprocess.run(cmd, check=False)
         else:
             proc = subprocess.run(["xdg-open", "--wait", path], check=False)
             if proc.returncode != 0:
