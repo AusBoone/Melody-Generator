@@ -25,8 +25,8 @@ function Run-Command($cmd) {
 function Ensure-Python {
     if (Get-Command python -ErrorAction SilentlyContinue) {
         $version = (python --version) -replace 'Python ', ''
-        $parts = $version.Split('.')
-        if ([int]$parts[0] -gt 3 -or ([int]$parts[0] -eq 3 -and [int]$parts[1] -ge 8)) {
+    $parts = $version.Split('.')
+    if ([int]$parts[0] -gt 3 -or ([int]$parts[0] -eq 3 -and [int]$parts[1] -ge 10)) {
             Write-Host "Found Python $version"
             return
         }

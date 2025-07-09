@@ -4,7 +4,7 @@
 #
 # This helper installs APT packages and Python dependencies required to
 # run Melody-Generator. It checks for an existing Python 3 installation
-# and only installs a new version when the current one is older than 3.8.
+# and only installs a new version when the current one is older than 3.10.
 # A Python virtual environment is created under ./venv.
 #
 # Usage:
@@ -41,15 +41,15 @@ verify_linux() {
     fi
 }
 
-# check_python ensures Python >=3.8 is installed. If python3 is missing or
+# check_python ensures Python >=3.10 is installed. If python3 is missing or
 # too old the function installs a newer version using apt-get.
 check_python() {
     if command -v python3 >/dev/null 2>&1; then
         local version
         version=$(python3 --version 2>&1 | awk '{print $2}')
         local major minor
-        IFS=. read -r major minor _ <<<"$version"
-        if (( major > 3 || (major == 3 && minor >= 8) )); then
+    IFS=. read -r major minor _ <<<"$version"
+    if (( major > 3 || (major == 3 && minor >= 10) )); then
             echo "Found Python $version"
             return
         fi

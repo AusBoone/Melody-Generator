@@ -29,7 +29,7 @@ def test_skip_python_install(tmp_path):
     py_path = bin_dir / "python3"
     py_path.write_text(
         "#!/bin/bash\n"
-        "if [ \"$1\" = -V ]; then echo 'Python 3.9.1'; exit 0; fi\n"
+        "if [ \"$1\" = -V ]; then echo 'Python 3.10.1'; exit 0; fi\n"
         "if [ \"$1\" = -m ] && [ \"$2\" = venv ]; then mkdir -p $3/bin; exit 0; fi\n"
     )
     py_path.chmod(0o755)
@@ -55,7 +55,7 @@ def test_skip_python_install(tmp_path):
         check=True,
     )
 
-    # The script should not attempt to install python because version >=3.8
+    # The script should not attempt to install python because version >=3.10
     assert "brew install python" not in result.stdout
     # But it should attempt to install fluid-synth since brew list fails
     assert "brew install fluid-synth" in result.stdout
