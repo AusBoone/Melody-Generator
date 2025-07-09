@@ -94,3 +94,16 @@ def test_generate_batch_negative_workers(monkeypatch):
 
     with pytest.raises(ValueError):
         batch.generate_batch([], workers=-1)
+
+
+def test_generate_batch_zero_workers(monkeypatch):
+    """``0`` workers should raise ``ValueError`` for clarity."""
+
+    batch = importlib.import_module("melody_generator.batch_generation")
+
+    # ``generate_melody`` is a lightweight stub so the test focuses solely on
+    # argument validation inside ``generate_batch``.
+    monkeypatch.setattr(batch, "generate_melody", lambda **kw: [])
+
+    with pytest.raises(ValueError):
+        batch.generate_batch([], workers=0)
