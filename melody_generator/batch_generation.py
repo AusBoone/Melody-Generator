@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import os
 from concurrent.futures import ProcessPoolExecutor
-from typing import Iterable, List, Dict, Any
+from typing import Iterable, List, Dict, Any, Optional
 
 from . import generate_melody
 
@@ -31,7 +31,7 @@ def _generate_single(kwargs: Dict[str, Any]) -> List[str]:
 
 
 def generate_batch(
-    configs: Iterable[Dict[str, Any]], *, workers: int | None = None
+    configs: Iterable[Dict[str, Any]], *, workers: Optional[int] = None
 ) -> List[List[str]]:
     """Generate multiple melodies in parallel.
 

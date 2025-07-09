@@ -30,7 +30,7 @@ from __future__ import annotations
 
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
-from typing import Callable, List, Tuple, Dict, Optional
+from typing import Callable, List, Tuple, Dict, Optional, Union
 import os
 import threading
 from tempfile import NamedTemporaryFile
@@ -221,7 +221,7 @@ class MelodyGeneratorGUI:
         widget.bind("<Enter>", show)
         widget.bind("<Leave>", hide)
 
-    def _update_bpm_label(self, value: str | int) -> None:
+    def _update_bpm_label(self, value: Union[str, int]) -> None:
         """Display the current BPM next to the slider.
 
         @param value: Slider value to display.
@@ -229,7 +229,7 @@ class MelodyGeneratorGUI:
         """
         self.bpm_label.config(text=str(int(float(value))))
 
-    def _update_notes_label(self, value: str | int) -> None:
+    def _update_notes_label(self, value: Union[str, int]) -> None:
         """Display the current number of notes next to the slider.
 
         @param value: Slider value to display.
@@ -237,7 +237,7 @@ class MelodyGeneratorGUI:
         """
         self.notes_label.config(text=str(int(float(value))))
 
-    def _update_octave_label(self, value: str | int) -> None:
+    def _update_octave_label(self, value: Union[str, int]) -> None:
         """Display the base octave next to its slider.
 
         @param value: Slider value to display.

@@ -53,7 +53,7 @@ from __future__ import annotations
 
 from importlib import import_module
 from tempfile import NamedTemporaryFile
-from typing import List
+from typing import List, Optional
 
 from melody_generator import playback
 from melody_generator.playback import MidiPlaybackError
@@ -140,7 +140,7 @@ def _generate_preview(
     include_chords: bool,
     chords_same: bool,
     enable_ml: bool,
-    style: str | None,
+    style: Optional[str],
     chords: List[str],
     humanize: bool,
 ) -> tuple[str, str]:

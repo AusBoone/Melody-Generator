@@ -25,6 +25,7 @@ import cProfile
 import io
 import pstats
 from contextlib import contextmanager
+from typing import Optional
 
 try:
     import numpy as np  # type: ignore
@@ -112,7 +113,7 @@ def compute_base_weights(intervals, chord_mask, prev_interval):
 
 
 @contextmanager
-def profile(output: io.TextIOBase | None = None):
+def profile(output: Optional[io.TextIOBase] = None):
     """Context manager that records cProfile statistics for a block."""
 
     pr = cProfile.Profile()

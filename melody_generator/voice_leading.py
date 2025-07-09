@@ -23,6 +23,7 @@ Design Notes
 from __future__ import annotations
 
 from . import note_to_midi
+from typing import List, Tuple, Optional, Union
 
 try:
     import numpy as np  # type: ignore
@@ -57,8 +58,8 @@ def counterpoint_penalty(
     prev_note: str,
     candidate: str,
     *,
-    prev_dir: int | None = None,
-    prev_interval: int | None = None,
+    prev_dir: Optional[int] = None,
+    prev_interval: Optional[int] = None,
 ) -> float:
     """Return a bias encouraging contrary motion and avoiding parallels.
 
@@ -101,11 +102,11 @@ def counterpoint_penalty(
 
 def counterpoint_penalties(
     prev_note: str,
-    candidates: list[str] | tuple[str, ...],
+    candidates: Union[List[str], Tuple[str, ...]],
     *,
-    prev_dir: int | None = None,
-    prev_interval: int | None = None,
-) -> "np.ndarray | list[float]":
+    prev_dir: Optional[int] = None,
+    prev_interval: Optional[int] = None,
+) -> "Union[np.ndarray, List[float]]":
     """Return penalties for multiple ``candidates`` at once.
 
     The vectorized implementation uses :mod:`numpy` to compute motion
@@ -127,7 +128,7 @@ def counterpoint_penalties(
 
     Returns
     -------
-    numpy.ndarray | list[float]
+    Union[numpy.ndarray, List[float]]
         Per-candidate penalty adjustments.
     """
 
@@ -164,9 +165,9 @@ def counterpoint_penalties(
 def parallel_fifths_mask(
     prev_a: str,
     prev_b: str,
-    candidates: list[str] | tuple[str, ...],
+    candidates: Union[List[str], Tuple[str, ...]],
     next_b: str,
-) -> "np.ndarray | list[bool]":
+) -> "Union[np.ndarray, List[bool]]":
     """Return a boolean mask for parallel fifth/octave motion.
 
     Each element corresponds to ``candidates`` and indicates whether that
