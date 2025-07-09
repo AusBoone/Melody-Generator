@@ -1,8 +1,14 @@
 """Command line helpers for Melody Generator.
 
-The functions here parse command line arguments and dispatch to the core
-library. Keeping the CLI isolated simplifies testing and allows other
-applications to reuse the generation logic without importing Tkinter.
+This module implements the console entry points for the project. The
+``run_cli`` function parses command line arguments and performs melody
+generation while :func:`main` decides whether to show the GUI or process CLI
+options.  A ``--settings-file`` argument is recognised so the GUI can load and
+save user preferences at a custom path.
+
+Keeping the CLI logic separated from the GUI widgets simplifies testing and
+allows other applications to reuse the generation routines without importing
+``tkinter``.
 """
 
 from __future__ import annotations
@@ -27,7 +33,11 @@ __all__ = ["run_cli", "main"]
 
 
 def run_cli() -> None:
-    """Parse CLI arguments and generate a MIDI file."""
+    """Parse CLI arguments and generate a MIDI file.
+
+    The ``--settings-file`` option is recognised for parity with the GUI even
+    though it has no effect when running purely from the command line.
+    """
 
     if "--list-keys" in sys.argv[1:]:
         print("\n".join(sorted(SCALE.keys())))
@@ -66,6 +76,11 @@ def run_cli() -> None:
     parser.add_argument("--style", type=str, help="Optional style name to bias note selection")
     parser.add_argument("--soundfont", type=str, help="Path to a SoundFont (.sf2) file used when previewing with --play")
     parser.add_argument("--play", action="store_true", help="Play the MIDI file after it is created")
+    parser.add_argument(
+        "--settings-file",
+        type=str,
+        help="Path to the JSON settings file used by the GUI",
+    )
     args = parser.parse_args()
 
     if args.bpm <= 0:
@@ -188,11 +203,20 @@ def run_cli() -> None:
 
 
 def main() -> None:
-    """Entry point that chooses between CLI and GUI."""
+    """Entry point that chooses between CLI and GUI.
+
+    ``--settings-file`` may be supplied when launching the GUI to override the
+    location of the persistent JSON configuration file. When additional
+    arguments are present the CLI executes normally and the option is ignored.
+    """
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
-    if len(sys.argv) > 1:
+    pre_parser = argparse.ArgumentParser(add_help=False)
+    pre_parser.add_argument("--settings-file", type=str)
+    pre_args, remaining = pre_parser.parse_known_args(sys.argv[1:])
+
+    if remaining:
         run_cli()
     else:
         try:
@@ -203,6 +227,8 @@ def main() -> None:
             )
             logging.error("Tkinter is not available. Please run with CLI options or install it.")
             sys.exit(1)
+
+        from pathlib import Path
 
         from . import (
             generate_melody,
@@ -217,13 +243,21 @@ def main() -> None:
             generate_counterpoint_melody,
         )
 
+        settings_path = Path(pre_args.settings_file).expanduser() if pre_args.settings_file else None
+
+        def _load() -> dict:
+            return load_settings(settings_path) if settings_path else load_settings()
+
+        def _save(data: dict) -> None:
+            save_settings(data, settings_path) if settings_path else save_settings(data)
+
         gui = MelodyGeneratorGUI(
             generate_melody,
             create_midi_file,
             SCALE,
             CHORDS,
-            load_settings,
-            save_settings,
+            _load,
+            _save,
             generate_random_chord_progression,
             generate_random_rhythm_pattern,
             generate_harmony_line,

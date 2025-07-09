@@ -82,7 +82,8 @@ User preferences such as BPM and key are stored in a JSON file located at
 `~/.melody_generator_settings.json`. The GUI loads this file on startup and you
 can choose to save your current selections after generating a melody.
 You can override the location by setting the `MELODY_SETTINGS_FILE` environment
-variable before starting the application. Additional optional variables are
+variable or passing `--settings-file PATH` on the command line before starting
+the application. Additional optional variables are
 summarized in the [Environment Variables](#environment-variables) section.
 
 ## Environment Variables
@@ -109,6 +110,7 @@ Generate a melody entirely from the command line:
 
 ```bash
 melody-generator \
+  --settings-file custom_settings.json \
   --key C \
   --chords C,G,Am,F \
   --bpm 120 \
@@ -129,7 +131,8 @@ Use `--play` to automatically preview the file once it is written.
 Another short example enabling the sequence model and selecting a style:
 
 ```bash
-melody-generator --key Em --chords Em,G,D,A --bpm 100 --timesig 4/4 \
+melody-generator --settings-file custom_settings.json \
+  --key Em --chords Em,G,D,A --bpm 100 --timesig 4/4 \
   --notes 32 --enable-ml --style blues --output jam.mid
 ```
 
