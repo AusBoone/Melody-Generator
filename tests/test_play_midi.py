@@ -11,6 +11,12 @@ Example
 >>> play_midi("melody.mid", soundfont="/path/to/font.sf2")
 """
 
+# Revision note
+# -------------
+# A test for ``Synth.play_midi_file`` failures was added to ensure the wrapper
+# propagates error messages via ``MidiPlaybackError``. The ``FailPlaySynth``
+# class simulates this scenario without relying on the real FluidSynth library.
+
 from __future__ import annotations
 
 import builtins
@@ -86,6 +92,13 @@ class FailStartSynth(DummySynth):
         raise RuntimeError("driver failure")
 
 
+class FailPlaySynth(DummySynth):
+    """Variant that raises when ``play_midi_file`` is invoked."""
+
+    def play_midi_file(self, path: str) -> None:  # type: ignore[override]
+        raise RuntimeError("synthesis error")
+
+
 def test_play_midi_success(tmp_path, monkeypatch):
     """Playback should invoke FluidSynth methods without errors."""
 
@@ -141,6 +154,26 @@ def test_play_midi_driver_start_failure(monkeypatch):
     monkeypatch.setitem(sys.modules, "fluidsynth", types.SimpleNamespace(Synth=FailStartSynth))
 
     with pytest.raises(MidiPlaybackError):
+        playback.play_midi("dummy.mid")
+
+
+def test_play_midi_playback_failure(monkeypatch):
+    """Playback errors should surface the original message for debugging.
+
+    ``DummySynth``'s ``play_midi_file`` method is forced to raise an
+    exception to mimic a synth failure.  ``play_midi`` should wrap this
+    error in ``MidiPlaybackError`` while preserving the message.
+    """
+
+    # Bypass soundfont resolution to focus solely on the playback failure.
+    monkeypatch.setattr(playback, "_resolve_soundfont", lambda sf: "font.sf2")
+    monkeypatch.setitem(
+        sys.modules,
+        "fluidsynth",
+        types.SimpleNamespace(Synth=FailPlaySynth),
+    )
+
+    with pytest.raises(MidiPlaybackError, match="synthesis error"):
         playback.play_midi("dummy.mid")
 
 
