@@ -22,7 +22,7 @@ try:
     import numpy as np  # type: ignore
 except Exception:  # pragma: no cover - optional
     np = None
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 
 BASIC_RHYTHMS = [
@@ -37,9 +37,9 @@ class RhythmGenerator:
 
     def __init__(
         self,
-        transitions: Dict[float, Dict[float, float]] | None = None,
+        transitions: Optional[Dict[float, Dict[float, float]]] = None,
         *,
-        start: float | None = None,
+        start: Optional[float] = None,
     ) -> None:
         """Create a new generator with optional custom transitions.
 
