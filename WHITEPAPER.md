@@ -110,6 +110,41 @@ Neural models are optional yet integrate tightly with the heuristic pipeline.
 
 Utility functions in `augmentation.py` demonstrate how to fine-tune these models on custom MIDI sequences. The lightweight design runs on modest hardware, and you can replace the architecture by implementing the `SequenceModel` protocol.
 
+## Phrase Planning and Pitch Range Control
+
+High-level structure originates in `phrase_planner.py`. The
+`generate_phrase_plan` helper sketches a pitch range and tension curve before
+any notes are produced. Each `PhrasePlan` contains a `tension_profile` list and
+`(min_octave, max_octave)` tuple validated against `MIN_OCTAVE` and `MAX_OCTAVE`
+from `__init__.py`. The `PhrasePlanner` class then identifies anchor points with
+`plan_skeleton` and fills the gaps using `infill_skeleton`. This hierarchical
+planning keeps phrases within a defined register while allowing local weighting
+heuristics to operate freely.
+
+## Polyphonic Generation and Voice Leading
+
+`polyphony.PolyphonicGenerator` manages four independent voices. Each part can
+use its own `SequenceModel`, after which `_enforce_voice_leading` shifts notes by
+octave to avoid crossing and ensures neighbouring voices remain within a single
+octave. The corrections rely on the interval checks implemented in
+`voice_leading.py` so counterpoint stays clean.
+
+## Training and Fine Tuning
+
+Although pretrained weights are not included, `augmentation.py` provides dataset
+helpers such as `augment_sequences` for transposition and inversion. The
+`fine_tune_model` routine demonstrates teacher forcing in PyTorch so
+`SequenceModel` or `StyleVAE` variants can adapt to genre-specific material.
+
+## Dataset Preparation and Evaluation Metrics
+
+`batch_generation.py` automates dataset creation by repeatedly calling
+`generate_melody`. Resulting phrases are assessed with Frechet Music Distance
+(FMD) via `feedback.py`. `compute_fmd` measures divergence from a reference set
+while `refine_with_fmd` slightly alters notes when it reduces the distance.
+These metrics provide an objective gauge when experimenting with new models or
+heuristics.
+
 ## Usage Examples
 
 Command‑line invocation is the most common entry point.  See `README.md` for a
