@@ -1312,3 +1312,54 @@ def test_cli_random_rhythm_passed(monkeypatch, tmp_path):
     assert captured["length"] == 4
     assert captured["pattern"] == [0.25] * 4
     assert captured["create"] == [0.25] * 4
+
+
+def test_gui_settings_file_argument(monkeypatch, tmp_path):
+    """Ensure ``--settings-file`` is forwarded to the GUI callbacks.
+
+    When ``main`` is invoked with only this option the GUI should be
+    constructed with wrappers that supply the provided path to
+    ``load_settings`` and ``save_settings``.
+    """
+
+    mod, gui_mod, _ = load_module()
+    path = tmp_path / "prefs.json"
+
+    calls = {}
+
+    def fake_load(p):
+        calls.setdefault("load", p)
+        return {}
+
+    def fake_save(data, p):
+        calls.setdefault("save", p)
+
+    def fake_init(
+        self,
+        _gm,
+        _cmf,
+        _scale,
+        _chords,
+        load_settings=None,
+        save_settings=None,
+        *_args,
+        **_kw,
+    ):
+        calls["load_fn"] = load_settings
+        calls["save_fn"] = save_settings
+
+    monkeypatch.setattr(mod, "load_settings", fake_load)
+    monkeypatch.setattr(mod, "save_settings", fake_save)
+    monkeypatch.setattr(gui_mod.MelodyGeneratorGUI, "__init__", fake_init)
+    monkeypatch.setattr(gui_mod.MelodyGeneratorGUI, "run", lambda self: None)
+
+    old = sys.argv
+    sys.argv = ["prog", "--settings-file", str(path)]
+    mod.main()
+    sys.argv = old
+
+    # Call the forwarded functions to check the path parameter
+    calls["load_fn"]()
+    calls["save_fn"]({})
+    assert calls.get("load") == path
+    assert calls.get("save") == path
