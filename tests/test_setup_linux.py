@@ -11,7 +11,7 @@ from pathlib import Path
 
 
 def test_skip_python_install(tmp_path):
-    """Setup script should not install python when version >= 3.8."""
+    """Setup script should not install python when version >= 3.10."""
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     log_file = tmp_path / "log.txt"
@@ -27,7 +27,7 @@ def test_skip_python_install(tmp_path):
     py_path = bin_dir / "python3"
     py_path.write_text(
         "#!/bin/bash\n"
-        "if [ \"$1\" = --version ]; then echo 'Python 3.9.1'; exit 0; fi\n"
+        "if [ \"$1\" = --version ]; then echo 'Python 3.10.1'; exit 0; fi\n"
         "if [ \"$1\" = -m ] && [ \"$2\" = venv ]; then mkdir -p $3/bin; exit 0; fi\n"
     )
     py_path.chmod(0o755)

@@ -235,7 +235,7 @@ Lint the project using [ruff](https://github.com/astral-sh/ruff):
 ruff check .
 ```
 The linter is configured via `ruff.toml`, which enforces a 100 character
-line length and targets Python 3.8. Adjust this file if different rules
+line length and targets Python 3.10. Adjust this file if different rules
 are required.
 
 ## Continuous Integration
