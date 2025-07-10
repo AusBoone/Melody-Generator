@@ -181,6 +181,33 @@ def test_open_default_player_commands(monkeypatch, tmp_path, platform, expected_
     assert not midi.exists()
 
 
+def test_open_default_player_respects_env_with_spaces(monkeypatch, tmp_path):
+    """Command in ``MELODY_PLAYER`` containing spaces should split correctly."""
+
+    midi = tmp_path / "track.mid"
+    midi.write_text("data")
+
+    calls = []
+
+    def fake_run(cmd, check=False):
+        """Record subprocess invocations for assertion."""
+        calls.append(cmd)
+        return types.SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(playback.subprocess, "run", fake_run)
+    monkeypatch.setattr(
+        playback.os,
+        "environ",
+        {"MELODY_PLAYER": "/usr/bin/custom player"},
+    )
+    monkeypatch.setattr(playback.sys, "platform", "linux", raising=False)
+
+    open_default_player(str(midi), delete_after=True)
+
+    assert calls == [["/usr/bin/custom", "player", str(midi)]]
+    assert not midi.exists()
+
+
 def test_render_midi_missing_fluidsynth(monkeypatch, tmp_path):
     """Missing ``fluidsynth`` executable should yield a clear error message."""
 
