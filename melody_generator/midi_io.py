@@ -100,7 +100,6 @@ def create_midi_file(
     beat_ticks = int(beat_fraction * whole_note_ticks)
     beats_per_segment = time_signature[0]
     beats_elapsed = 0
-    start_beat = 0.0
     rest_ticks = 0
     last_note = None
     last_velocity = 64
@@ -113,7 +112,6 @@ def create_midi_file(
         if duration_fraction == 0:
             rest_ticks += beat_ticks
             beats_elapsed += 1
-            start_beat += 1
             continue
 
         note_duration = int(duration_fraction * whole_note_ticks)
@@ -154,7 +152,6 @@ def create_midi_file(
         total_beats += beat_len
         last_note = midi_note
         last_velocity = velocity
-        start_beat += beat_len
 
         if beats_elapsed >= beats_per_segment:
             if last_note is not None and random.random() < 0.5:

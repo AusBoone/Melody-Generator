@@ -34,6 +34,7 @@ from typing import Callable, List, Tuple, Dict, Optional, Union
 import os
 import threading
 from tempfile import NamedTemporaryFile
+import random
 
 from . import diatonic_chords, MIN_OCTAVE, MAX_OCTAVE
 from .sequence_model import load_sequence_model
@@ -120,6 +121,8 @@ class MelodyGeneratorGUI:
         self.ml_var = tk.BooleanVar(value=False)
         self.humanize_var = tk.BooleanVar(value=True)
         self.style_var = tk.StringVar(value="")
+        # Seed for deterministic generation. Empty string disables seeding.
+        self.seed_var = tk.StringVar(value="")
         self.styles = sorted(STYLE_VECTORS.keys())
 
         self.root = tk.Tk()
@@ -403,6 +406,8 @@ class MelodyGeneratorGUI:
         self.motif_entry.grid(row=8, column=1)
         self._create_tooltip(self.motif_entry, "Length of repeating motif")
         self.motif_entry.set(4)
+        ttk.Label(frame, text="Seed:").grid(row=8, column=2, sticky="w")
+        ttk.Entry(frame, textvariable=self.seed_var, width=6).grid(row=8, column=3)
 
         ttk.Checkbutton(
             frame,
@@ -579,6 +584,21 @@ class MelodyGeneratorGUI:
                     messagebox.showerror("Dependency Error", str(exc))
                     return
 
+            seed_val = self.seed_var.get()
+            if seed_val:
+                try:
+                    seed = int(seed_val)
+                    random.seed(seed)
+                    try:  # pragma: no cover - numpy optional
+                        import numpy as _np
+
+                        _np.random.seed(seed)
+                    except Exception:
+                        pass
+                except ValueError:
+                    messagebox.showerror("Input Error", "Seed must be an integer")
+                    return
+
             melody = self.generate_melody(
                 key,
                 notes_count,
@@ -683,6 +703,21 @@ class MelodyGeneratorGUI:
                 seq_model = load_sequence_model(None, len(self.scale[key]))
             except RuntimeError as exc:
                 messagebox.showerror("Dependency Error", str(exc))
+                return
+
+        seed_val = self.seed_var.get()
+        if seed_val:
+            try:
+                seed = int(seed_val)
+                random.seed(seed)
+                try:  # pragma: no cover - numpy optional
+                    import numpy as _np
+
+                    _np.random.seed(seed)
+                except Exception:
+                    pass
+            except ValueError:
+                messagebox.showerror("Input Error", "Seed must be an integer")
                 return
 
         melody = self.generate_melody(
@@ -841,6 +876,7 @@ class MelodyGeneratorGUI:
             "instrument": self.instrument_var.get(),
             "soundfont": self.soundfont_var.get(),
             "humanize": self.humanize_var.get(),
+            "seed": self.seed_var.get(),
         }
 
     def _apply_settings(self, settings: Dict) -> None:
@@ -880,6 +916,8 @@ class MelodyGeneratorGUI:
         if "soundfont" in settings:
             self.soundfont_var.set(settings["soundfont"])
             self._check_preview_available()
+        if "seed" in settings:
+            self.seed_var.set(str(settings["seed"]))
         self._update_chord_list()
         chords = settings.get("chords")
         if chords:
