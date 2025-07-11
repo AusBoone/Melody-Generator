@@ -808,7 +808,8 @@ def generate_melody(
         using :func:`canonical_key` so lowercase names are accepted. A
         ``ValueError`` is raised when the key does not exist in
         :data:`SCALE`.
-    @param num_notes (int): Total number of notes to generate.
+    @param num_notes (int): Total number of notes to generate. Must be a
+        positive integer otherwise ``ValueError`` is raised.
     @param chord_progression (List[str]): Chords guiding note choice. Each name
         is canonicalised via :func:`canonical_chord` to allow any casing.
     @param motif_length (int): Length of the initial motif.
@@ -857,6 +858,11 @@ def generate_melody(
     # values which keeps the later lookup operations safe.
     key = canonical_key(key)
     chord_progression = [canonical_chord(ch) for ch in chord_progression]
+
+    # ``num_notes`` must be positive so the generator can actually produce a
+    # melody. An explicit check keeps the error message clear for callers.
+    if num_notes <= 0:
+        raise ValueError("num_notes must be positive")
 
     # ``motif_length`` represents the number of notes in the initial idea that
     # will be repeated.  It cannot exceed the total number of notes requested or

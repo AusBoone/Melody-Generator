@@ -1,5 +1,10 @@
 """Parallel melody generation helpers.
 
+Modification summary
+--------------------
+* Expanded module documentation with design notes describing worker model and
+  assumptions.
+
 This module provides a small convenience function for producing many
 melodies concurrently. It offloads each generation call to a worker
 process via :class:`concurrent.futures.ProcessPoolExecutor` so CPU bound
@@ -13,6 +18,14 @@ Example
 ... ]
 >>> generate_batch(configs, workers=2)
 [["C4", "E4", ...], ["D4", "F4", ...]]
+
+Design Notes
+------------
+``generate_batch`` is intentionally lightweight. It avoids custom process
+management and simply proxies arguments to :func:`generate_melody` in worker
+processes. The function assumes each configuration dictionary contains valid
+keys for ``generate_melody`` and raises ``ValueError`` if ``workers`` is
+non-positive.
 """
 
 from __future__ import annotations

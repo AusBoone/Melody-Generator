@@ -97,6 +97,21 @@ def test_generate_melody_length_and_error():
         generate_melody("C", 3, chords, motif_length=4)
 
 
+def test_generate_melody_non_positive_num_notes():
+    """``generate_melody`` should reject zero or negative ``num_notes``.
+
+    Passing ``0`` or ``-1`` ensures the new validation branch raises a clear
+    ``ValueError`` instead of failing later when generating the motif.
+    """
+    chords = ["C", "G"]
+
+    with pytest.raises(ValueError):
+        generate_melody("C", 0, chords)
+
+    with pytest.raises(ValueError):
+        generate_melody("C", -1, chords)
+
+
 def test_generate_melody_invalid_denominator():
     """Invalid time signature denominators raise ``ValueError``.
 
@@ -231,6 +246,23 @@ def test_create_midi_file_negative_pattern(tmp_path):
     out = tmp_path / "neg.mid"
     with pytest.raises(ValueError):
         create_midi_file(melody, 120, (4, 4), str(out), pattern=[0.25, -1.0])
+
+
+def test_create_midi_file_creates_directory(tmp_path):
+    """``create_midi_file`` should create missing output directories.
+
+    Using a path that contains a non-existent subdirectory exercises the new
+    logic which calls ``Path.mkdir`` before saving the file.
+    """
+    chords = ["C", "G"]
+    melody = generate_melody("C", 4, chords)
+    out = tmp_path / "sub" / "dir" / "new.mid"
+
+    create_midi_file(melody, 120, (4, 4), str(out), pattern=[0.25], chord_progression=chords)
+
+    # ``DummyMidiFile.save`` does not create the file but the directory should
+    # have been made by ``create_midi_file``.
+    assert out.parent.exists()
 
 
 def test_extra_tracks_created(tmp_path):
