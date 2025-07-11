@@ -74,6 +74,26 @@ def test_invalid_timesig_flash():
     assert b"Time signature must be" in resp.data
 
 
+def test_invalid_timesig_with_zero_harmony():
+    """Invalid time signatures should be validated even when harmony is off."""
+
+    client = app.test_client()
+    resp = client.post(
+        "/",
+        data={
+            "key": "C",
+            "chords": "C",
+            "bpm": "120",
+            "timesig": "4",  # invalid
+            "notes": "8",
+            "motif_length": "4",
+            "base_octave": "4",
+            "harmony_lines": "0",
+        },
+    )
+    assert b"Time signature must be" in resp.data
+
+
 def test_invalid_numerator_flash():
     """Numerator outside the valid range triggers an error flash."""
     client = app.test_client()
@@ -102,6 +122,25 @@ def test_negative_numerator_flash():
             "chords": "C",
             "bpm": "120",
             "timesig": "-3/4",
+            "notes": "8",
+            "motif_length": "4",
+            "base_octave": "4",
+        },
+    )
+    assert b"Time signature must be" in resp.data
+
+
+def test_invalid_denominator_flash():
+    """Denominators outside the common set should trigger a flash."""
+
+    client = app.test_client()
+    resp = client.post(
+        "/",
+        data={
+            "key": "C",
+            "chords": "C",
+            "bpm": "120",
+            "timesig": "4/5",
             "notes": "8",
             "motif_length": "4",
             "base_octave": "4",
@@ -264,8 +303,8 @@ def test_non_positive_motif_length_flash():
     assert b"Motif length must be greater than 0" in resp.data
 
 
-def test_non_positive_harmony_lines_flash():
-    """Requesting zero harmony lines should raise a validation error."""
+def test_negative_harmony_lines_flash():
+    """Negative harmony line counts are rejected."""
 
     client = app.test_client()
     resp = client.post(
@@ -278,7 +317,7 @@ def test_non_positive_harmony_lines_flash():
             "notes": "8",
             "motif_length": "4",
             "base_octave": "4",
-            "harmony_lines": "0",
+            "harmony_lines": "-1",
         },
     )
     assert b"Harmony lines must be greater than 0" in resp.data
@@ -659,3 +698,54 @@ def test_random_rhythm_length_matches_notes(monkeypatch):
 
     assert captured.get("length") == 4
     assert captured.get("pattern") == [0.25] * 4
+
+
+def test_temp_files_cleaned_on_failure(tmp_path, monkeypatch):
+    """Temporary preview files should be removed even if generation fails."""
+
+    created: list[Path] = []
+
+    def fake_tmpfile(suffix="", delete=False):
+        path = tmp_path / f"tmp{len(created)}{suffix}"
+        path.touch()
+
+        class Dummy:
+            def __init__(self, name):
+                self.name = str(name)
+
+            def close(self):
+                pass
+
+        created.append(path)
+        return Dummy(path)
+
+    def raise_error(*_a, **_k):
+        raise RuntimeError("fail")
+
+    monkeypatch.setattr(web_gui, "NamedTemporaryFile", fake_tmpfile)
+    monkeypatch.setattr(web_gui, "create_midi_file", raise_error)
+    monkeypatch.setattr(web_gui.playback, "render_midi_to_wav", lambda *a, **k: None)
+
+    with pytest.raises(RuntimeError):
+        web_gui._generate_preview(
+            key="C",
+            bpm=120,
+            timesig=(4, 4),
+            notes=1,
+            motif_length=1,
+            base_octave=4,
+            instrument="Piano",
+            harmony=False,
+            random_rhythm=False,
+            counterpoint=False,
+            harmony_lines=0,
+            include_chords=False,
+            chords_same=False,
+            enable_ml=False,
+            style=None,
+            chords=["C"],
+            humanize=False,
+        )
+
+    for path in created:
+        assert not path.exists()

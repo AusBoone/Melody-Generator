@@ -39,9 +39,10 @@ jobs:
         run: |
           # Upgrade pip to avoid resolution issues with optional dependencies
           python -m pip install --upgrade pip
-          # Install project in editable mode along with tools and optional packages
-          # Explicitly listing pyfluidsynth and numpy ensures the CI environment
-          # mirrors a local developer setup where these are available.
+          # Install project in editable mode along with tools and optional packages.
+          # Flask and other extras are included so web GUI tests run the same as
+          # on a local developer machine. Listing pyfluidsynth and numpy mirrors
+          # the recommended setup documented in README.md.
           pip install -e . ruff pytest pyfluidsynth numpy
 
       - name: Run Ruff

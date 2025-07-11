@@ -11,10 +11,13 @@ dependencies remain optional.
 Real applications would train a much larger network on MIDI corpora and
 load the resulting weights via :func:`load_sequence_model`.
 """
+# ``load_sequence_model`` now uses ``functools.lru_cache`` so repeated
+# requests for the same model avoid costly disk reads.
 
 from __future__ import annotations
 
 import os
+from functools import lru_cache
 from typing import List, Optional, Protocol
 
 try:
@@ -88,8 +91,24 @@ class MelodyLSTM(nn.Module):
         return logits.squeeze(0).tolist()
 
 
+@lru_cache(maxsize=None)
 def load_sequence_model(path: Optional[str], vocab_size: int) -> SequenceModel:
-    """Load a pretrained model or create a fresh one when ``path`` is absent."""
+    """Return a cached LSTM loaded from ``path`` or an untrained model.
+
+    Parameters
+    ----------
+    path:
+        Optional file system location of the saved model weights.
+        ``None`` creates a fresh model instead of loading from disk.
+    vocab_size:
+        Size of the note vocabulary used when constructing the model.
+
+    Returns
+    -------
+    SequenceModel
+        Loaded model instance. Repeated calls with the same arguments
+        return the cached object to avoid redundant disk reads.
+    """
     if torch is None:
         raise RuntimeError("PyTorch is required to load the sequence model")
 

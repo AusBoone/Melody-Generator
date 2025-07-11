@@ -38,6 +38,8 @@ musician's perspective
   generation.
 - Lookup tables and common helpers are memoized with ``functools.lru_cache``
   to speed up repeated note and scale queries.
+- Sequence models loaded for machine learning previews are cached so multiple
+  requests avoid reading the same weights from disk.
 
 # Requirements
 - Python 3.x

@@ -48,6 +48,16 @@ infrastructure.
 # be positive integers. If the user submits a value less than or equal to
 # zero, the form re-renders with an explanatory flash message so invalid
 # input never reaches the melody generation helpers.
+#
+# This update refines validation and resource management:
+#   * ``harmony_lines`` may now be zero so users can preview monophonic
+#     melodies. Negative values still trigger a flash message.
+#   * The time-signature denominator is restricted to common values
+#     (1, 2, 4, 8 or 16) matching the CLI and Tkinter GUIs.
+#   * ``_generate_preview`` cleans up temporary MIDI and WAV files even when
+#     generation fails so no stale files accumulate under ``/tmp``.
+#   * ``load_sequence_model`` caches models by path and vocabulary size to
+#     avoid repeatedly loading the same weights from disk during preview.
 
 from __future__ import annotations
 
@@ -178,46 +188,47 @@ def _generate_preview(
         extra.append(generate_counterpoint_melody(melody, key))
 
     tmp = NamedTemporaryFile(suffix=".mid", delete=False)
-    try:
-        tmp_path = tmp.name
-    finally:
-        tmp.close()
-
-    numerator, denominator = timesig
-    create_midi_file(
-        melody,
-        bpm,
-        (numerator, denominator),
-        tmp_path,
-        harmony=harmony,
-        pattern=rhythm,
-        extra_tracks=extra,
-        chord_progression=chords if include_chords else None,
-        chords_separate=not chords_same,
-        program=INSTRUMENTS.get(instrument, 0),
-        humanize=humanize,
-    )
-
     wav_tmp = NamedTemporaryFile(suffix=".wav", delete=False)
     try:
+        tmp_path = tmp.name
         wav_path = wav_tmp.name
     finally:
+        tmp.close()
         wav_tmp.close()
 
+    midi_bytes = b""
+    wav_data = None
     try:
-        playback.render_midi_to_wav(tmp_path, wav_path)
-    except MidiPlaybackError:
-        wav_data = None
-    else:
-        with open(wav_path, "rb") as fh:
-            wav_data = fh.read()
+        numerator, denominator = timesig
+        create_midi_file(
+            melody,
+            bpm,
+            (numerator, denominator),
+            tmp_path,
+            harmony=harmony,
+            pattern=rhythm,
+            extra_tracks=extra,
+            chord_progression=chords if include_chords else None,
+            chords_separate=not chords_same,
+            program=INSTRUMENTS.get(instrument, 0),
+            humanize=humanize,
+        )
+
+        with open(tmp_path, "rb") as fh:
+            midi_bytes = fh.read()
+
+        try:
+            playback.render_midi_to_wav(tmp_path, wav_path)
+        except MidiPlaybackError:
+            wav_data = None
+        else:
+            with open(wav_path, "rb") as fh:
+                wav_data = fh.read()
     finally:
         if os.path.exists(wav_path):
             os.remove(wav_path)
-
-    with open(tmp_path, "rb") as fh:
-        midi_bytes = fh.read()
-    os.remove(tmp_path)
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
 
     audio_encoded = base64.b64encode(wav_data).decode("ascii") if wav_data else ""
     midi_encoded = base64.b64encode(midi_bytes).decode("ascii")
@@ -287,7 +298,7 @@ def index():
                 styles=STYLE_VECTORS.keys(),
             )
 
-        if harmony_lines <= 0:
+        if harmony_lines < 0:
             flash("Harmony lines must be greater than 0.")
             return render_template(
                 'index.html',
@@ -338,13 +349,18 @@ def index():
             if len(parts) != 2:
                 raise ValueError
             numerator, denominator = map(int, parts)
-            if numerator <= 0 or denominator <= 0:
+            if numerator <= 0 or denominator not in {1, 2, 4, 8, 16}:
                 raise ValueError
         except ValueError:
             flash(
-                "Time signature must be two integers in the form 'numerator/denominator' with numerator > 0 and denominator > 0."
+                "Time signature must be in the form 'numerator/denominator' with numerator > 0 and denominator one of 1, 2, 4, 8 or 16."
             )
-            return render_template('index.html', scale=sorted(SCALE.keys()), instruments=INSTRUMENTS.keys(), styles=STYLE_VECTORS.keys())
+            return render_template(
+                'index.html',
+                scale=sorted(SCALE.keys()),
+                instruments=INSTRUMENTS.keys(),
+                styles=STYLE_VECTORS.keys(),
+            )
 
         if motif_length > notes:
             flash("Motif length cannot exceed the number of notes.")
