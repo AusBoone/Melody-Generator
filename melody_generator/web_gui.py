@@ -67,6 +67,7 @@ from typing import List, Optional
 
 from melody_generator import playback
 from melody_generator.playback import MidiPlaybackError
+from melody_generator.utils import validate_time_signature
 
 try:
     from celery import Celery
@@ -345,12 +346,7 @@ def index():
                         return render_template('index.html', scale=sorted(SCALE.keys()), instruments=INSTRUMENTS.keys(), styles=STYLE_VECTORS.keys())
 
         try:
-            parts = timesig.split('/')
-            if len(parts) != 2:
-                raise ValueError
-            numerator, denominator = map(int, parts)
-            if numerator <= 0 or denominator not in {1, 2, 4, 8, 16}:
-                raise ValueError
+            numerator, denominator = validate_time_signature(timesig)
         except ValueError:
             flash(
                 "Time signature must be in the form 'numerator/denominator' with numerator > 0 and denominator one of 1, 2, 4, 8 or 16."
