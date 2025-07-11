@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
+import random
 from importlib import import_module
 from typing import List
 
@@ -71,6 +72,7 @@ def run_cli() -> None:
     parser.add_argument("--include-chords", action="store_true", help="Add the chord progression to the MIDI output")
     parser.add_argument("--chords-same-track", action="store_true", help="Write chords on the melody track instead of a new one")
     parser.add_argument("--instrument", type=int, default=0, help="MIDI program number for the melody instrument")
+    parser.add_argument("--seed", type=int, help="Random seed for reproducible output")
     parser.add_argument("--no-humanize", dest="humanize", action="store_false", help="Disable timing and velocity randomization")
     parser.add_argument("--enable-ml", action="store_true", help="Activate ML-based weighting using a small sequence model")
     parser.add_argument("--style", type=str, help="Optional style name to bias note selection")
@@ -99,9 +101,22 @@ def run_cli() -> None:
         logging.error("Instrument must be between 0 and 127.")
         sys.exit(1)
 
+    if args.harmony_lines < 0:
+        logging.error("Harmony lines must be non-negative")
+        sys.exit(1)
+
     if not MIN_OCTAVE <= args.base_octave <= MAX_OCTAVE:
         logging.error(f"Base octave must be between {MIN_OCTAVE} and {MAX_OCTAVE}.")
         sys.exit(1)
+
+    if args.seed is not None:
+        random.seed(args.seed)
+        try:  # pragma: no cover - numpy may be absent
+            import numpy as _np
+
+            _np.random.seed(args.seed)
+        except Exception:
+            pass
 
     try:
         from . import (

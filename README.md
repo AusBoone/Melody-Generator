@@ -120,7 +120,8 @@ melody-generator \
   --soundfont /path/to/font.sf2 \
   --output song.mid \
   --no-humanize \
-  --harmony --counterpoint --harmony-lines 1
+  --harmony --counterpoint --harmony-lines 1 \
+  --seed 42
 ```
 
 This command creates `song.mid` with one harmony line and an additional counterpoint track.
@@ -203,7 +204,7 @@ When running from the command line you can supply optional flags:
 - `--random-chords N` generates a progression of `N` random chords and ignores `--chords`.
 - `--random-rhythm` creates a random rhythmic pattern for the melody.
 - `--harmony` adds a parallel harmony track.
-- `--harmony-lines N` creates `N` additional harmony parts.
+ - `--harmony-lines N` creates `N` additional harmony parts. Values must be non-negative.
 - `--counterpoint` generates a contrapuntal line based on the melody.
 - `--base-octave N` sets the starting octave of the melody (0-8,
   default: 4).
@@ -217,6 +218,7 @@ When running from the command line you can supply optional flags:
   informed by training data.
 - `--style NAME` selects a predefined style embedding to bias the melody toward
   a genre such as blues or chiptune.
+ - `--seed N` sets the random seed for reproducible output.
 
 ## Development
 

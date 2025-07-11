@@ -15,6 +15,7 @@ from pathlib import Path
 import types
 import threading
 import time
+import random
 import pytest
 
 def load_module():
@@ -332,6 +333,7 @@ def test_generate_button_click(tmp_path, monkeypatch):
     gui.counterpoint_fn = cp
     gui.save_settings = None
     gui.rhythm_pattern = None
+    gui.seed_var = types.SimpleNamespace(get=lambda: "")
     gui.ml_var = types.SimpleNamespace(get=lambda: False)
     gui.style_var = types.SimpleNamespace(get=lambda: "")
     gui.key_var = types.SimpleNamespace(get=lambda: "C")
@@ -407,6 +409,7 @@ def test_generate_button_click_non_positive(tmp_path, monkeypatch):
     gui.counterpoint_fn = None
     gui.save_settings = None
     gui.rhythm_pattern = None
+    gui.seed_var = types.SimpleNamespace(get=lambda: "")
     gui.ml_var = types.SimpleNamespace(get=lambda: False)
     gui.style_var = types.SimpleNamespace(get=lambda: "")
     gui.key_var = types.SimpleNamespace(get=lambda: "C")
@@ -448,6 +451,7 @@ def test_generate_button_click_invalid_denominator(tmp_path, monkeypatch):
     gui.counterpoint_fn = None
     gui.save_settings = None
     gui.rhythm_pattern = None
+    gui.seed_var = types.SimpleNamespace(get=lambda: "")
     gui.ml_var = types.SimpleNamespace(get=lambda: False)
     gui.style_var = types.SimpleNamespace(get=lambda: "")
     gui.key_var = types.SimpleNamespace(get=lambda: "C")
@@ -494,6 +498,7 @@ def test_generate_button_click_invalid_numerator(tmp_path, monkeypatch):
     gui.counterpoint_fn = None
     gui.save_settings = None
     gui.rhythm_pattern = None
+    gui.seed_var = types.SimpleNamespace(get=lambda: "")
     gui.ml_var = types.SimpleNamespace(get=lambda: False)
     gui.style_var = types.SimpleNamespace(get=lambda: "")
     gui.key_var = types.SimpleNamespace(get=lambda: "C")
@@ -540,6 +545,7 @@ def test_generate_button_click_motif_exceeds_notes(tmp_path, monkeypatch):
     gui.counterpoint_fn = None
     gui.save_settings = None
     gui.rhythm_pattern = None
+    gui.seed_var = types.SimpleNamespace(get=lambda: "")
     gui.ml_var = types.SimpleNamespace(get=lambda: False)
     gui.style_var = types.SimpleNamespace(get=lambda: "")
     gui.key_var = types.SimpleNamespace(get=lambda: "C")
@@ -583,6 +589,7 @@ def test_generate_button_click_invalid_base_octave(tmp_path, monkeypatch):
     gui.counterpoint_fn = None
     gui.save_settings = None
     gui.rhythm_pattern = None
+    gui.seed_var = types.SimpleNamespace(get=lambda: "")
     gui.ml_var = types.SimpleNamespace(get=lambda: False)
     gui.style_var = types.SimpleNamespace(get=lambda: "")
     gui.key_var = types.SimpleNamespace(get=lambda: "C")
@@ -706,6 +713,87 @@ def test_cli_non_positive_values_exit(tmp_path):
     sys.argv = old
 
 
+def test_cli_negative_harmony_lines_exit(tmp_path):
+    """``run_cli`` exits when ``--harmony-lines`` is negative."""
+
+    mod, _, _ = load_module()
+    out = tmp_path / "bad.mid"
+    argv = [
+        "prog",
+        "--key",
+        "C",
+        "--chords",
+        "C,G",
+        "--bpm",
+        "120",
+        "--timesig",
+        "4/4",
+        "--notes",
+        "4",
+        "--base-octave",
+        "4",
+        "--harmony-lines",
+        "-1",
+        "--output",
+        str(out),
+    ]
+    old = sys.argv
+    sys.argv = argv
+    with pytest.raises(SystemExit):
+        mod.run_cli()
+    sys.argv = old
+
+
+def test_cli_seed_reproducible(monkeypatch, tmp_path):
+    """Providing ``--seed`` should make output deterministic."""
+
+    mod, _, _ = load_module()
+    out1 = tmp_path / "s1.mid"
+    out2 = tmp_path / "s2.mid"
+
+    results = []
+
+    def gen_mel(*_args, **_kw):
+        return [str(random.random()) for _ in range(2)]
+
+    def create(mel, *_a, **_k):
+        results.append(list(mel))
+
+    monkeypatch.setattr(mod, "generate_melody", gen_mel)
+    monkeypatch.setattr(mod, "create_midi_file", create)
+
+    argv = [
+        "prog",
+        "--key",
+        "C",
+        "--chords",
+        "C,G",
+        "--bpm",
+        "120",
+        "--timesig",
+        "4/4",
+        "--notes",
+        "2",
+        "--motif_length",
+        "2",
+        "--base-octave",
+        "4",
+        "--seed",
+        "5",
+        "--output",
+        str(out1),
+    ]
+    old = sys.argv
+    sys.argv = argv
+    mod.run_cli()
+    argv[-1] = str(out2)
+    sys.argv = argv
+    mod.run_cli()
+    sys.argv = old
+
+    assert results and results[0] == results[1]
+
+
 def test_cli_motif_exceeds_notes_exit(tmp_path):
     """Motif lengths longer than ``--notes`` should abort execution.
 
@@ -811,6 +899,7 @@ def test_preview_button_uses_playback(monkeypatch, tmp_path):
     gui.counterpoint_fn = None
     gui.save_settings = None
     gui.rhythm_pattern = None
+    gui.seed_var = types.SimpleNamespace(get=lambda: "")
     gui.ml_var = types.SimpleNamespace(get=lambda: False)
     gui.style_var = types.SimpleNamespace(get=lambda: "")
     gui.key_var = types.SimpleNamespace(get=lambda: "C")
@@ -855,6 +944,7 @@ def test_preview_button_falls_back(monkeypatch, tmp_path):
     gui.counterpoint_fn = None
     gui.save_settings = None
     gui.rhythm_pattern = None
+    gui.seed_var = types.SimpleNamespace(get=lambda: "")
     gui.ml_var = types.SimpleNamespace(get=lambda: False)
     gui.style_var = types.SimpleNamespace(get=lambda: "")
     gui.key_var = types.SimpleNamespace(get=lambda: "C")
@@ -902,6 +992,7 @@ def test_preview_file_removed(monkeypatch, tmp_path):
     gui.counterpoint_fn = None
     gui.save_settings = None
     gui.rhythm_pattern = None
+    gui.seed_var = types.SimpleNamespace(get=lambda: "")
     gui.ml_var = types.SimpleNamespace(get=lambda: False)
     gui.style_var = types.SimpleNamespace(get=lambda: "")
     gui.key_var = types.SimpleNamespace(get=lambda: "C")
@@ -949,6 +1040,7 @@ def test_preview_file_waits_for_player(monkeypatch):
     gui.counterpoint_fn = None
     gui.save_settings = None
     gui.rhythm_pattern = None
+    gui.seed_var = types.SimpleNamespace(get=lambda: "")
     gui.ml_var = types.SimpleNamespace(get=lambda: False)
     gui.style_var = types.SimpleNamespace(get=lambda: "")
     gui.key_var = types.SimpleNamespace(get=lambda: "C")
