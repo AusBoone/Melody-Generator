@@ -41,6 +41,7 @@ from . import (
     MIN_OCTAVE,
     SCALE,
 )
+from .utils import validate_time_signature
 
 
 __all__ = ["run_cli", "main"]
@@ -164,12 +165,7 @@ def run_cli() -> None:
                 sys.exit(1)
 
     try:
-        parts = args.timesig.split("/")
-        if len(parts) != 2:
-            raise ValueError
-        numerator, denominator = map(int, parts)
-        if numerator <= 0 or denominator not in {1, 2, 4, 8, 16}:
-            raise ValueError
+        numerator, denominator = validate_time_signature(args.timesig)
     except ValueError:
         logging.error(
             "Time signature must be in the form 'numerator/denominator' with numerator > 0 and denominator one of 1, 2, 4, 8 or 16."

@@ -66,6 +66,9 @@ create_midi_file = mg.create_midi_file
 MIN_OCTAVE = mg.MIN_OCTAVE
 MAX_OCTAVE = mg.MAX_OCTAVE
 PolyphonicGenerator = importlib.import_module("melody_generator.polyphony").PolyphonicGenerator
+validate_time_signature = importlib.import_module(
+    "melody_generator.utils"
+).validate_time_signature
 
 
 def test_create_midi_file_empty_chord_progression(tmp_path) -> None:
@@ -90,3 +93,21 @@ def test_generate_base_octaves_out_of_range() -> None:
         gen.generate("C", 4, ["C"], base_octaves={"soprano": MIN_OCTAVE - 1})
     with pytest.raises(ValueError):
         gen.generate("C", 4, ["C"], base_octaves={"alto": MAX_OCTAVE + 1})
+
+
+def test_validate_time_signature_success() -> None:
+    """Typical time signatures should parse into integer tuples."""
+
+    assert validate_time_signature("4/4") == (4, 4)
+    assert validate_time_signature("7/8") == (7, 8)
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["4", "3/5", "0/4", "-2/4", "A/B"],
+)
+def test_validate_time_signature_errors(value: str) -> None:
+    """Malformed or unsupported signatures should raise ``ValueError``."""
+
+    with pytest.raises(ValueError):
+        validate_time_signature(value)
