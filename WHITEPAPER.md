@@ -91,6 +91,35 @@ the same logic but operate on separate voices.
 5. **Cadence Enforcement** – the final note resolves to the tonic of the last chord for a clear ending.
 During step 2 the candidate pool is built from cached scale and chord notes using `_candidate_pool`. Weights begin with `compute_base_weights` and are adjusted by style embeddings, sequence model logits and the current tension target. Counterpoint helpers penalise parallel fifths or octaves. NumPy accelerates these calculations when available.
 
+## Algorithm Complexity
+
+The core generation loop performs a constant amount of work for each produced
+note. Candidate pools are cached per chord and octave so the selection step does
+not rebuild lists on every iteration. As a result the algorithm runs in
+**O(n)** time where *n* is the number of notes requested. Phrase planning and
+post-processing steps scale with the number of bars, typically a small constant
+factor. Memory usage remains linear with the melody length since only a history
+of recent notes is retained.
+
+Although the overall complexity is linear, the constant factors matter in
+practice. Let *c* represent the average number of candidate pitches examined
+per step. The weighting procedure consults style embeddings, neural logits and
+voice-leading heuristics, yielding a per-note cost of roughly *O(c)*. Because
+`c` rarely exceeds a few dozen values, the approach remains tractable even when
+generating multi-minute phrases. Polyphonic generation duplicates this cost for
+each active voice, so a four-part texture is still **O(n)** but with a factor of
+four in both time and memory. The design intentionally avoids quadratic
+behaviour so that the generator scales to longer compositions without requiring
+specialised hardware.
+
+```text
+for i in range(n):
+    chord = progression[i % len(progression)]
+    candidates = cached_pool[chord]
+    next_note = weighted_choice(candidates)
+    melody.append(next_note)
+```
+
 ## Machine Learning Components
 
 Neural models are optional yet integrate tightly with the heuristic pipeline.
@@ -145,6 +174,51 @@ while `refine_with_fmd` slightly alters notes when it reduces the distance.
 These metrics provide an objective gauge when experimenting with new models or
 heuristics.
 
+### Recommended Pipeline
+
+1. **Collect MIDI files** from public datasets such as the Lakh corpus or
+   user-generated material.
+2. **Convert** each file to a sequence of scale degrees with
+   `midi_to_degrees` and align rhythms to the nearest 16th note.
+3. **Filter** out fragments shorter than eight bars or containing unsupported
+   time signatures.
+4. **Augment** the remaining sequences using `augment_sequences` to apply
+   transpositions and rhythmic jitter.
+5. **Split** the data into training and validation sets before feeding them to
+   `fine_tune_model` or another `SequenceModel` implementation.
+
+```text
+for midi in corpus:
+    degrees = midi_to_degrees(midi)
+    if len(degrees) < threshold:
+        continue
+    for seq in augment_sequences(degrees):
+        write_to_dataset(seq)
+```
+
+This process yields a balanced collection of melodies in a uniform format,
+ready for training lightweight models that bias note selection.
+
+When constructing a large corpus it is beneficial to maintain provenance
+metadata. Keeping track of the original source, applied augmentations and any
+manual corrections aids reproducibility and allows subsets to be reconstructed
+for ablation studies. A typical workflow writes an index file alongside the
+preprocessed sequences that records these details in JSON:
+
+```text
+{
+    "src": "lakh/1234.mid",
+    "transposition": 2,
+    "stretch": 1.0,
+    "valid_bars": 12
+}
+```
+
+Researchers may then implement stratified sampling or k-fold cross validation
+directly on this metadata, ensuring each experiment draws from comparable
+distributions. Where licensing permits, sharing these indices rather than raw
+MIDI files simplifies collaboration while respecting copyright.
+
 ## Usage Examples
 
 Command‑line invocation is the most common entry point.  See `README.md` for a
@@ -190,6 +264,26 @@ SoundFont resources.
   short guide aimed at classically trained musicians.
 - [`docs/README_FLUIDSYNTH.md`](docs/README_FLUIDSYNTH.md) describes how to
   install the FluidSynth dependency.
+
+## Security Considerations
+
+Melody‑Generator performs all processing locally and does not require network
+access once dependencies are installed. Nevertheless you should treat any
+downloaded MIDI files with caution, as they may embed unusual metadata. The
+loader strips non-MIDI chunks to prevent file parsing issues. If using the web
+interface, run it on ``localhost`` and avoid exposing it to the public internet
+without additional authentication and rate limiting.
+
+From a security engineering standpoint the most likely attack vector involves
+malicious MIDI files crafted to exploit parser vulnerabilities. The project
+therefore opens files in binary mode and validates chunk headers before
+processing any events. Paths supplied on the command line are resolved to their
+canonical forms to mitigate directory traversal attacks. Users embedding the
+library within larger applications should apply the principle of least
+privilege—read-only filesystem permissions and sandboxing where practical—to
+isolate the generation process from sensitive data. None of the components need
+elevated privileges, so dropping capabilities is recommended when launching the
+web interface as a long-running service.
 
 ## Design Considerations and Extensibility
 
