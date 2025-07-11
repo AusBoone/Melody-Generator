@@ -1,5 +1,10 @@
 """Utilities for writing MIDI files and previewing them.
 
+Modification summary
+--------------------
+* ``create_midi_file`` now creates the destination directory automatically so
+  callers can pass a path in a new folder without preparing it.
+
 This module contains the low-level helpers used to render melodies as MIDI and
 open the resulting files with the user's default player. It is separated from
 the main package so applications can use the MIDI functionality without
@@ -12,6 +17,7 @@ import logging
 import math
 import random
 import threading
+from pathlib import Path
 from typing import List, Optional, Tuple
 
 import mido
@@ -45,7 +51,9 @@ def create_midi_file(
 
     Chord names supplied via ``chord_progression`` are canonicalised using
     :func:`canonical_chord` so case-insensitive input is accepted. Unknown
-    chords raise ``ValueError`` before any MIDI events are created.
+    chords raise ``ValueError`` before any MIDI events are created. The parent
+    directory of ``output_file`` is created automatically so callers may supply
+    paths in a new folder without preparing it beforehand.
     """
 
     if chord_progression is not None and not chord_progression:
@@ -205,6 +213,10 @@ def create_midi_file(
 
     if humanize:
         humanize_events(mid.tracks[0])
+
+    # Ensure the destination directory exists so ``mid.save`` succeeds even
+    # when the caller specifies a path in a new folder.
+    Path(output_file).expanduser().parent.mkdir(parents=True, exist_ok=True)
 
     mid.save(output_file)
     logging.info("MIDI file saved to %s", output_file)

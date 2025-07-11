@@ -249,3 +249,16 @@ def test_play_midi_missing_fluidsynth(monkeypatch, tmp_path):
         match="Install the FluidSynth library",
     ):
         playback.play_midi(str(midi))
+
+
+def test_render_midi_missing_file(monkeypatch, tmp_path):
+    """Nonexistent MIDI input should raise ``MidiPlaybackError``."""
+
+    wav = tmp_path / "out.wav"
+
+    # ``_resolve_soundfont`` would search the filesystem; bypass it for speed
+    # and determinism in the unit test.
+    monkeypatch.setattr(playback, "_resolve_soundfont", lambda sf: str(tmp_path / "font.sf2"))
+
+    with pytest.raises(MidiPlaybackError, match="MIDI file not found"):
+        render_midi_to_wav(str(tmp_path / "missing.mid"), str(wav))

@@ -1,5 +1,10 @@
 """Command line helpers for Melody Generator.
 
+Modification summary
+--------------------
+* Expanded module docstring with an explicit usage example and notes on design
+  assumptions.
+
 This module implements the console entry points for the project. The
 ``run_cli`` function parses command line arguments and performs melody
 generation while :func:`main` decides whether to show the GUI or process CLI
@@ -9,6 +14,14 @@ save user preferences at a custom path.
 Keeping the CLI logic separated from the GUI widgets simplifies testing and
 allows other applications to reuse the generation routines without importing
 ``tkinter``.
+
+Example
+-------
+Running ``python -m melody_generator.cli --key C --chords C,G,Am,F --bpm 120 \
+    --timesig 4/4 --notes 16 --output out.mid`` will create a 16-note melody in
+the key of C and save it to ``out.mid``. The CLI assumes FluidSynth is installed
+for playback if requested and relies on ``--settings-file`` only when the GUI is
+launched without additional arguments.
 """
 
 from __future__ import annotations
