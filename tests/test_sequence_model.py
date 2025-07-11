@@ -151,3 +151,23 @@ def test_quantize_onnx_model_requires_runtime(monkeypatch):
 
     with pytest.raises(RuntimeError):
         seq.quantize_onnx_model("model.onnx", "quant.onnx")
+
+
+def test_load_sequence_model_cached(monkeypatch):
+    """Repeated loads of the same model path should reuse the instance."""
+
+    seq_mod = importlib.reload(importlib.import_module("melody_generator.sequence_model"))
+
+    calls = []
+
+    class DummyModel:
+        def __init__(self, vocab):
+            calls.append(vocab)
+
+    monkeypatch.setattr(seq_mod, "MelodyLSTM", DummyModel)
+
+    m1 = seq_mod.load_sequence_model(None, 5)
+    m2 = seq_mod.load_sequence_model(None, 5)
+
+    assert m1 is m2
+    assert calls == [5]
