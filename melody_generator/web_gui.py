@@ -58,6 +58,8 @@ infrastructure.
 #     generation fails so no stale files accumulate under ``/tmp``.
 #   * ``load_sequence_model`` caches models by path and vocabulary size to
 #     avoid repeatedly loading the same weights from disk during preview.
+#   * Flash message for invalid harmony line counts now clarifies that zero is
+#     permitted.
 
 from __future__ import annotations
 
@@ -300,7 +302,9 @@ def index():
             )
 
         if harmony_lines < 0:
-            flash("Harmony lines must be greater than 0.")
+            # Inform the user that negative values are invalid while zero is
+            # acceptable so monophonic melodies remain supported.
+            flash("Harmony lines must be non-negative.")
             return render_template(
                 'index.html',
                 scale=sorted(SCALE.keys()),
