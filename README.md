@@ -101,6 +101,9 @@ summarized in the [Environment Variables](#environment-variables) section.
   `fluid-soundfont-gm` package).
 - `FLASK_SECRET` – Secret key for the web interface session. If omitted a
   random key is generated each run.
+- `CELERY_BROKER_URL` – URL of the Celery broker used for asynchronous preview
+  generation. Defaults to `memory://` so the web interface works without
+  additional services.
 
 # Usage
 
@@ -176,6 +179,9 @@ python -m melody_generator.web_gui
    logged.
 6. Optionally set `FLASK_DEBUG=1` to enable Flask debug mode during
    development.
+7. Set `CELERY_BROKER_URL` to the address of a Celery broker if you want
+   preview generation handled asynchronously. If the broker is unreachable the
+   server falls back to synchronous generation so your request still succeeds.
 
 
 ## Docker Usage
