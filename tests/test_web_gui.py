@@ -320,7 +320,8 @@ def test_negative_harmony_lines_flash():
             "harmony_lines": "-1",
         },
     )
-    assert b"Harmony lines must be greater than 0" in resp.data
+    # The form should explicitly allow zero harmony lines but reject negatives.
+    assert b"Harmony lines must be non-negative" in resp.data
 
 
 def test_include_chords_flag():
