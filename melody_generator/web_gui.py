@@ -60,6 +60,8 @@ infrastructure.
 #     avoid repeatedly loading the same weights from disk during preview.
 #   * Flash message for invalid harmony line counts now clarifies that zero is
 #     permitted.
+#   * Unchecked "Humanize performance" checkbox now correctly disables the
+#     feature by treating a missing form field as ``False``.
 
 from __future__ import annotations
 
@@ -327,7 +329,9 @@ def index():
         counterpoint = bool(request.form.get('counterpoint'))
         include_chords = bool(request.form.get('include_chords'))
         chords_same = bool(request.form.get('chords_same'))
-        humanize = bool(request.form.get('humanize', '1'))
+        # Treat a missing checkbox as ``False`` so unchecking actually
+        # disables the humanize feature.
+        humanize = bool(request.form.get('humanize'))
         enable_ml = bool(request.form.get('enable_ml'))
         style = request.form.get('style') or None
 

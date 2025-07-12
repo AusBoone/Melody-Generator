@@ -46,7 +46,7 @@ jobs:
           # Flask and other extras are included so web GUI tests run the same as
           # on a local developer machine. Listing pyfluidsynth and numpy mirrors
           # the recommended setup documented in README.md.
-          pip install -e . ruff pytest pyfluidsynth numpy
+          pip install -e . ruff pytest pyfluidsynth numpy Flask
 
       - name: Run Ruff
         run: ruff check .
