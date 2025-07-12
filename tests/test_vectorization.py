@@ -1,3 +1,5 @@
+"""Tests for vectorised helpers in the voice leading module."""
+
 import importlib
 import sys
 import types

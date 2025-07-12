@@ -56,6 +56,7 @@ def apply_tension_weights(weights, tensions: Iterable[float], target: float):
     """Bias ``weights`` toward the ``target`` tension level."""
 
     values = [1 / (1 + abs(t - target)) for t in tensions]
-    if hasattr(weights, "__mul__") and not isinstance(weights, list):
+    if hasattr(weights, "__mul__") and not isinstance(weights, list) and np is not None:
+        # NumPy may be missing so guard the vectorized path to avoid attribute errors
         return weights * np.array(values)
     return [w * v for w, v in zip(weights, values)]
