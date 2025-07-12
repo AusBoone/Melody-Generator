@@ -151,3 +151,20 @@ def test_load_styles_invalid_format(tmp_path):
     with pytest.raises(ValueError):
         style.load_styles(str(bad))
 
+
+def test_load_styles_yaml(tmp_path):
+    """Styles defined in YAML files should load correctly."""
+
+    pytest.importorskip(
+        "yaml"
+    )  # Skip test entirely when optional PyYAML is missing
+
+    # Create a minimal YAML file defining an extra style vector
+    path = tmp_path / "styles.yaml"
+    path.write_text("folk: [0.1, 0.6, 0.3]\n")
+
+    style.load_styles(str(path))
+    # Verify the new style can be retrieved just like built-in presets.
+    # ``list`` ensures equality regardless of NumPy usage internally.
+    assert list(style.get_style_vector("folk")) == [0.1, 0.6, 0.3]
+
