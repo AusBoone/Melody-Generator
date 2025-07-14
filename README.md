@@ -43,14 +43,21 @@ musician's perspective
    melody-generator
    ```
 
+   If the command is not found, ensure your environment's `bin` directory is on
+   your `PATH`.
+
    If you prefer running directly from the source without installation, use:
 
    ```bash
    python -m melody_generator
    ```
 
+   Run this from the **project root** so Python locates the package correctly.
+
    Avoid executing `python melody_generator.py` because the package must be run
-   as a module for its relative imports to resolve correctly.
+   as a module for its relative imports to resolve correctly. Running inside the
+   `melody_generator/` subdirectory will result in `No module named
+   melody_generator`.
 
 ## Features
 
