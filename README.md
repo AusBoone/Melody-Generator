@@ -13,33 +13,72 @@ the machine learning components used for style embeddings and sequence models
 musician's perspective
 ([docs/README_MUSICAL_OVERVIEW.md](docs/README_MUSICAL_OVERVIEW.md)).
 
+## Getting Started
+
+1. **Download the project**
+   - Clone it with `git clone https://github.com/AusBoone/Melody-Generator.git`.
+   - Or select **Code → Download ZIP** on GitHub and extract the archive.
+2. **Open a terminal** and change into the directory:
+
+   ```bash
+   cd Melody-Generator
+   ```
+
+3. **Create a virtual environment** (optional but recommended):
+
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate  # On Windows use .venv\Scripts\activate
+   ```
+
+4. **Install the package and its dependencies**:
+
+   ```bash
+   pip install .
+   ```
+
+5. **Launch the graphical interface** with the installed command:
+
+   ```bash
+   melody-generator
+   ```
+
+   If you prefer running directly from the source without installation, use:
+
+   ```bash
+   python -m melody_generator
+   ```
+
+   Avoid executing `python melody_generator.py` because the package must be run
+   as a module for its relative imports to resolve correctly.
+
 ## Features
 
-- Additional modes like Dorian, Mixolydian and pentatonic scales.
-- Automatic chord progressions based on common pop patterns.
-- Cross-platform setup scripts now ship with executable permissions for one-step
-  installation.
-- Dynamic velocity in the MIDI output for a more natural sound.
-- Optional performance humanization adds slight timing and velocity
-  variations. This can be disabled for fully quantized output.
-- Expanded rhythmic patterns including eighth- and sixteenth-note figures.
-- GUI button to reload saved preferences at any time.
-- GUI can preview the generated melody before saving.
-- Harmony and counterpoint tracks for multi-line melodies.
-- Melodic rules such as leap compensation to avoid jarring jumps.
-- Optional base octave parameter to constrain the melody's register with
-  occasional octave shifts.
-- Variations when motifs repeat so phrases remain interesting.
-- Style embeddings and an optional sequence model bias note selection for
-  genre-specific melodies.
-- Web interface now previews the generated melody using a WAV rendering created
-  with FluidSynth.
+### Melody generation
+- Supports major, minor and modal scales such as Dorian or Mixolydian
+- Offers built-in chord progressions and rhythmic patterns
+- Can add harmony or counterpoint lines
+- Enforces smooth motion using simple melodic rules
+- Style embeddings and a lightweight sequence model tailor note choices
+
+### User interface
+- GUI previews the melody before saving and can reload saved preferences
+- Web interface provides a WAV preview via FluidSynth
+
+### Output customization
+- Dynamic velocity for a more natural sound
+- Optional performance humanization with timing and velocity variations
+- Optional base octave parameter to constrain the register
+- Variations when motifs repeat so phrases remain interesting
+
+### Performance and infrastructure
 - Batch export helper uses ``ProcessPoolExecutor`` and Celery for parallel
-  generation.
-- Lookup tables and common helpers are memoized with ``functools.lru_cache``
-  to speed up repeated note and scale queries.
-- Sequence models loaded for machine learning previews are cached so multiple
-  requests avoid reading the same weights from disk.
+  generation
+- Lookup tables and helpers are memoized with ``functools.lru_cache`` to speed
+  up note and scale queries
+- Sequence models cached to avoid reloading weights from disk
+- Cross-platform setup scripts ship with executable permissions for one-step
+  installation
 
 # Requirements
 - Python 3.x
