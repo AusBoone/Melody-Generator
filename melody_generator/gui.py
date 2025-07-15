@@ -25,6 +25,9 @@ counterpoint generation is delegated to :mod:`melody_generator`.
 # * ``_generate_button_click`` now validates ``base_octave`` against
 #   ``MIN_OCTAVE`` and ``MAX_OCTAVE`` so the register remains within the
 #   MIDI specification.
+# * ``__init__`` creates the Tk root before any ``BooleanVar`` or
+#   ``StringVar`` objects to comply with Python 3.12's stricter Tkinter
+#   initialization requirements.
 # ---------------------------------------------------------------
 from __future__ import annotations
 
@@ -118,15 +121,21 @@ class MelodyGeneratorGUI:
         self.counterpoint_fn = counterpoint_fn
 
         self.rhythm_pattern: Optional[List[float]] = None
-        self.ml_var = tk.BooleanVar(value=False)
-        self.humanize_var = tk.BooleanVar(value=True)
-        self.style_var = tk.StringVar(value="")
-        # Seed for deterministic generation. Empty string disables seeding.
-        self.seed_var = tk.StringVar(value="")
-        self.styles = sorted(STYLE_VECTORS.keys())
 
+        # The Tk root must exist before creating any Tkinter variables.
+        # Python 3.12 enforces this requirement whereas older versions
+        # implicitly created a root.  By instantiating the window first and
+        # explicitly passing it as ``master`` all ``BooleanVar`` and
+        # ``StringVar`` objects are guaranteed a valid context.
         self.root = tk.Tk()
         self.root.title("Melody Generator")
+
+        self.ml_var = tk.BooleanVar(master=self.root, value=False)
+        self.humanize_var = tk.BooleanVar(master=self.root, value=True)
+        self.style_var = tk.StringVar(master=self.root, value="")
+        # Seed for deterministic generation. Empty string disables seeding.
+        self.seed_var = tk.StringVar(master=self.root, value="")
+        self.styles = sorted(STYLE_VECTORS.keys())
 
         self._setup_theme()
         self._build_widgets()
