@@ -28,12 +28,10 @@ from typing import Iterable
 try:
     import numpy as np
 except Exception:  # pragma: no cover - optional dependency
-    import types
-
-    def _array(vals):
-        return vals
-
-    np = types.SimpleNamespace(array=_array)
+    # NumPy is optional; when it's missing ``np`` is simply set to ``None`` so
+    # callers can check availability.  All functions in this module handle the
+    # ``None`` case and fall back to pure Python implementations.
+    np = None
 
 
 
