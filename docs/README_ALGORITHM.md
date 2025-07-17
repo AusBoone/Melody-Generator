@@ -1,24 +1,39 @@
 # Melody Generation Algorithm
 
-This document is aimed at readers interested in the musical and probabilistic
-foundations of the generator.
+This document explains the heuristics and optional machine learning components
+used by Melody-Generator.  It is intended for researchers who want a technical
+overview of the process.
+
+## Contents
+
+1. [Overview](#overview)
+2. [Step-by-Step Process](#step-by-step-process)
+3. [Pseudocode](#pseudocode)
+4. [Design Goals](#design-goals)
+5. [Technical Notes](#technical-notes)
+6. [Recent Additions](#recent-additions)
+7. [Candidate Weighting in Depth](#candidate-weighting-in-depth)
+8. [ONNX Export and Quantization](#onnx-export-and-quantization)
+9. [Putting It All Together](#putting-it-all-together)
+10. [Theoretical Background](#theoretical-background)
+11. [Complexity Analysis](#complexity-analysis)
+12. [Further Reading](#further-reading)
 
 ## Overview
 
-The generator constructs a concise motif and reiterates it over the requested
-number of measures. Each pass through the motif may transpose or mutate the
-original material, mirroring the variation techniques found in classical forms.
-Candidate notes are selected from the active chord and surrounding scale tones,
-yielding a small set that can be treated as a first-order Markov state. The
-resulting sequence balances repetition with stochastic choice. Harmony is
-specified either directly by the user or by the helper function
-`generate_random_chord_progression`.
+At a high level the algorithm constructs a short motif and repeats it with small
+variations. Random choices are influenced by the surrounding chord and scale so
+the melody remains tonally grounded.  Optional machine learning models provide
+additional bias toward smooth contours and genre-specific styles.
 
-While the algorithm is primarily heuristic, optional machine learning models can
-subtly bias these choices. A lightweight LSTM predicts the next scale degree and
-style embeddings derived from a variational autoencoder nudge the weights toward
-specific genres. These components act as learned priors layered atop the
-hand-crafted rules, providing a blend of determinism and data-driven variation.
+- **Motif repetition** – A seed fragment is varied across the requested number
+  of measures.
+- **Chord awareness** – Candidate notes are drawn from the active chord and its
+  associated scale.
+- **Weighted randomness** – Transition probabilities favour stepwise motion but
+  allow occasional leaps.
+- **Machine learning hooks** – An LSTM and VAE can adjust weights toward
+  smoother or genre-specific output.
 
 ## Step-by-Step Process
 
@@ -53,7 +68,7 @@ hand-crafted rules, providing a blend of determinism and data-driven variation.
    counterpoint melodies and chord tracks. These follow the same scale and chord
    rules so they blend with the main melody.
 
-### Pseudocode Overview
+## Pseudocode
 
 ```
 motif = generate_motif(length, key)
@@ -206,7 +221,7 @@ training corpus. Up to five percent of notes are randomly replaced in a
 hill-climbing loop and kept only when the FMD decreases, nudging melodies
 toward the distribution of real music.
 
-### ONNX Export and Quantization
+## ONNX Export and Quantization
 
 The helper :func:`melody_generator.sequence_model.export_onnx` exports an LSTM
 to ONNX format. :func:`melody_generator.sequence_model.quantize_onnx_model`
@@ -223,3 +238,46 @@ extensions are enabled they act only as soft preferences, leaving the
 deterministic backbone intact. This design keeps the system lightweight and
 interpretable while still allowing researchers to experiment with more advanced
 models.
+
+## Theoretical Background
+
+While the implementation focuses on pragmatic heuristics, the overall design
+draws upon established research in algorithmic composition. Candidate
+selections correspond to a Markov process in which each state represents the
+current scale degree and rhythmic position. Transition probabilities are biased
+by melodic contour and chord context, mirroring the finite-state techniques
+discussed by Hiller and Isaacson in *Experimental Music* (1959). The phrase
+planning stage adapts the tension models presented in Lerdahl and Jackendoff's
+*A Generative Theory of Tonal Music* (1983) by mapping their tension curves to a
+lightweight numeric profile.
+
+Although machine learning components are optional, they provide a connection to
+modern sequence modelling practices. The LSTM used for pitch prediction follows
+standard language modelling formulations as described in Hochreiter and
+Schmidhuber's foundational work on Long Short-Term Memory networks. Style
+embeddings implement a variational autoencoder trained on MIDI corpora, aligning
+with Kingma and Welling's framework for unsupervised learning of latent
+representations. These models operate only as prior distributions, ensuring the
+core algorithm remains interpretable and amenable to analytical study.
+
+## Complexity Analysis
+
+The basic melody generation loop runs in linear time with respect to the number
+of notes requested. Assuming ``n`` notes and ``k`` candidates per step, the
+weighting and sampling operations are **O(k)**, yielding an overall complexity of
+**O(nk)**. In practice ``k`` is small (often fewer than ten pitches), so the
+algorithm scales effectively for real-time use. Cached lookups for chord and
+scale information further reduce constant factors, allowing typical melodies of
+16–32 measures to generate in milliseconds on modern hardware.
+
+## Further Reading
+
+- Hiller, L., & Isaacson, L. (1959). *Experimental Music: Composition with the
+  Electronic Computer*. McGraw-Hill.
+- Lerdahl, F., & Jackendoff, R. (1983). *A Generative Theory of Tonal Music*.
+  MIT Press.
+- Hochreiter, S., & Schmidhuber, J. (1997). "Long Short-Term Memory". *Neural
+  Computation*, 9(8), 1735–1780.
+- Kingma, D., & Welling, M. (2014). "Auto-Encoding Variational Bayes". In
+  *Proceedings of the International Conference on Learning Representations*.
+
