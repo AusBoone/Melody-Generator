@@ -69,3 +69,12 @@ def test_refine_with_fmd_short_sequences_return_input():
     assert fb.refine_with_fmd(one.copy(), "C", ["C"], 4) == one
     assert fb.refine_with_fmd(two.copy(), "C", ["C"], 4) == two
 
+
+def test_refine_with_fmd_raises_on_empty_chord_prog():
+    """Empty chord progressions cannot guide note selection and should error."""
+
+    fb = importlib.import_module("melody_generator.feedback")
+
+    with pytest.raises(ValueError):
+        fb.refine_with_fmd(["C4", "E4", "G4"], "C", [], 4)
+

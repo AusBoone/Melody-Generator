@@ -12,6 +12,13 @@ Example
 >>> improved = refine_with_fmd(melody, "C", ["C"], 4)
 """
 
+# Changelog
+# ---------
+# - Added validation for empty chord progressions in ``refine_with_fmd``.  The
+#   previous implementation assumed at least one chord was supplied and would
+#   fail with a modulo-by-zero error when the progression was empty.  Raising a
+#   ``ValueError`` provides immediate, user-friendly feedback.
+
 from __future__ import annotations
 
 import math
@@ -96,6 +103,12 @@ def refine_with_fmd(
         # modify while keeping the first and last notes fixed, so simply
         # return the melody unchanged.
         return melody
+
+    if not chord_prog:
+        # The candidate note pool relies on a chord progression.  An empty list
+        # would lead to modulo-by-zero errors when selecting chords, so we fail
+        # fast with a clear message.
+        raise ValueError("chord_prog must contain at least one chord")
 
     size = max(1, int(len(melody) * 0.05))
     best_score = compute_fmd(melody)
