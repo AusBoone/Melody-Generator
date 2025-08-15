@@ -11,6 +11,12 @@ Example
 60
 """
 
+# Modification Summary
+# ---------------------
+# * Improved error reporting in ``note_to_midi`` by raising a descriptive
+#   ``ValueError`` when an unknown note name is encountered. Previously a bare
+#   ``KeyError`` was re-raised, which obscured the cause for callers.
+
 from __future__ import annotations
 
 import logging
@@ -66,8 +72,10 @@ def note_to_midi(note: str) -> int:
     try:
         note_idx = NOTE_TO_SEMITONE[note_name]
     except KeyError:
-        logging.error("Note %s not recognized.", note_name)
-        raise
+        logging.error("Unknown note name: %s", note_name)
+        # Convert the internal KeyError into a user-facing ValueError so that
+        # callers receive a clear message about the invalid note name.
+        raise ValueError(f"Unknown note name: {note_name}")
 
     midi_val = note_idx + (octave * 12)
     return max(0, min(127, midi_val))
