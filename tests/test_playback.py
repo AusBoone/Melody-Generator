@@ -3,7 +3,8 @@
 This module focuses on verifying the behavior of ``_resolve_soundfont`` and
 ``render_midi_to_wav``. The former must honour the ``SOUND_FONT`` environment
 variable and fall back to sensible defaults on each platform. The latter should
-invoke ``subprocess.run`` with the correct command when rendering audio.
+invoke ``subprocess.run`` with the correct command when rendering audio and
+create the destination directory when rendering to a new location.
 """
 
 import subprocess
@@ -15,7 +16,8 @@ import importlib
 
 import pytest
 
-# Ensure the repository root is on `sys.path` so `melody_generator` can be imported regardless of where pytest is executed from.
+# Ensure the repository root is on ``sys.path`` so ``melody_generator`` can be
+# imported regardless of where ``pytest`` is executed from.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 
@@ -131,7 +133,9 @@ def test_render_midi_invokes_subprocess(tmp_path, monkeypatch):
         called["stdout"] = stdout
         called["stderr"] = stderr
 
-    monkeypatch.setattr(playback, "_resolve_soundfont", lambda sf: str(tmp_path / "font.sf2"))
+    monkeypatch.setattr(
+        playback, "_resolve_soundfont", lambda sf: str(tmp_path / "font.sf2")
+    )
     monkeypatch.setattr(subprocess, "run", fake_run)
 
     render_midi_to_wav(str(midi), str(wav))
@@ -149,6 +153,43 @@ def test_render_midi_invokes_subprocess(tmp_path, monkeypatch):
     assert called["stderr"] == subprocess.DEVNULL
 
 
+def test_render_midi_creates_parent_dir(tmp_path, monkeypatch):
+    """Rendering to a nested path creates the required directory.
+
+    ``render_midi_to_wav`` should proactively create the parent folder for the
+    target WAV file because ``fluidsynth`` will not do so. This test verifies
+    the directory is present after invocation even when it did not exist
+    beforehand.
+    """
+
+    midi = tmp_path / "in.mid"
+    midi.write_text("midi")
+
+    wav_dir = tmp_path / "new" / "subdir"
+    wav = wav_dir / "out.wav"
+
+    called = {}
+
+    def fake_run(cmd, check=False, stdout=None, stderr=None):
+        """Capture ``subprocess.run`` arguments for inspection."""
+        called["cmd"] = cmd
+
+    monkeypatch.setattr(
+        playback, "_resolve_soundfont", lambda sf: str(tmp_path / "font.sf2")
+    )
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    # Directory should not exist prior to calling ``render_midi_to_wav``
+    assert not wav_dir.exists()
+
+    render_midi_to_wav(str(midi), str(wav))
+
+    # After rendering the directory must be present and the command must point
+    # to the nested WAV path.
+    assert wav_dir.exists()
+    assert called["cmd"][3] == str(wav)
+
+
 @pytest.mark.parametrize(
     "platform,expected_prefix",
     [
@@ -157,7 +198,9 @@ def test_render_midi_invokes_subprocess(tmp_path, monkeypatch):
         ("linux", ["xdg-open", "--wait"]),
     ],
 )
-def test_open_default_player_commands(monkeypatch, tmp_path, platform, expected_prefix):
+def test_open_default_player_commands(
+    monkeypatch, tmp_path, platform, expected_prefix
+):
     """Verify platform-specific commands used by ``open_default_player``."""
 
     midi = tmp_path / "x.mid"
@@ -182,7 +225,7 @@ def test_open_default_player_commands(monkeypatch, tmp_path, platform, expected_
 
 
 def test_open_default_player_respects_env_with_spaces(monkeypatch, tmp_path):
-    """Command in ``MELODY_PLAYER`` containing spaces should split correctly."""
+    """Command with spaces in ``MELODY_PLAYER`` should split correctly."""
 
     midi = tmp_path / "track.mid"
     midi.write_text("data")
@@ -231,7 +274,7 @@ def test_render_midi_missing_fluidsynth(monkeypatch, tmp_path):
 
 
 def test_play_midi_missing_fluidsynth(monkeypatch, tmp_path):
-    """``play_midi`` should report missing FluidSynth library via a specific message."""
+    """``play_midi`` reports missing FluidSynth via a specific message."""
 
     midi = tmp_path / "song.mid"
     midi.write_text("data")
@@ -242,7 +285,9 @@ def test_play_midi_missing_fluidsynth(monkeypatch, tmp_path):
         def __init__(self) -> None:
             raise FileNotFoundError("libfluidsynth")
 
-    monkeypatch.setitem(sys.modules, "fluidsynth", types.SimpleNamespace(Synth=Dummy))
+    monkeypatch.setitem(
+        sys.modules, "fluidsynth", types.SimpleNamespace(Synth=Dummy)
+    )
 
     with pytest.raises(
         MidiPlaybackError,
@@ -258,7 +303,9 @@ def test_render_midi_missing_file(monkeypatch, tmp_path):
 
     # ``_resolve_soundfont`` would search the filesystem; bypass it for speed
     # and determinism in the unit test.
-    monkeypatch.setattr(playback, "_resolve_soundfont", lambda sf: str(tmp_path / "font.sf2"))
+    monkeypatch.setattr(
+        playback, "_resolve_soundfont", lambda sf: str(tmp_path / "font.sf2")
+    )
 
     with pytest.raises(MidiPlaybackError, match="MIDI file not found"):
         render_midi_to_wav(str(tmp_path / "missing.mid"), str(wav))
