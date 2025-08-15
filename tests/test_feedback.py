@@ -78,3 +78,28 @@ def test_refine_with_fmd_raises_on_empty_chord_prog():
     with pytest.raises(ValueError):
         fb.refine_with_fmd(["C4", "E4", "G4"], "C", [], 4)
 
+
+def test_melody_stats_raises_on_empty_sequence():
+    """_melody_stats should clearly reject empty input sequences.
+
+    The function computes mean and variance of MIDI pitches and would otherwise
+    divide by zero when no notes are supplied.  A descriptive ValueError ensures
+    that callers are informed about the requirement for at least one note.
+    """
+
+    fb = importlib.import_module("melody_generator.feedback")
+
+    # ``notes`` is empty, so the helper should raise a ValueError.
+    with pytest.raises(ValueError, match="at least one note"):
+        fb._melody_stats([])
+
+
+def test_compute_fmd_raises_on_empty_sequence():
+    """compute_fmd should propagate the empty-sequence validation."""
+
+    fb = importlib.import_module("melody_generator.feedback")
+
+    # The public API should also reject empty note lists to maintain consistency.
+    with pytest.raises(ValueError, match="at least one note"):
+        fb.compute_fmd([])
+
