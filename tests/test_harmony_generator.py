@@ -73,6 +73,15 @@ def test_generate_progression_lengths():
     assert len(rhythm) == 4
 
 
+def test_degree_to_chord_diminished():
+    """Scale degrees resolving to diminished triads retain the ``dim`` tag."""
+
+    harmony = importlib.import_module("melody_generator.harmony_generator")
+    # In C major the leading tone (degree seven) forms a B diminished triad.
+    chord = harmony._degree_to_chord("C", 6)
+    assert chord == "Bdim"
+
+
 def test_harmony_generator_rule_based():
     """Fallback generator should match bar count when no model is supplied."""
     harmony = importlib.import_module("melody_generator.harmony_generator")
