@@ -19,6 +19,12 @@ arch-shaped tension curve but callers may construct :class:`PhrasePlan`
 objects directly for custom behaviour.
 """
 
+# Summary
+# -------
+# Enhanced ``PhrasePlanner.infill_skeleton`` index validation to require
+# strictly increasing anchor positions. This avoids ambiguous ordering and
+# negative gaps that could arise from duplicate or descending indices.
+
 from dataclasses import dataclass
 from typing import List, Tuple
 
@@ -136,7 +142,8 @@ class PhrasePlanner:
         Parameters
         ----------
         skeleton:
-            Ordered list of ``(index, note)`` pairs starting at ``0``.
+            Ordered list of ``(index, note)`` pairs starting at ``0`` and
+            increasing strictly.
         motif:
             Short sequence repeated to fill the gaps. Must not be empty.
 
@@ -148,8 +155,8 @@ class PhrasePlanner:
         Raises
         ------
         ValueError
-            If ``skeleton`` or ``motif`` is empty or indices are not ascending
-            from ``0``.
+            If ``skeleton`` or ``motif`` is empty or if anchor indices do not
+            start at ``0`` and increase strictly without duplicates.
         """
 
         if not skeleton:
@@ -158,8 +165,14 @@ class PhrasePlanner:
             raise ValueError("motif must not be empty")
 
         indices = [idx for idx, _ in skeleton]
-        if indices[0] != 0 or indices != sorted(indices):
-            raise ValueError("skeleton indices must start at 0 and be ascending")
+        # Indices must begin at zero so the melody starts at the first beat.
+        if indices[0] != 0:
+            raise ValueError("skeleton indices must start at 0")
+        # Ensure each index is greater than the previous. This guards against
+        # duplicate anchors (curr == prev) and descending values (curr < prev),
+        # either of which would produce ambiguous or negative-length gaps.
+        if any(curr <= prev for prev, curr in zip(indices, indices[1:])):
+            raise ValueError("skeleton indices must be strictly increasing")
 
         melody: List[str] = []
         motif_pos = 0

@@ -76,4 +76,22 @@ def test_infill_skeleton_repeats_motif():
     assert melody == ["C", "D", "G", "E", "C"]
 
 
+def test_infill_skeleton_rejects_duplicate_indices():
+    """Duplicate skeleton indices should raise ``ValueError``."""
+    planner = PhrasePlanner()
+    # Two anchors at position 2 create an ambiguous gap.
+    skeleton = [(0, "C"), (2, "G"), (2, "A")]
+    with pytest.raises(ValueError):
+        planner.infill_skeleton(skeleton, ["D"])
+
+
+def test_infill_skeleton_rejects_descending_indices():
+    """Descending indices should raise ``ValueError``."""
+    planner = PhrasePlanner()
+    # Indices must increase; going from 3 back to 2 is invalid.
+    skeleton = [(0, "C"), (3, "G"), (2, "A")]
+    with pytest.raises(ValueError):
+        planner.infill_skeleton(skeleton, ["D"])
+
+
 
