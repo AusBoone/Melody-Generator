@@ -18,6 +18,10 @@ Example
 [1.0, 1.0, 2.0, 0.5]
 """
 
+# 2024-11-29: Added explicit validation of time signatures in
+# ``HarmonyGenerator.generate`` to prevent division errors and clarify
+# expected inputs.
+
 from __future__ import annotations
 
 import random
@@ -206,14 +210,51 @@ class HarmonyGenerator:
         *,
         time_signature: Tuple[int, int] = (4, 4),
     ) -> Tuple[List[str], List[float]]:
-        """Return chords and durations for ``motif`` within ``key``."""
+        """Return chords and durations for ``motif`` within ``key``.
+
+        Parameters
+        ----------
+        key : str
+            Key signature used to derive harmonic context.
+        motif : list[str]
+            Melody fragment in scientific pitch notation.
+        rhythm : list[float]
+            Durations of the ``motif`` notes measured in beats.
+        time_signature : tuple[int, int], optional
+            Meter as ``(numerator, denominator)``. Both parts must be
+            positive integers and the denominator may not be zero.
+
+        Returns
+        -------
+        tuple[list[str], list[float]]
+            ``(chords, durations)`` where ``chords`` holds chord symbols and
+            ``durations`` gives the number of beats each chord spans.
+
+        Raises
+        ------
+        ValueError
+            If inputs are empty or the time signature components are
+            non-positive.
+        """
         if not motif:
             raise ValueError("motif must not be empty")
         if not rhythm:
             raise ValueError("rhythm must not be empty")
 
+        # Validate the time signature before using it in calculations. A
+        # zero or negative denominator would cause division errors when
+        # computing beats per bar, and non-positive numerators are musically
+        # meaningless.
+        numerator, denominator = time_signature
+        if numerator <= 0:
+            raise ValueError("time signature numerator must be positive")
+        if denominator == 0:
+            raise ValueError("time signature denominator must be non-zero")
+        if denominator < 0:
+            raise ValueError("time signature denominator must be positive")
+
         num_bars = _downbeat_bars(rhythm, time_signature)
-        beats_per_bar = time_signature[0] * (4 / time_signature[1])
+        beats_per_bar = numerator * (4 / denominator)
 
         if self.model is None:
             chords, _ = generate_progression(key, num_bars)

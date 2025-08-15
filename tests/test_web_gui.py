@@ -18,19 +18,33 @@ pytest.importorskip("flask")
 
 # Stub mido and tkinter so the imports succeed
 stub_mido = types.ModuleType("mido")
-stub_mido.Message = lambda *a, **k: None
+
+
+class DummyMessage:
+    """Lightweight stand-in capturing the ``time`` and ``velocity`` fields."""
+
+    def __init__(self, _type: str, **kw) -> None:
+        self.type = _type
+        self.time = kw.get("time", 0)
+        self.note = kw.get("note")
+        self.velocity = kw.get("velocity")
+        self.program = kw.get("program")
+
+
 class DummyMidiFile:
     """Minimal MidiFile stub with a save method."""
 
     def __init__(self, *a, **k):
-        self.tracks = []
+        self.tracks: list = []
 
     def save(self, _path):
         pass
 
+
+stub_mido.Message = DummyMessage
 stub_mido.MidiFile = DummyMidiFile
 stub_mido.MidiTrack = lambda *a, **k: []
-stub_mido.MetaMessage = lambda *a, **k: None
+stub_mido.MetaMessage = lambda *a, **k: DummyMessage("meta", **k)
 stub_mido.bpm2tempo = lambda bpm: bpm
 sys.modules.setdefault("mido", stub_mido)
 
@@ -324,8 +338,15 @@ def test_negative_harmony_lines_flash():
     assert b"Harmony lines must be non-negative" in resp.data
 
 
-def test_include_chords_flag():
+def test_include_chords_flag(monkeypatch):
     """Setting the ``include_chords`` checkbox should be accepted."""
+
+    # Avoid exercising the full melody generator and MIDI writer which would
+    # require complex stubs. Returning minimal placeholders keeps the test
+    # focused on form handling.
+    monkeypatch.setattr(web_gui, "generate_melody", lambda *a, **k: ["C4"] * 8)
+    monkeypatch.setattr(web_gui, "create_midi_file", lambda *a, **k: None)
+
     client = app.test_client()
     resp = client.post(
         "/",
