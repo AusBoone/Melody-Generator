@@ -396,6 +396,23 @@ CHORDS = {
     "Bm": ["B", "D", "F#"],
     "Db": ["Db", "F", "Ab"],
     "Dbm": ["Db", "E", "Ab"],
+    # Diminished triads allow the harmony generator to output fully
+    # qualified names such as ``Bdim``.
+    "Cdim": ["C", "Eb", "Gb"],
+    "C#dim": ["C#", "E", "G"],
+    "Ddim": ["D", "F", "Ab"],
+    "Ebdim": ["Eb", "Gb", "A"],
+    "Edim": ["E", "G", "Bb"],
+    "Fdim": ["F", "Ab", "B"],
+    "F#dim": ["F#", "A", "C"],
+    "Gdim": ["G", "Bb", "Db"],
+    "G#dim": ["G#", "B", "D"],
+    "Abdim": ["Ab", "Cb", "E"],
+    "Adim": ["A", "C", "Eb"],
+    "A#dim": ["A#", "C#", "E"],
+    "Bbdim": ["Bb", "Db", "E"],
+    "Bdim": ["B", "D", "F"],
+    "Dbdim": ["Db", "E", "G"],
 }
 
 # Lookup tables mapping lowercase names to their canonical forms. These

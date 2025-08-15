@@ -5,6 +5,10 @@ progression and matching harmonic rhythm (duration of each chord).
 It intentionally keeps the rules minimal so unit tests can run
 without heavy dependencies.
 
+The implementation was extended to retain diminished chord suffixes
+(`"dim"`) so scale degrees resolve to their full triad names
+(`"Bdim"` rather than `"B"`).
+
 Example
 -------
 >>> chords, rhythm = generate_progression("C", 4)
@@ -43,21 +47,34 @@ _RHYTHM_PATTERNS = [
 def _degree_to_chord(key: str, idx: int) -> str:
     """Return a chord name for ``idx`` scale degree within ``key``.
 
-    Chords default to major/minor triads derived from the key signature.
-    When the resulting name is unknown a random fallback from ``CHORDS`` is
-    used so the output always contains valid chord symbols.
+    Chords default to major, minor or diminished triads derived from the
+    key signature.  When the resulting name is unknown a random fallback from
+    ``CHORDS`` is used so the output always contains valid chord symbols.
     """
 
     from . import SCALE, CHORDS
+
     notes = SCALE[key]
     is_minor = key.endswith("m")
+
+    # Map each scale degree to the corresponding triad quality.  Major keys
+    # feature a single diminished triad on the leading tone (degree seven)
+    # while natural minor keys place it on the supertonic (degree two).
     if is_minor:
         qualities = ["m", "dim", "", "m", "m", "", ""]
     else:
         qualities = ["", "m", "m", "", "", "m", "dim"]
+
     note = notes[idx % len(notes)]
     quality = qualities[idx % len(qualities)]
-    chord = note + ("" if quality == "dim" else quality)
+
+    # Append the quality suffix directly so diminished triads retain the
+    # "dim" tag (e.g. ``Bdim`` instead of ``B``).
+    chord = note + quality
+
+    # Fall back to a random known chord when the computed triad is absent
+    # from the global ``CHORDS`` table. This keeps outputs valid even for
+    # exotic keys lacking explicit definitions.
     if chord not in CHORDS:
         chord = random.choice(list(CHORDS.keys()))
     return chord
