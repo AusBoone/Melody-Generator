@@ -122,3 +122,20 @@ def test_harmony_generator_custom_model():
     assert model.calls == 2
     # Ensure returned chords correspond to degree zero
     assert all(c == "C" for c in chords)
+
+
+@pytest.mark.parametrize(
+    "time_signature",
+    [
+        (-4, 4),  # negative numerator should be rejected
+        (4, 0),   # zero denominator would trigger division by zero
+        (4, -4),  # negative denominator is musically invalid
+    ],
+)
+def test_harmony_generator_rejects_invalid_time_signature(time_signature):
+    """``generate`` should validate time signature components."""
+    harmony = importlib.import_module("melody_generator.harmony_generator")
+    gen = harmony.HarmonyGenerator()
+    rhythm = [1.0] * 4  # one bar of 4/4
+    with pytest.raises(ValueError):
+        gen.generate("C", ["C4"], rhythm, time_signature=time_signature)
