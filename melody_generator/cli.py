@@ -4,6 +4,7 @@ Modification summary
 --------------------
 * Expanded module docstring with an explicit usage example and notes on design
   assumptions.
+* Added validation and error handling for ``--random-chords`` values.
 
 This module implements the console entry points for the project. The
 ``run_cli`` function parses command line arguments and performs melody
@@ -122,6 +123,10 @@ def run_cli() -> None:
     if not MIN_OCTAVE <= args.base_octave <= MAX_OCTAVE:
         logging.error(f"Base octave must be between {MIN_OCTAVE} and {MAX_OCTAVE}.")
         sys.exit(1)
+    # Ensure random chord generation requests specify a positive count.
+    if args.random_chords is not None and args.random_chords <= 0:
+        logging.error("Random chord count must be a positive integer.")
+        sys.exit(1)
 
     if args.seed is not None:
         random.seed(args.seed)
@@ -150,7 +155,14 @@ def run_cli() -> None:
         sys.exit(1)
 
     if args.random_chords:
-        chord_progression = generate_random_chord_progression(args.key, args.random_chords)
+        # Attempt to generate a random progression while surfacing validation errors
+        try:
+            chord_progression = generate_random_chord_progression(
+                args.key, args.random_chords
+            )
+        except ValueError as exc:
+            logging.error(str(exc))
+            sys.exit(1)
     else:
         if not args.chords:
             logging.error("Chord progression required unless --random-chords is used.")
