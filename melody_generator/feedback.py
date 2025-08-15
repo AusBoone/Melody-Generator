@@ -18,6 +18,9 @@ Example
 #   previous implementation assumed at least one chord was supplied and would
 #   fail with a modulo-by-zero error when the progression was empty.  Raising a
 #   ``ValueError`` provides immediate, user-friendly feedback.
+# - Added validation for empty note sequences in ``_melody_stats``.  Computing
+#   statistics on an empty iterable previously resulted in a ``ZeroDivisionError``;
+#   a descriptive ``ValueError`` now informs callers of the requirement.
 
 from __future__ import annotations
 
@@ -54,14 +57,42 @@ TRAIN_VAR: float = _TRAIN_VAR
 # ---------------------------------------------------------------------------
 
 def _melody_stats(notes: Iterable[str]) -> Tuple[float, float]:
-    """Return ``(mean, variance)`` of MIDI pitches from ``notes``."""
+    """Return ``(mean, variance)`` of MIDI pitches derived from ``notes``.
+
+    Parameters
+    ----------
+    notes:
+        Iterable of note names such as ``["C4", "E4"]``.  The iterable must
+        contain at least one element; otherwise the statistics are undefined.
+
+    Returns
+    -------
+    Tuple[float, float]
+        A pair containing the arithmetic mean and population variance of the
+        MIDI pitches for the supplied notes.
+
+    Raises
+    ------
+    ValueError
+        If ``notes`` is empty.  The mean and variance require at least one
+        sample and an empty iterable would result in a division-by-zero error.
+    """
+
+    # Convert the iterable into a list so we can both validate emptiness and
+    # iterate over the collection multiple times without exhaustion.
+    note_list = list(notes)
+    if not note_list:
+        # A helpful error message guides callers to provide meaningful input
+        # instead of silently returning invalid statistics.
+        raise ValueError("notes must contain at least one note")
 
     from . import note_to_midi  # imported here to avoid circular dependency
 
     if np is not None:
-        midi = np.array([note_to_midi(n) for n in notes], dtype=float)
+        midi = np.array([note_to_midi(n) for n in note_list], dtype=float)
         return float(np.mean(midi)), float(np.var(midi))
-    midi = [note_to_midi(n) for n in notes]
+
+    midi = [note_to_midi(n) for n in note_list]
     mean = sum(midi) / len(midi)
     var = sum((m - mean) ** 2 for m in midi) / len(midi)
     return float(mean), float(var)
@@ -70,7 +101,26 @@ def _melody_stats(notes: Iterable[str]) -> Tuple[float, float]:
 def compute_fmd(
     notes: Iterable[str], mean: float = TRAIN_MEAN, var: float = TRAIN_VAR
 ) -> float:
-    """Return Frechet Music Distance between ``notes`` and training data."""
+    """Return Frechet Music Distance between ``notes`` and training data.
+
+    Parameters
+    ----------
+    notes:
+        Sequence of note names to evaluate. Must not be empty.
+    mean, var:
+        Precomputed training-set statistics used as the reference point for
+        distance calculations.
+
+    Returns
+    -------
+    float
+        The Frechet Music Distance from ``notes`` to the training data.
+
+    Raises
+    ------
+    ValueError
+        Propagated from :func:`_melody_stats` if ``notes`` is empty.
+    """
 
     m_mean, m_var = _melody_stats(notes)
     return (m_mean - mean) ** 2 + m_var + var - 2 * math.sqrt(m_var * var)
