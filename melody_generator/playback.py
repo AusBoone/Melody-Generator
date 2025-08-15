@@ -32,6 +32,10 @@ configuration.
 # (e.g. paths under ``Program Files``) are executed correctly. ``open_default_player``
 # now validates the target MIDI file before launching the subprocess so
 # erroneous paths raise ``FileNotFoundError`` immediately.
+#
+# Additionally, ``render_midi_to_wav`` now creates the destination directory
+# when it does not already exist. This guards against ``fluidsynth`` failing to
+# open the output file when rendering to a new folder.
 
 from __future__ import annotations
 
@@ -172,7 +176,9 @@ def render_midi_to_wav(
 
     ``fluidsynth`` must be installed on the system for this to work. The
     function is primarily used by the web interface to embed audio in the
-    browser when native MIDI playback is not available.
+    browser when native MIDI playback is not available. The output directory
+    is created automatically when it does not yet exist so rendering to a new
+    location succeeds.
 
     Raises
     ------
@@ -190,6 +196,15 @@ def render_midi_to_wav(
     # error message from the subprocess.
     if not os.path.isfile(midi_path):
         raise MidiPlaybackError("MIDI file not found")
+
+    # ``fluidsynth`` will not create directories for the output file. Create
+    # the parent folder when rendering to a path under a new directory so the
+    # subprocess can open the target file successfully. Using ``exist_ok=True``
+    # avoids raising an error if the directory already exists.
+    parent = os.path.dirname(wav_path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+
     cmd = [
         "fluidsynth",
         "-ni",
