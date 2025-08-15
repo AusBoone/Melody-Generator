@@ -424,10 +424,12 @@ def test_progression_chords_exist():
 def test_diatonic_chords_major_minor():
     """Major and minor key helpers return the correct diatonic chords."""
     major = melody_generator.diatonic_chords("C")
-    assert major == ["C", "Dm", "Em", "F", "G", "Am", "B"]
+    # The leading tone triad should explicitly carry the "dim" suffix.
+    assert major == ["C", "Dm", "Em", "F", "G", "Am", "Bdim"]
 
     minor = melody_generator.diatonic_chords("Am")
-    assert minor == ["Am", "B", "C", "Dm", "Em", "F", "G"]
+    # The second scale degree is diminished in natural minor keys.
+    assert minor == ["Am", "Bdim", "C", "Dm", "Em", "F", "G"]
 
 
 def test_random_progression_invalid_key():
@@ -435,6 +437,28 @@ def test_random_progression_invalid_key():
 
     with pytest.raises(ValueError):
         melody_generator.generate_random_chord_progression("H", 4)
+
+
+def test_progression_preserves_dim(monkeypatch):
+    """Diminished chords retain their suffix in random progressions.
+
+    ``generate_random_chord_progression`` chooses from a set of degree
+    patterns. To force selection of the leading tone (a diminished triad in
+    major keys) we monkeypatch ``random.choice`` to return ``[6]``."""
+
+    monkeypatch.setattr(random, "choice", lambda _patterns: [6])
+    prog = melody_generator.generate_random_chord_progression("C", 1)
+    assert prog == ["Bdim"]
+
+
+def test_random_progression_invalid_length():
+    """Zero or negative ``length`` values should raise ``ValueError``."""
+
+    with pytest.raises(ValueError):
+        melody_generator.generate_random_chord_progression("C", 0)
+
+    with pytest.raises(ValueError):
+        melody_generator.generate_random_chord_progression("C", -2)
 
 
 def test_diatonic_chords_invalid_key():

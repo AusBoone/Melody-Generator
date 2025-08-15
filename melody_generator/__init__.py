@@ -71,6 +71,9 @@ __version__ = "0.1.0"
 #   ``pattern`` lists are non-empty and raise ``ValueError`` when violated.
 # * ``generate_random_chord_progression`` and ``diatonic_chords`` now check
 #   for unknown ``key`` values and raise ``ValueError`` with a clear message.
+# * ``generate_random_chord_progression`` rejects non-positive ``length`` values
+#   and both it and ``diatonic_chords`` preserve the "dim" suffix when building
+#   chord names so diminished triads remain explicit.
 # * ``generate_melody`` rejects ``base_octave`` values outside the safe MIDI
 #   range (``MIN_OCTAVE``-``MAX_OCTAVE``) so melodies cannot reference invalid
 #   pitches.
@@ -502,7 +505,8 @@ def generate_random_chord_progression(key: str, length: int = 4) -> List[str]:
 
     @param key (str): Musical key to base the chords on. ``ValueError`` is
         raised when the key is not defined in :data:`SCALE`.
-    @param length (int): Number of chords to generate.
+    @param length (int): Number of chords to generate. Must be positive or a
+        ``ValueError`` is raised.
     @returns List[str]: Chord names forming the progression.
     """
 
@@ -514,6 +518,12 @@ def generate_random_chord_progression(key: str, length: int = 4) -> List[str]:
 
     if key not in SCALE:
         raise ValueError(f"Unknown key '{key}'")
+
+    if length <= 0:
+        # Guard against nonsensical requests so callers always receive at least
+        # one chord. Returning an empty list would make downstream algorithms
+        # such as melody generation ambiguous.
+        raise ValueError("length must be positive")
 
     is_minor = key.endswith("m")
     notes = SCALE[key]
@@ -534,9 +544,11 @@ def generate_random_chord_progression(key: str, length: int = 4) -> List[str]:
             qualities = ["m", "dim", "", "m", "m", "", ""]
         else:
             qualities = ["", "m", "m", "", "", "m", "dim"]
-        # Look up the chord quality for this scale degree (major, minor or diminished)
+        # Look up the chord quality for this scale degree (major, minor or
+        # diminished). Concatenate the quality directly so diminished chords keep
+        # their "dim" suffix instead of being truncated to a plain triad.
         quality = qualities[idx % len(qualities)]
-        chord = note + (quality if quality != "dim" else "")
+        chord = note + quality
         if chord not in CHORDS:
             # Translate enharmonic spellings to match available chord names
             translation = {
@@ -565,8 +577,9 @@ def diatonic_chords(key: str) -> List[str]:
     """Return the diatonic triads for ``key``.
 
     The chords mirror the quality of each scale degree. Diminished
-    chords fall back to their major spelling when an exact match is not
-    present in :data:`CHORDS`.
+    chords explicitly retain the ``"dim"`` suffix so callers can
+    distinguish them from their major counterparts. Unknown chords fall
+    back to their enharmonic equivalents when possible.
 
     @param key (str): Musical key whose triads are requested. ``ValueError`` is
         raised when the key is not defined in :data:`SCALE`.
@@ -579,7 +592,9 @@ def diatonic_chords(key: str) -> List[str]:
     is_minor = key.endswith("m")
     notes = SCALE[key]
     qualities = (
-        ["m", "dim", "", "m", "m", "", ""] if is_minor else ["", "m", "m", "", "", "m", "dim"]
+        ["m", "dim", "", "m", "m", "", ""]
+        if is_minor
+        else ["", "m", "m", "", "", "m", "dim"]
     )
     chords = []
     translation = {
@@ -591,7 +606,9 @@ def diatonic_chords(key: str) -> List[str]:
         "Abm": "G#m",
     }
     for note, qual in zip(notes, qualities):
-        chord = note + (qual if qual != "dim" else "")
+        # Concatenate the quality directly so diminished chords retain the
+        # "dim" suffix instead of collapsing to a bare major triad.
+        chord = note + qual
         if chord not in CHORDS:
             chord = translation.get(chord, chord)
         if chord in CHORDS and chord not in chords:
