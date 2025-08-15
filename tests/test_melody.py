@@ -613,6 +613,50 @@ def test_chord_duration_respects_time_signature(tmp_path, monkeypatch):
     assert off_times and off_times[0] == 1440
 
 
+def test_chord_track_covers_extra_note(tmp_path, monkeypatch):
+    """Chord track duration includes extra beats from inserted notes.
+
+    ``create_midi_file`` occasionally repeats the last note at a phrase
+    boundary. The additional beats must be reflected in the chord track so the
+    harmony does not end before the melody."""
+
+    # Force the extra-note branch and choose a full-beat extension.
+    monkeypatch.setattr(melody_generator.random, "random", lambda: 0.0)
+    monkeypatch.setattr(melody_generator.random, "choice", lambda _opts: 1.0)
+
+    melody = ["C4", "D4", "E4", "F4"]  # One 4/4 measure.
+    out = tmp_path / "extra.mid"
+    melody_generator.create_midi_file(
+        melody,
+        120,
+        (4, 4),
+        str(out),
+        pattern=[0.25],
+        chord_progression=["C"],
+        humanize=False,
+    )
+
+    mid = DummyMidiFile.last_instance
+    assert mid is not None
+    melody_track = mid.tracks[0]
+    chord_track = mid.tracks[1]
+
+    def last_off_time(track):
+        """Return absolute tick time of the final ``note_off`` event."""
+
+        abs_time = 0
+        last_time = 0
+        for msg in track:
+            abs_time += msg.time
+            if msg.type == "note_off":
+                last_time = abs_time
+        return last_time
+
+    # The chord track should extend at least as long as the melody so the
+    # harmonic context matches the repeated extra note.
+    assert last_off_time(chord_track) >= last_off_time(melody_track)
+
+
 def test_candidate_cache_populated():
     """``generate_melody`` should populate the candidate cache on first use."""
 

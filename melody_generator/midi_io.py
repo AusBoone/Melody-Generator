@@ -4,6 +4,8 @@ Modification summary
 --------------------
 * ``create_midi_file`` now creates the destination directory automatically so
   callers can pass a path in a new folder without preparing it.
+* ``create_midi_file`` accounts for extra inserted beats when extending the
+  melody so chord tracks remain aligned with the final note.
 
 This module contains the low-level helpers used to render melodies as MIDI and
 open the resulting files with the user's default player. It is separated from
@@ -166,10 +168,21 @@ def create_midi_file(
                 extra_fraction = random.choice([0.5, 1.0])
                 extra_ticks = int(extra_fraction * whole_note_ticks)
                 on = Message("note_on", note=last_note, velocity=last_velocity, time=0)
-                off = Message("note_off", note=last_note, velocity=last_velocity, time=extra_ticks)
+                off = Message(
+                    "note_off", note=last_note, velocity=last_velocity, time=extra_ticks
+                )
                 track.append(on)
                 track.append(off)
+
+                # The randomly inserted extra note extends the overall piece.
+                # Update the beat counters so chord and measure calculations
+                # include the additional duration.
+                total_beats += extra_fraction
+                beats_elapsed += extra_fraction
+
                 rest_ticks = beat_ticks
+            # Reset the segment counter after any optional extension so the
+            # next measure begins at beat zero.
             beats_elapsed = 0
 
     if chord_track is not None:
