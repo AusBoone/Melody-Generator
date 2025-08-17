@@ -83,6 +83,18 @@ def test_create_midi_file_empty_chord_progression(tmp_path) -> None:
         create_midi_file(melody, 120, (4, 4), str(out), chord_progression=[])
 
 
+@pytest.mark.parametrize("bpm", [0, -120])
+def test_create_midi_file_invalid_bpm(bpm: int, tmp_path) -> None:
+    """``create_midi_file`` should reject non-positive ``bpm`` values."""
+
+    melody = ["C4"]
+    out = tmp_path / "out.mid"
+    # Tempo defines note spacing; zero or negative BPM is nonsensical and must
+    # raise ``ValueError`` so callers correct their input before file creation.
+    with pytest.raises(ValueError):
+        create_midi_file(melody, bpm, (4, 4), str(out))
+
+
 def test_generate_base_octaves_out_of_range() -> None:
     """``generate`` should validate octave overrides for each voice."""
 
