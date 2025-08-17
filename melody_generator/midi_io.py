@@ -6,6 +6,8 @@ Modification summary
   callers can pass a path in a new folder without preparing it.
 * ``create_midi_file`` accounts for extra inserted beats when extending the
   melody so chord tracks remain aligned with the final note.
+* ``create_midi_file`` validates ``bpm`` is positive so invalid tempos are
+  caught early.
 
 This module contains the low-level helpers used to render melodies as MIDI and
 open the resulting files with the user's default player. It is separated from
@@ -57,6 +59,11 @@ def create_midi_file(
     directory of ``output_file`` is created automatically so callers may supply
     paths in a new folder without preparing it beforehand.
     """
+    # ``bpm`` determines the tempo of the piece; values less than or equal to
+    # zero would yield invalid timing information. Validate early so callers
+    # receive a clear error instead of generating a nonsensical MIDI file.
+    if bpm <= 0:
+        raise ValueError("bpm must be a positive integer")
 
     if chord_progression is not None and not chord_progression:
         raise ValueError("chord_progression must contain at least one chord")
