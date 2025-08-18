@@ -8,6 +8,8 @@ Modification summary
   melody so chord tracks remain aligned with the final note.
 * ``create_midi_file`` validates ``bpm`` is positive so invalid tempos are
   caught early.
+* ``create_midi_file`` applies ``humanize_events`` to all MIDI tracks so timing
+  jitter affects every part of the composition rather than only the melody.
 
 This module contains the low-level helpers used to render melodies as MIDI and
 open the resulting files with the user's default player. It is separated from
@@ -232,7 +234,12 @@ def create_midi_file(
                 last = tick
 
     if humanize:
-        humanize_events(mid.tracks[0])
+        # Apply humanization to every track so harmony and auxiliary parts
+        # receive the same timing variations as the melody track. Iterating over
+        # ``mid.tracks`` ensures any future tracks added to the file are also
+        # adjusted without additional code changes.
+        for midi_track in mid.tracks:
+            humanize_events(midi_track)
 
     # Ensure the destination directory exists so ``mid.save`` succeeds even
     # when the caller specifies a path in a new folder.
