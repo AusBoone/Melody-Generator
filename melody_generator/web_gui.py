@@ -65,6 +65,9 @@ The latest revision introduces two major changes:
 #     permitted.
 #   * Unchecked "Humanize performance" checkbox now correctly disables the
 #     feature by treating a missing form field as ``False``.
+#   * Asynchronous preview rendering now waits only a bounded time for Celery
+#     workers. If no result arrives within the timeout the request falls back
+#     to synchronous generation and the timeout is logged for diagnostics.
 
 from __future__ import annotations
 
@@ -76,10 +79,18 @@ from melody_generator import playback
 from melody_generator.playback import MidiPlaybackError
 from melody_generator.utils import validate_time_signature
 
+# Celery is an optional dependency. When present we import the main class and
+# the ``TimeoutError`` used when a task exceeds its allotted runtime.  Each
+# import is guarded so the module gracefully degrades when Celery is missing.
 try:
     from celery import Celery
 except Exception:  # pragma: no cover - optional dependency
     Celery = None
+
+try:  # pragma: no cover - optional dependency
+    from celery.exceptions import TimeoutError as CeleryTimeoutError
+except Exception:
+    CeleryTimeoutError = TimeoutError
 
 from flask import Flask, render_template, request, flash
 from flask_wtf.csrf import CSRFProtect
@@ -406,7 +417,22 @@ def index():
                     # and still generate the preview in-process so the user sees
                     # a result instead of an error page.
                     async_result = generate_preview_task.delay(**params)
-                    result = async_result.get()
+                    try:
+                        # ``get`` could otherwise block indefinitely if the
+                        # worker is unavailable. A short timeout keeps the
+                        # request responsive.
+                        result = async_result.get(timeout=10)
+                    except CeleryTimeoutError as exc:
+                        # Log the timeout for debugging and fall back to a
+                        # synchronous preview so the user still receives a
+                        # response.
+                        logger.exception(
+                            "Timed out waiting for background worker: %s", exc
+                        )
+                        flash(
+                            "Background worker timed out; generating preview synchronously."
+                        )
+                        result = _generate_preview(**params)
                 except Exception:  # pragma: no cover - triggered via tests
                     flash(
                         "Could not connect to the background worker; generating preview synchronously."
