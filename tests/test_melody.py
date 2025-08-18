@@ -621,6 +621,9 @@ def test_chord_duration_respects_time_signature(tmp_path, monkeypatch):
         str(out),
         pattern=[0.125],
         chord_progression=["C"],
+        # Disable humanization so chord durations remain deterministic for
+        # validation against the expected 6/8 measure length.
+        humanize=False,
     )
 
     mid = melody_generator.mido.MidiFile.last_instance

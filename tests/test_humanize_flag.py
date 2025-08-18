@@ -86,3 +86,44 @@ def test_no_humanize_preserves_events(tmp_path, monkeypatch):
     diffs = [j - b for j, b in zip(jitter_times, base_times)]
     assert any(d == 99 for d in diffs)
     assert all(b <= j for b, j in zip(base_times, jitter_times))
+
+
+def test_humanize_all_tracks(tmp_path, monkeypatch):
+    """Humanization is applied to every track when multiple tracks exist."""
+    # By requesting harmony and providing an additional track, ``create_midi_file``
+    # produces three tracks: the melody, a harmony line, and the extra part.
+    # ``humanize_events`` is monkeypatched to record each invocation and to add
+    # a constant offset to event times so the test can verify that every track
+    # was processed.
+    mod, DummyFile = _setup_module()
+
+    calls = []
+
+    def fake_humanize(msgs):
+        calls.append(id(msgs))
+        for m in msgs:
+            m.time += 99
+
+    monkeypatch.setattr(mod, "humanize_events", fake_humanize)
+    monkeypatch.setattr(mod.midi_io, "humanize_events", fake_humanize)
+
+    melody = ["C4"]
+    extra = [["E4"]]
+    out = tmp_path / "multi.mid"
+    mod.create_midi_file(
+        melody,
+        120,
+        (4, 4),
+        str(out),
+        pattern=[0.25],
+        harmony=True,
+        extra_tracks=extra,
+        humanize=True,
+    )
+
+    # ``humanize_events`` should have been called once per track.
+    assert len(calls) == len(DummyFile.last_instance.tracks)
+    # The first message in every track should reflect the jitter added by the
+    # stubbed ``humanize_events`` implementation.
+    for track in DummyFile.last_instance.tracks:
+        assert track[0].time == 99
