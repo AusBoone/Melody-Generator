@@ -130,6 +130,7 @@ def test_harmony_generator_custom_model():
         (-4, 4),  # negative numerator should be rejected
         (4, 0),   # zero denominator would trigger division by zero
         (4, -4),  # negative denominator is musically invalid
+        (4, 3),   # denominator outside the allowed simple set should fail
     ],
 )
 def test_harmony_generator_rejects_invalid_time_signature(time_signature):
@@ -139,3 +140,20 @@ def test_harmony_generator_rejects_invalid_time_signature(time_signature):
     rhythm = [1.0] * 4  # one bar of 4/4
     with pytest.raises(ValueError):
         gen.generate("C", ["C4"], rhythm, time_signature=time_signature)
+
+
+@pytest.mark.parametrize("denominator", [1, 2, 4, 8, 16])
+def test_harmony_generator_accepts_common_denominator(denominator):
+    """Generator should allow simple meter denominators without error."""
+    harmony = importlib.import_module("melody_generator.harmony_generator")
+    gen = harmony.HarmonyGenerator()
+    # Construct a rhythm that spans exactly one bar for the given meter so
+    # bar counting remains consistent across denominations.
+    beats_per_bar = int(4 * (4 / denominator))
+    rhythm = [1.0] * beats_per_bar
+    chords, durations = gen.generate(
+        "C", ["C4"], rhythm, time_signature=(4, denominator)
+    )
+    # Only one bar of chords should be produced and duration should match beats per bar
+    assert len(chords) == 1
+    assert durations == [4 * (4 / denominator)]
