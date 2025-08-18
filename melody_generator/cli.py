@@ -5,6 +5,9 @@ Modification summary
 * Expanded module docstring with an explicit usage example and notes on design
   assumptions.
 * Added validation and error handling for ``--random-chords`` values.
+* Logged playback failures before falling back to the system's default MIDI
+  player so users still hear results while developers retain the traceback for
+  debugging.
 
 This module implements the console entry points for the project. The
 ``run_cli`` function parses command line arguments and performs melody
@@ -52,7 +55,10 @@ def run_cli() -> None:
     """Parse CLI arguments and generate a MIDI file.
 
     The ``--settings-file`` option is recognised for parity with the GUI even
-    though it has no effect when running purely from the command line.
+    though it has no effect when running purely from the command line. When
+    ``--play`` is supplied the generated MIDI will be previewed; any failures
+    during FluidSynth playback are logged and the system's default player is
+    invoked so users still hear the result.
     """
 
     if "--list-keys" in sys.argv[1:]:
@@ -233,7 +239,15 @@ def run_cli() -> None:
             from . import playback
 
             playback.play_midi(args.output, soundfont=args.soundfont)
-        except Exception:
+        except Exception:  # noqa: BLE001 - broad to ensure fallback
+            # ``logging.exception`` records the stack trace so developers can
+            # diagnose issues such as missing FluidSynth or audio driver
+            # misconfiguration. The user experience is preserved by falling
+            # back to the operating system's default player regardless of the
+            # failure cause.
+            logging.exception(
+                "FluidSynth playback failed; using system default player as fallback.",
+            )
             _open_default_player(args.output)
     logging.info("Melody generation complete.")
 
