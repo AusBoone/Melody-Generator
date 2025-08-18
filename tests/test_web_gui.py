@@ -695,6 +695,86 @@ def test_celery_failure_falls_back_to_sync(monkeypatch):
     assert b"background worker" in resp.data
 
 
+def test_celery_timeout_falls_back_to_sync(monkeypatch):
+    """Timed-out Celery tasks should trigger a synchronous fallback."""
+
+    celery_mod = types.ModuleType("celery")
+    called: dict = {}
+
+    class DummyAsyncResult:
+        """Stand-in that always times out when fetching the result."""
+
+        def get(self, timeout=None):
+            # Record the timeout parameter to ensure the code waits only a
+            # bounded period for the worker.
+            called["timeout"] = timeout
+            raise celery_mod.exceptions.TimeoutError("timeout")
+
+    class DummyTask:
+        def __init__(self, fn):
+            self.fn = fn
+
+        def delay(self, **_kw):
+            """Return an async result that will trigger a timeout."""
+            called["delay"] = True
+            return DummyAsyncResult()
+
+    class DummyCelery:
+        def __init__(self, *a, **k):
+            pass
+
+        def task(self, fn):
+            return DummyTask(fn)
+
+    # Provide a placeholder TimeoutError so the module under test can import it.
+    exceptions_mod = types.ModuleType("celery.exceptions")
+
+    class DummyTimeout(Exception):
+        pass
+
+    exceptions_mod.TimeoutError = DummyTimeout
+    celery_mod.Celery = DummyCelery
+    celery_mod.exceptions = exceptions_mod
+    monkeypatch.setitem(sys.modules, "celery", celery_mod)
+    monkeypatch.setitem(sys.modules, "celery.exceptions", exceptions_mod)
+
+    gui = importlib.reload(importlib.import_module("melody_generator.web_gui"))
+    gui.app.config["WTF_CSRF_ENABLED"] = False
+    client = gui.app.test_client()
+
+    called_sync: dict = {}
+
+    def fake_preview(**_kw):
+        called_sync["called"] = True
+        return "", ""
+
+    # Replace the real preview generator so the test remains fast and
+    # deterministic.
+    monkeypatch.setattr(gui, "_generate_preview", fake_preview)
+
+    resp = client.post(
+        "/",
+        data={
+            "key": "C",
+            "chords": "C",
+            "bpm": "120",
+            "timesig": "4/4",
+            "notes": "1",
+            "motif_length": "1",
+            "base_octave": "4",
+            "harmony_lines": "1",
+        },
+    )
+
+    assert resp.status_code == 200
+    assert called.get("delay")
+    assert called_sync.get("called")
+    # Verify that ``get`` was invoked with the expected timeout parameter.
+    assert called.get("timeout") == 10
+    # The user should see a notice that the worker timed out.
+    assert b"timed out" in resp.data
+
+
 def test_random_rhythm_length_matches_notes(monkeypatch):
     """Random rhythm option should produce a pattern equal to the note count."""
 
