@@ -2,7 +2,8 @@
 
 The helper converts note names such as ``C#4`` or ``Db4`` into MIDI numbers.
 These tests confirm that enharmonic spellings map to the same value and that
-invalid notes raise clear errors."""
+invalid notes or notes yielding MIDI numbers outside ``0-127`` raise clear
+errors."""
 
 import sys
 from pathlib import Path
@@ -48,19 +49,35 @@ def test_flat_conversion():
     assert note_to_midi('Db4') == 61
 
 
-def test_multi_digit_octaves():
-    """Octaves with multiple digits convert correctly.
+def test_multi_digit_octaves_and_range_validation():
+    """Multi-digit octaves parse correctly and out-of-range values error.
 
-    This ensures ``note_to_midi`` handles values like ``C10`` or ``Gb11`` by
-    reading all trailing digits instead of only the last character.
+    ``note_to_midi`` previously clamped values beyond the MIDI limits. The
+    helper now raises ``ValueError`` so callers cannot unknowingly exceed the
+    valid range. We test both a valid multi-digit octave and two out-of-range
+    examples.
     """
-    assert note_to_midi('C10') == 127  # values above 127 are clamped
-    assert note_to_midi('Gb11') == 127
+
+    # Valid multi-digit octave (within 0-127).
+    assert note_to_midi('C8') == 108
+    assert note_to_midi('Gb9') == 126
+
+    # Octaves that would map beyond MIDI 127 should raise an error.
+    with pytest.raises(ValueError, match="out of range"):
+        note_to_midi('C10')
+    with pytest.raises(ValueError, match="out of range"):
+        note_to_midi('Gb11')
 
 
-def test_negative_octaves_clamped():
-    """Notes below MIDI 0 clamp to 0."""
-    assert note_to_midi('C-2') == 0
+def test_negative_octaves_raise_value_error():
+    """Notes mapping below MIDI 0 raise ``ValueError`` instead of clamping."""
+
+    # ``C-1`` represents MIDI note 0 and is valid.
+    assert note_to_midi('C-1') == 0
+
+    # Octaves below ``-1`` produce negative MIDI numbers and should fail.
+    with pytest.raises(ValueError, match="out of range"):
+        note_to_midi('C-2')
 
 
 def test_unknown_note_raises_value_error(monkeypatch):
