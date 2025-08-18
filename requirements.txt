@@ -1,4 +1,5 @@
 mido==1.2.10
 Flask
+Flask-WTF
 pyfluidsynth
 numpy<2

@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
 """Flask web interface for Melody Generator.
 
-This module provides a minimal web front-end that mirrors the
-functionality of the command line and Tkinter interfaces provided
-by the :mod:`melody_generator` package.  Users can select a key,
-chord progression and tempo through a simple HTML form.  The server
-generates a temporary MIDI file which is returned for download and,
-when possible, rendered to WAV for immediate playback.
+This module provides a minimal web front-end mirroring the command-line and
+Tkinter interfaces. Users choose musical parameters through a form and the
+server renders a temporary MIDI (and optionally WAV) file for download and
+preview.
 
-The interface is intentionally lightweight and runs with Flask's
-development server so examples can be tried without additional
-infrastructure.
+The latest revision introduces two major changes:
+
+* **CSRF protection** – Flask-WTF's :class:`~flask_wtf.csrf.CSRFProtect` now
+  injects and validates tokens for every POST request, securing the form
+  against cross-site request forgery attacks.
+* **WSGI-friendly entry point** – a :func:`create_app` factory builds and
+  configures the Flask application so production servers like Gunicorn can
+  serve it directly.
 """
 # This revision introduces validation for the ``base_octave`` input so
 # out-of-range values (anything not between ``MIN_OCTAVE`` and
@@ -79,6 +82,7 @@ except Exception:  # pragma: no cover - optional dependency
     Celery = None
 
 from flask import Flask, render_template, request, flash
+from flask_wtf.csrf import CSRFProtect
 import base64
 import os
 import secrets
@@ -115,24 +119,16 @@ INSTRUMENTS = {
     "Flute": 73,
 }
 
-# Create the Flask application instance and register templates and static files.
-app = Flask(__name__, template_folder="templates", static_folder="static")
-
+# Logger used throughout the module for diagnostic messages.
 logger = logging.getLogger(__name__)
 
-# Configure the session secret.
-secret = os.environ.get("FLASK_SECRET")
-if not secret:
-    secret = secrets.token_urlsafe(32)
-    logger.warning(
-        "FLASK_SECRET environment variable not set. "
-        "Using a randomly generated key; sessions will not persist across restarts."
-    )
-app.secret_key = secret
+# CSRF protection instance. ``init_app`` is invoked inside ``create_app`` so
+# tests can control when protection is enabled.
+csrf = CSRFProtect()
 
-# Optional Celery application used to offload melody rendering so the
-# Flask thread remains responsive. The broker defaults to the in-memory
-# backend which requires no external services for small deployments.
+# Optional Celery application used to offload melody rendering so the Flask
+# thread remains responsive. The broker defaults to the in-memory backend which
+# requires no external services for small deployments.
 celery_app = None
 if Celery is not None:
     celery_app = Celery(
@@ -244,7 +240,6 @@ if celery_app is not None:
     generate_preview_task = celery_app.task(_generate_preview)  # type: ignore
 
 
-@app.route('/', methods=['GET', 'POST'])
 def index():
     """Render the form and handle submissions.
 
@@ -434,17 +429,53 @@ def index():
             flash(
                 "Preview audio could not be generated because FluidSynth or a soundfont is unavailable."
             )
-        return render_template('play.html', audio=audio_encoded, midi=midi_encoded)
+        return render_template("play.html", audio=audio_encoded, midi=midi_encoded)
 
     # On a normal GET request simply render the form so the user can
     # enter their parameters.
-    return render_template('index.html', scale=sorted(SCALE.keys()), instruments=INSTRUMENTS.keys(), styles=STYLE_VECTORS.keys())
+    return render_template(
+        "index.html",
+        scale=sorted(SCALE.keys()),
+        instruments=INSTRUMENTS.keys(),
+        styles=STYLE_VECTORS.keys(),
+    )
 
-# Allow the module to be run directly with ``python web_gui.py``.
-# ``pragma: no cover`` keeps test coverage tools from complaining when
-# this block is skipped during automated testing.
-if __name__ == '__main__':  # pragma: no cover - manual usage
-    # Launch the development server
-    if os.environ.get("FLASK_DEBUG", "").lower() in {"1", "true", "yes"}:
-        app.debug = True
-    app.run()
+
+def create_app() -> Flask:
+    """Build and configure the Flask application instance.
+
+    This factory enables running the web interface under a production WSGI
+    server such as Gunicorn. It configures the session secret, attaches CSRF
+    protection, and registers the routes defined in this module.
+
+    Returns:
+        Flask: Configured application ready for use by a WSGI server.
+    """
+
+    app = Flask(__name__, template_folder="templates", static_folder="static")
+
+    # Configure the session secret used to sign cookies. A random key is
+    # generated when ``FLASK_SECRET`` is missing so the app remains usable but
+    # sessions reset between restarts.
+    secret = os.environ.get("FLASK_SECRET")
+    if not secret:
+        secret = secrets.token_urlsafe(32)
+        logger.warning(
+            "FLASK_SECRET environment variable not set. "
+            "Using a randomly generated key; sessions will not persist across restarts."
+        )
+    app.secret_key = secret
+
+    # Enable CSRF protection so every form submission must include a valid
+    # token. ``csrf_token`` is injected into templates via context processor.
+    csrf.init_app(app)
+
+    # Register the primary form handler.
+    app.add_url_rule("/", view_func=index, methods=["GET", "POST"])
+
+    return app
+
+
+# Instantiate a default application for ad-hoc scripts and tests while still
+# exposing ``create_app`` for production WSGI servers.
+app = create_app()

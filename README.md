@@ -209,10 +209,16 @@ melody-generator
 
 ### Web Interface
 
-Start the Flask app:
+Run the application with Flask's built-in server during development:
 
 ```bash
-python -m melody_generator.web_gui
+flask --app melody_generator.web_gui:create_app run
+```
+
+For production deployments use a WSGI server such as Gunicorn:
+
+```bash
+gunicorn 'melody_generator.web_gui:create_app()'
 ```
 
 1. Open `http://localhost:5000` in your browser.
