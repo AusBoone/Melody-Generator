@@ -62,10 +62,10 @@ def test_open_player_platform_commands(monkeypatch, tmp_path, platform, expected
 
     calls = []
 
-    def fake_run(cmd, check=False):
+    def fake_run(cmd, check=False, capture_output=False, text=False):
         """Record invocations of ``subprocess.run`` for assertions."""
         calls.append(cmd)
-        return types.SimpleNamespace(returncode=0)
+        return types.SimpleNamespace(returncode=0, args=cmd, stderr="")
 
     monkeypatch.setattr(playback.subprocess, "run", fake_run)
     monkeypatch.setattr(playback.os, "environ", {})
@@ -106,9 +106,9 @@ def test_custom_player_with_spaces(monkeypatch, tmp_path):
 
     calls = []
 
-    def fake_run(cmd, check=False):
+    def fake_run(cmd, check=False, capture_output=False, text=False):
         calls.append(cmd)
-        return types.SimpleNamespace(returncode=0)
+        return types.SimpleNamespace(returncode=0, args=cmd, stderr="")
 
     monkeypatch.setattr(playback.subprocess, "run", fake_run)
     monkeypatch.setattr(
