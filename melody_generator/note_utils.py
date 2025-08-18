@@ -16,6 +16,9 @@ Example
 # * Improved error reporting in ``note_to_midi`` by raising a descriptive
 #   ``ValueError`` when an unknown note name is encountered. Previously a bare
 #   ``KeyError`` was re-raised, which obscured the cause for callers.
+# * Added explicit MIDI range validation to ``note_to_midi``. Instead of
+#   silently clamping values outside ``0-127``, the function now raises a
+#   ``ValueError`` so callers can handle out-of-range notes knowingly.
 
 from __future__ import annotations
 
@@ -46,18 +49,26 @@ def note_to_midi(note: str) -> int:
     Raises
     ------
     ValueError
-        If ``note`` is not properly formatted.
+        If ``note`` is not properly formatted or if the computed MIDI value
+        falls outside the allowed ``0-127`` range.
     """
 
+    # Validate the incoming note string. The regular expression ensures a
+    # letter A–G followed by an optional accidental and a signed integer
+    # octave. Examples: ``C#4``, ``Gb9``, ``C-1``.
     match = re.fullmatch(r"([A-Ga-g][#b]?)(-?\d+)", note)
     if not match:
         logging.error("Invalid note format: %s", note)
         raise ValueError(f"Invalid note format: {note}")
 
     note_name, octave_str = match.groups()
+    # MIDI's octave numbers are offset by one relative to scientific pitch
+    # notation, hence the ``+ 1`` adjustment.
     octave = int(octave_str) + 1
     note_name = note_name.capitalize()
 
+    # Normalize flats to their enharmonic sharp equivalents so the lookup
+    # table only needs sharp names. ``Db`` → ``C#`` etc.
     flat_to_sharp = {
         "Db": "C#",
         "Eb": "D#",
@@ -77,8 +88,26 @@ def note_to_midi(note: str) -> int:
         # callers receive a clear message about the invalid note name.
         raise ValueError(f"Unknown note name: {note_name}")
 
+    # Compute the MIDI value by adding the semitone index to the octave offset.
     midi_val = note_idx + (octave * 12)
-    return max(0, min(127, midi_val))
+
+    # MIDI defines valid note numbers in the inclusive range 0–127. Rather than
+    # silently clamping out-of-range values, raise a ``ValueError`` so calling
+    # code can either correct the input or handle the issue explicitly.
+    #
+    # Typical cases:
+    #   * ``C-1`` → 0 (valid lower boundary)
+    #   * ``G9``  → 127 (valid upper boundary)
+    # Edge cases triggering errors:
+    #   * ``C-2`` → -12 (below range)
+    #   * ``C10`` → 132 (above range)
+    if not 0 <= midi_val <= 127:
+        logging.error("MIDI value out of range: %s -> %d", note, midi_val)
+        raise ValueError(
+            f"Computed MIDI value {midi_val} out of range 0-127 for note {note}"
+        )
+
+    return midi_val
 
 
 def midi_to_note(midi_note: int) -> str:
