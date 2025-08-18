@@ -451,6 +451,22 @@ def test_progression_preserves_dim(monkeypatch):
     assert prog == ["Bdim"]
 
 
+def test_seventh_degree_padding(monkeypatch):
+    """Padded progressions should be able to select the leading tone chord.
+
+    When the requested progression length exceeds the base pattern length,
+    ``generate_random_chord_progression`` appends random degrees. To verify the
+    seventh degree can appear, this test forces ``random.randint`` to return the
+    highest index so the padding resolves to ``Bdim`` in the key of C major."""
+
+    # Force padding to choose the seventh scale degree (index 6)
+    monkeypatch.setattr(random, "randint", lambda _a, _b: 6)
+    prog = melody_generator.generate_random_chord_progression("C", 5)
+    # The final chord should be Bdim, confirming that all scale degrees are
+    # sampled when padding progressions.
+    assert prog[-1] == "Bdim"
+
+
 def test_random_progression_invalid_length():
     """Zero or negative ``length`` values should raise ``ValueError``."""
 
