@@ -8,11 +8,18 @@ embedding from a reference MIDI file.
 
 ``load_styles`` allows additional style vectors to be imported from JSON or
 YAML files at runtime so experiments can easily extend the built-in presets.
+The loader now enforces that every imported vector has the same dimensionality
+as existing presets to prevent downstream matrix shape errors.
 
 ``STYLE_VECTORS`` is now defined unconditionally for better static analysis and
 helper functions return copies rather than references so callers cannot mutate
 module-level state by accident.
 """
+
+# Modification summary: ``load_styles`` was expanded to verify that imported
+# style vectors have the same dimensionality as existing presets. Rejecting
+# mismatched vectors early prevents confusing runtime errors in components that
+# assume a fixed-length embedding.
 
 from __future__ import annotations
 
@@ -65,7 +72,8 @@ def load_styles(path: str) -> None:
     Raises
     ------
     ValueError
-        If the file cannot be parsed or does not contain a mapping of vectors.
+        If the file cannot be parsed, does not contain a mapping of vectors or
+        supplies vectors with dimensions that differ from existing presets.
     RuntimeError
         If a YAML file is supplied but the ``yaml`` package is missing.
     """
@@ -95,12 +103,30 @@ def load_styles(path: str) -> None:
     if not isinstance(data, dict):
         raise ValueError("style file must contain a mapping of names to vectors")
 
+    # Determine the dimensionality of existing style vectors so new vectors can
+    # be validated before mutating the global mapping. ``len`` works for both
+    # lists and ``numpy.ndarray`` instances.
+    expected_dim = None
+    if STYLE_VECTORS:
+        expected_dim = len(next(iter(STYLE_VECTORS.values())))
+
+    # Convert and validate the incoming vectors in a temporary dictionary so
+    # partial updates are avoided when an error occurs.
+    converted: Dict[str, Sequence[float]] = {}
     for name, vec in data.items():
         if not isinstance(vec, (list, tuple)):
             raise ValueError(f"vector for {name!r} must be a sequence")
-        STYLE_VECTORS[name] = (
-            np.array(list(vec), dtype=float) if USE_NUMPY else [float(v) for v in vec]
+        values = [float(v) for v in vec]
+        if expected_dim is not None and len(values) != expected_dim:
+            raise ValueError(
+                f"vector for {name!r} has dimension {len(values)} but expected {expected_dim}"
+            )
+        converted[name] = (
+            np.array(values, dtype=float) if USE_NUMPY else values
         )
+
+    # Merge the validated vectors into the module-level presets.
+    STYLE_VECTORS.update(converted)
 
 
 def get_style_vector(name: str) -> Sequence[float]:

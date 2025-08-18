@@ -168,3 +168,21 @@ def test_load_styles_yaml(tmp_path):
     # ``list`` ensures equality regardless of NumPy usage internally.
     assert list(style.get_style_vector("folk")) == [0.1, 0.6, 0.3]
 
+
+def test_load_styles_dimension_mismatch(tmp_path):
+    """Vectors of differing lengths should trigger ``ValueError`` and not modify presets."""
+
+    # Prepare a JSON file that mixes a valid 3D vector with an invalid 4D one.
+    path = tmp_path / "bad_dim.json"
+    path.write_text(json.dumps({"good": [0.1, 0.2, 0.7], "bad": [1, 2, 3, 4]}))
+
+    # Snapshot the current presets so we can verify they remain untouched.
+    before = dict(style.STYLE_VECTORS)
+
+    # Loading should fail because "bad" has more dimensions than the existing presets.
+    with pytest.raises(ValueError):
+        style.load_styles(str(path))
+
+    # Ensure neither of the new names were merged and existing presets were preserved.
+    assert style.STYLE_VECTORS == before
+
