@@ -12,6 +12,12 @@ Example
 [62, 64, 66, 67]
 """
 
+# Modification summary: ``augment_sequences`` now checks that each provided
+# subsequence contains at least one note.  Empty subsequences previously caused
+# ``IndexError`` when computing inversions because they lack a pivot note.
+# Validation prevents this by raising ``ValueError`` early, ensuring callers are
+# explicitly aware of malformed input.
+
 from __future__ import annotations
 
 import random
@@ -86,7 +92,9 @@ def augment_sequences(
     Parameters
     ----------
     sequences:
-        Iterable of pitch sequences to augment. Must not be empty.
+        Iterable of pitch sequences to augment. The iterable itself and each
+        contained sequence must have at least one note so a pivot exists for
+        inversion.
     transpose_range:
         Collection of semitone offsets applied to each sequence. Defaults to
         ``range(-2, 3)`` yielding five transpositions.
@@ -101,7 +109,7 @@ def augment_sequences(
     Raises
     ------
     ValueError
-        If ``sequences`` is empty.
+        If ``sequences`` is empty or any contained sequence is empty.
     """
     sequences = list(sequences)
     if not sequences:
@@ -112,6 +120,10 @@ def augment_sequences(
         # Operate on a list copy so repeated transpositions do not mutate the
         # caller's sequence object.
         seq = list(seq)
+        if not seq:
+            # Explicitly reject empty subsequences to avoid accessing a missing
+            # pivot note during inversion.
+            raise ValueError("subsequences must contain at least one note")
         for t in transpose_range:
             # Add a transposed version for each semitone offset.
             augmented.append(transpose_sequence(seq, t))

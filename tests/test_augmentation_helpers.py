@@ -2,8 +2,8 @@
 
 This module verifies that data augmentation correctly generates transposed and
 optionally inverted copies of input pitch sequences.  It also checks error
-handling when no sequences are provided and that custom transposition ranges are
-honoured.
+handling when no sequences are provided, when a subsequence is empty, and that
+custom transposition ranges are honoured.
 """
 
 from __future__ import annotations
@@ -65,6 +65,13 @@ def test_augment_sequences_empty_input_error():
 
     with pytest.raises(ValueError):
         aug.augment_sequences([])
+
+
+def test_augment_sequences_empty_subsequence_error():
+    """Empty subsequences should raise ``ValueError`` to alert the caller."""
+
+    with pytest.raises(ValueError):
+        aug.augment_sequences([[]])
 
 
 def test_augment_sequences_custom_transpose_range():
