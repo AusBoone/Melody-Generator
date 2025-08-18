@@ -1,9 +1,8 @@
-"""Unit tests for the ``note_to_midi`` helper.
+"""Unit tests for note ↔ MIDI conversion helpers.
 
-The helper converts note names such as ``C#4`` or ``Db4`` into MIDI numbers.
-These tests confirm that enharmonic spellings map to the same value and that
-invalid notes or notes yielding MIDI numbers outside ``0-127`` raise clear
-errors."""
+These tests exercise both :func:`note_to_midi` and :func:`midi_to_note`. The
+goal is to ensure round-trip conversions behave as expected, while invalid
+inputs result in descriptive errors instead of silent failures."""
 
 import sys
 from pathlib import Path
@@ -36,6 +35,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 melody_generator = importlib.import_module("melody_generator")
 note_to_midi = melody_generator.note_to_midi
+midi_to_note = melody_generator.midi_to_note
 note_utils_mod = importlib.import_module("melody_generator.note_utils")
 
 
@@ -92,4 +92,23 @@ def test_unknown_note_raises_value_error(monkeypatch):
     note_utils_mod.note_to_midi.cache_clear()
     with pytest.raises(ValueError, match="Unknown note name: C"):
         note_utils_mod.note_to_midi("C4")
+
+
+def test_midi_to_note_range_validation():
+    """``midi_to_note`` rejects values outside the valid 0-127 range.
+
+    The helper should successfully convert boundary values while flagging
+    out-of-range integers. Negative numbers and values above 127 are common
+    user mistakes; raising ``ValueError`` ensures the caller is alerted.
+    """
+
+    # Valid boundary conversions.
+    assert midi_to_note(0) == "C-1"
+    assert midi_to_note(127) == "G9"
+
+    # Values below 0 or above 127 should raise errors.
+    with pytest.raises(ValueError, match="out of range"):
+        midi_to_note(-1)
+    with pytest.raises(ValueError, match="out of range"):
+        midi_to_note(128)
 
