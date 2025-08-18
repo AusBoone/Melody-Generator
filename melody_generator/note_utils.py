@@ -19,6 +19,9 @@ Example
 # * Added explicit MIDI range validation to ``note_to_midi``. Instead of
 #   silently clamping values outside ``0-127``, the function now raises a
 #   ``ValueError`` so callers can handle out-of-range notes knowingly.
+# * Introduced validation in ``midi_to_note`` to ensure MIDI numbers lie
+#   within the valid ``0-127`` range. Out-of-range values now raise a
+#   descriptive ``ValueError`` rather than producing incorrect results.
 
 from __future__ import annotations
 
@@ -111,8 +114,46 @@ def note_to_midi(note: str) -> int:
 
 
 def midi_to_note(midi_note: int) -> str:
-    """Convert a MIDI number back into a note string using sharps."""
+    """Convert a MIDI number into a note name using sharps.
 
+    Parameters
+    ----------
+    midi_note:
+        Integer representing the MIDI note number. Valid values range from
+        ``0`` (``C-1``) through ``127`` (``G9``).
+
+    Returns
+    -------
+    str
+        Note name with octave, e.g. ``C4``. Sharps are used for accidentals
+        to maintain consistency with ``note_to_midi``.
+
+    Raises
+    ------
+    ValueError
+        If ``midi_note`` is outside the inclusive ``0-127`` range. A
+        ``TypeError`` may be raised by Python if a non-integer is supplied.
+
+    Examples
+    --------
+    >>> midi_to_note(60)
+    'C4'
+    >>> midi_to_note(61)
+    'C#4'
+    >>> midi_to_note(-1)
+    Traceback (most recent call last):
+        ...
+    ValueError: MIDI note -1 out of range 0-127
+    """
+
+    # MIDI defines 128 discrete notes; values outside 0-127 are invalid and
+    # should be rejected to avoid producing nonsensical pitches.
+    if not 0 <= midi_note <= 127:
+        raise ValueError(f"MIDI note {midi_note} out of range 0-127")
+
+    # Determine the octave by integer division and map the remaining semitone
+    # offset to a pitch class name. The note names mirror those used in
+    # ``note_to_midi`` so round-trip conversions are stable.
     octave = midi_note // 12 - 1
     name = NOTES[midi_note % 12]
     return f"{name}{octave}"
