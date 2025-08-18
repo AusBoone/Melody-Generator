@@ -126,6 +126,8 @@ __version__ = "0.1.0"
 #   disable timing jitter for deterministic output.
 # * ``generate_melody`` and ``create_midi_file`` now canonicalise keys and
 #   chords so lowercase input is accepted by the public API.
+# * ``generate_random_chord_progression`` samples all seven scale degrees when
+#   padding progressions so the leading tone chord can be chosen.
 # ---------------------------------------------------------------
 
 import random
@@ -567,7 +569,13 @@ def generate_random_chord_progression(key: str, length: int = 4) -> List[str]:
     progression = [degree_to_chord(d) for d in degrees]
     if length > len(progression):
         # Pad the progression with random chords if the requested length is longer
-        extra = [degree_to_chord(random.randint(0, 5)) for _ in range(length - len(progression))]
+        # ``random.randint`` previously sampled only from degrees 0-5 which excluded
+        # the leading tone chord. Sampling ``0`` through ``len(notes) - 1`` ensures
+        # all scale degrees (including the seventh) are candidates for padding.
+        extra = [
+            degree_to_chord(random.randint(0, len(notes) - 1))
+            for _ in range(length - len(progression))
+        ]
         # Extend with random chords so the returned list matches ``length``
         progression.extend(extra)
     return progression[:length]
