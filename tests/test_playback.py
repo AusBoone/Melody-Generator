@@ -208,9 +208,10 @@ def test_open_default_player_commands(
 
     calls = []
 
-    def fake_run(cmd, check=False):
+    def fake_run(cmd, check=False, capture_output=False, text=False):
+        """Record ``subprocess.run`` usage for inspection."""
         calls.append(cmd)
-        return types.SimpleNamespace(returncode=0)
+        return types.SimpleNamespace(returncode=0, args=cmd, stderr="")
 
     monkeypatch.setattr(playback.subprocess, "run", fake_run)
     monkeypatch.setattr(playback.os, "environ", {})
@@ -232,10 +233,10 @@ def test_open_default_player_respects_env_with_spaces(monkeypatch, tmp_path):
 
     calls = []
 
-    def fake_run(cmd, check=False):
+    def fake_run(cmd, check=False, capture_output=False, text=False):
         """Record subprocess invocations for assertion."""
         calls.append(cmd)
-        return types.SimpleNamespace(returncode=0)
+        return types.SimpleNamespace(returncode=0, args=cmd, stderr="")
 
     monkeypatch.setattr(playback.subprocess, "run", fake_run)
     monkeypatch.setattr(
@@ -249,6 +250,31 @@ def test_open_default_player_respects_env_with_spaces(monkeypatch, tmp_path):
 
     assert calls == [["/usr/bin/custom", "player", str(midi)]]
     assert not midi.exists()
+
+
+def test_open_default_player_failing_command(monkeypatch, tmp_path):
+    """Non-zero exit from player should raise ``MidiPlaybackError``.
+
+    A custom ``MELODY_PLAYER`` that exits with status ``1`` simulates a player
+    failure. ``open_default_player`` must surface the error and keep the file so
+    callers may retry or inspect the temporary output.
+    """
+
+    midi = tmp_path / "fail.mid"
+    midi.write_text("data")
+
+    monkeypatch.setattr(
+        playback.os,
+        "environ",
+        {"MELODY_PLAYER": "bash -c 'echo boom >&2; exit 1'"},
+    )
+    monkeypatch.setattr(playback.sys, "platform", "linux", raising=False)
+
+    with pytest.raises(MidiPlaybackError, match="boom"):
+        open_default_player(str(midi), delete_after=True)
+
+    # The file should remain because playback never started successfully.
+    assert midi.exists()
 
 
 def test_render_midi_missing_fluidsynth(monkeypatch, tmp_path):

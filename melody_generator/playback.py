@@ -36,6 +36,12 @@ configuration.
 # Additionally, ``render_midi_to_wav`` now creates the destination directory
 # when it does not already exist. This guards against ``fluidsynth`` failing to
 # open the output file when rendering to a new folder.
+#
+# The latest revision inspects the return code of player subprocesses. The
+# ``CompletedProcess`` returned by ``subprocess.run`` is checked and any
+# non-zero status triggers a ``MidiPlaybackError`` with the captured stderr.
+# Cleanup of temporary files is performed in a best-effort manner so failures
+# do not mask playback errors.
 
 from __future__ import annotations
 
@@ -43,6 +49,7 @@ import os
 import subprocess
 import sys
 import shlex
+import logging
 from typing import Optional
 
 __all__ = [
@@ -51,6 +58,9 @@ __all__ = [
     "render_midi_to_wav",
     "open_default_player",
 ]
+
+
+logger = logging.getLogger(__name__)
 
 
 class MidiPlaybackError(RuntimeError):
@@ -249,9 +259,10 @@ def open_default_player(path: str, *, delete_after: bool = False) -> None:
 
     Raises
     ------
-    Exception
-        Propagates any errors raised by ``subprocess.run`` or ``os.remove``.
-        ``FileNotFoundError`` is raised when ``path`` does not exist.
+    MidiPlaybackError
+        Raised when the player command exits with a non-zero status.
+    FileNotFoundError
+        If ``path`` does not point to an existing file.
     """
 
     # Fail fast when the target MIDI file is missing so callers immediately know
@@ -264,26 +275,58 @@ def open_default_player(path: str, *, delete_after: bool = False) -> None:
     # containing spaces are parsed into individual arguments.
     player_args = shlex.split(player) if player else None
 
+    proc: subprocess.CompletedProcess[str] | None = None
+    cmd: list[str] | None = None
+
     if sys.platform.startswith("win"):
-        if player_args:
-            cmd = player_args + [path]
-            subprocess.run(cmd, check=False)
-        else:
-            subprocess.run(["cmd", "/c", "start", "/wait", "", path], check=False)
+        cmd = (
+            player_args + [path]
+            if player_args
+            else ["cmd", "/c", "start", "/wait", "", path]
+        )
     elif sys.platform == "darwin":
-        if player_args:
-            cmd = ["open", "-W", "-a"] + player_args + [path]
-            subprocess.run(cmd, check=False)
-        else:
-            subprocess.run(["open", "-W", path], check=False)
+        cmd = (
+            ["open", "-W", "-a"] + player_args + [path]
+            if player_args
+            else ["open", "-W", path]
+        )
     else:
         if player_args:
             cmd = player_args + [path]
-            subprocess.run(cmd, check=False)
         else:
-            proc = subprocess.run(["xdg-open", "--wait", path], check=False)
+            # ``xdg-open`` supports a ``--wait`` flag to block until the player
+            # exits. Some desktop environments do not implement the flag, so a
+            # fallback without ``--wait`` is attempted if the initial command
+            # fails.
+            proc = subprocess.run(
+                ["xdg-open", "--wait", path],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
             if proc.returncode != 0:
-                subprocess.run(["xdg-open", path], check=False)
+                cmd = ["xdg-open", path]
+
+    if cmd is not None:
+        proc = subprocess.run(
+            cmd,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+    assert proc is not None  # for type checkers; ``proc`` is always set above
+    if proc.returncode != 0:
+        # Include the failing command in logs to aid debugging and surface any
+        # stderr output in the raised exception so callers know why playback
+        # failed.
+        logger.error("Player command failed: %s", proc.args)
+        raise MidiPlaybackError(proc.stderr.strip() or "Player command failed")
 
     if delete_after:
-        os.remove(path)
+        try:
+            os.remove(path)
+        except OSError as exc:
+            # Log cleanup issues without aborting so users still receive playback
+            # results even if temporary file removal fails.
+            logger.warning("Failed to delete temporary file %s: %s", path, exc)
