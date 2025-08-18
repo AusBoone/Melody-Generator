@@ -8,6 +8,8 @@ Modification summary
 * Logged playback failures before falling back to the system's default MIDI
   player so users still hear results while developers retain the traceback for
   debugging.
+* Ensured the output directory exists and gracefully handles ``OSError`` when
+  writing MIDI files.
 
 This module implements the console entry points for the project. The
 ``run_cli`` function parses command line arguments and performs melody
@@ -35,6 +37,7 @@ import logging
 import sys
 import random
 from importlib import import_module
+from pathlib import Path
 from typing import List
 
 from . import (
@@ -221,19 +224,31 @@ def run_cli() -> None:
         extra.append(generate_harmony_line(melody))
     if args.counterpoint:
         extra.append(generate_counterpoint_melody(melody, args.key))
-    create_midi_file(
-        melody,
-        args.bpm,
-        (numerator, denominator),
-        args.output,
-        harmony=args.harmony,
-        pattern=rhythm,
-        extra_tracks=extra,
-        chord_progression=chord_progression if args.include_chords else None,
-        chords_separate=not args.chords_same_track,
-        program=args.instrument,
-        humanize=args.humanize,
-    )
+    # Ensure the destination directory exists before attempting to write the
+    # MIDI file. ``exist_ok=True`` permits reusing pre-existing directories
+    # while still creating nested paths as needed.
+    Path(args.output).parent.mkdir(parents=True, exist_ok=True)
+
+    try:
+        create_midi_file(
+            melody,
+            args.bpm,
+            (numerator, denominator),
+            args.output,
+            harmony=args.harmony,
+            pattern=rhythm,
+            extra_tracks=extra,
+            chord_progression=chord_progression if args.include_chords else None,
+            chords_separate=not args.chords_same_track,
+            program=args.instrument,
+            humanize=args.humanize,
+        )
+    except OSError as exc:
+        # Permission issues or full disks may surface as ``OSError``. Logging
+        # the exception gives users insight into the failure and exiting with a
+        # non-zero code signals that generation did not succeed.
+        logging.error("Could not write MIDI file: %s", exc)
+        sys.exit(1)
     if args.play:
         try:
             from . import playback
