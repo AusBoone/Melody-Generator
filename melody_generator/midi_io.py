@@ -10,6 +10,8 @@ Modification summary
   caught early.
 * ``create_midi_file`` applies ``humanize_events`` to all MIDI tracks so timing
   jitter affects every part of the composition rather than only the melody.
+* Imports from ``mido`` are deferred inside ``create_midi_file`` so the module
+  can load even when the optional dependency is missing.
 
 This module contains the low-level helpers used to render melodies as MIDI and
 open the resulting files with the user's default player. It is separated from
@@ -25,9 +27,6 @@ import random
 import threading
 from pathlib import Path
 from typing import List, Optional, Tuple
-
-import mido
-from mido import Message, MidiFile, MidiTrack
 
 from . import (
     CHORDS,
@@ -61,6 +60,17 @@ def create_midi_file(
     directory of ``output_file`` is created automatically so callers may supply
     paths in a new folder without preparing it beforehand.
     """
+    # ``mido`` is imported lazily so projects depending on this module do not
+    # need the optional MIDI dependency unless they actually render files.  A
+    # clear error message guides users on how to install the requirement.
+    try:
+        import mido
+        from mido import Message, MidiFile, MidiTrack
+    except ModuleNotFoundError as exc:
+        raise ImportError(
+            "mido is required to create MIDI files; install it with 'pip install mido'"
+        ) from exc
+
     # ``bpm`` determines the tempo of the piece; values less than or equal to
     # zero would yield invalid timing information. Validate early so callers
     # receive a clear error instead of generating a nonsensical MIDI file.
