@@ -60,6 +60,21 @@ sys.modules.setdefault("tkinter.ttk", stub_tk.ttk)
 web_gui = importlib.import_module("melody_generator.web_gui")
 
 app = web_gui.app
+# Disable CSRF protection for most tests to focus on form validation logic.
+app.config["WTF_CSRF_ENABLED"] = False
+
+
+def test_csrf_protection_enforced():
+    """Form submissions without a CSRF token are rejected with HTTP 400."""
+    protected_app = web_gui.create_app()
+    client = protected_app.test_client()
+    resp = client.post(
+        "/",
+        data={
+            "key": "C",  # minimal payload; CSRF check occurs before validation
+        },
+    )
+    assert resp.status_code == 400
 
 
 def test_index_route():
@@ -513,6 +528,7 @@ def test_generation_dispatched_to_celery(monkeypatch):
     monkeypatch.setitem(sys.modules, "celery", celery_mod)
 
     gui = importlib.reload(importlib.import_module("melody_generator.web_gui"))
+    gui.app.config["WTF_CSRF_ENABLED"] = False
     client = gui.app.test_client()
 
     monkeypatch.setattr(gui, "_generate_preview", lambda **kw: ("", ""))
@@ -572,6 +588,7 @@ def test_delay_arguments_match_preview_parameters(monkeypatch):
     monkeypatch.setitem(sys.modules, "celery", celery_mod)
 
     gui = importlib.reload(importlib.import_module("melody_generator.web_gui"))
+    gui.app.config["WTF_CSRF_ENABLED"] = False
     client = gui.app.test_client()
 
     # Avoid heavy processing during the test by stubbing the actual generator.
@@ -644,6 +661,7 @@ def test_celery_failure_falls_back_to_sync(monkeypatch):
     monkeypatch.setitem(sys.modules, "celery", celery_mod)
 
     gui = importlib.reload(importlib.import_module("melody_generator.web_gui"))
+    gui.app.config["WTF_CSRF_ENABLED"] = False
     client = gui.app.test_client()
 
     called_sync = {}
