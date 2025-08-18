@@ -17,7 +17,9 @@ Example
 # -------
 # This module's voice-leading helper now includes a detailed explanation
 # and example usage. Inline comments clarify how octave shifts prevent
-# crossing and excessive spacing.
+# crossing and excessive spacing. Validation now verifies all voice lists
+# share equal length before voice-leading adjustments to avoid hidden
+# indexing errors.
 
 from __future__ import annotations
 
@@ -147,6 +149,17 @@ class PolyphonicGenerator:
         voices are kept within a single octave by raising the lower voice when
         it sits more than 12 semitones below its neighbour.
 
+        Parameters
+        ----------
+        voices:
+            Mapping from voice name to note sequence. **All lists must share the
+            same length**; otherwise a descriptive ``ValueError`` is raised.
+
+        Raises
+        ------
+        ValueError
+            If the provided voice lists are not all the same length.
+
         Example
         -------
         >>> voices = {
@@ -160,7 +173,17 @@ class PolyphonicGenerator:
         ['C5', 'E4', 'C4', 'C3']
         """
 
-        length = len(next(iter(voices.values())))
+        # Ensure each voice has the same number of notes before processing.
+        # Without this guard, indexing below could raise ``IndexError`` and
+        # produce confusing results when voices differ in length.
+        lengths = {voice: len(notes) for voice, notes in voices.items()}
+        if len(set(lengths.values())) != 1:
+            raise ValueError(
+                "All voice lists must be the same length; received: "
+                + ", ".join(f"{v}={count}" for v, count in lengths.items())
+            )
+
+        length = next(iter(lengths.values()))
         from . import note_to_midi, midi_to_note  # Local import avoids circular deps
 
         for i in range(length):
