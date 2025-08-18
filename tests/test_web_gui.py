@@ -332,6 +332,102 @@ def test_non_positive_motif_length_flash():
     assert b"Motif length must be greater than 0" in resp.data
 
 
+def test_non_integer_bpm_flash():
+    """Textual tempo values should return a helpful validation message."""
+
+    client = app.test_client()
+    resp = client.post(
+        "/",
+        data={
+            "key": "C",
+            "chords": "C",
+            "bpm": "fast",  # invalid string that cannot be cast to int
+            "timesig": "4/4",
+            "notes": "8",
+            "motif_length": "4",
+            "base_octave": "4",
+        },
+    )
+    assert b"BPM must be an integer" in resp.data
+
+
+def test_non_integer_notes_flash():
+    """Non-numeric note counts should be rejected with a flash message."""
+
+    client = app.test_client()
+    resp = client.post(
+        "/",
+        data={
+            "key": "C",
+            "chords": "C",
+            "bpm": "120",
+            "timesig": "4/4",
+            "notes": "many",  # invalid
+            "motif_length": "4",
+            "base_octave": "4",
+        },
+    )
+    assert b"Number of notes must be an integer" in resp.data
+
+
+def test_non_integer_motif_length_flash():
+    """Motif length entered as text should prompt the user to enter a number."""
+
+    client = app.test_client()
+    resp = client.post(
+        "/",
+        data={
+            "key": "C",
+            "chords": "C",
+            "bpm": "120",
+            "timesig": "4/4",
+            "notes": "8",
+            "motif_length": "long",  # invalid
+            "base_octave": "4",
+        },
+    )
+    assert b"Motif length must be an integer" in resp.data
+
+
+def test_non_integer_base_octave_flash():
+    """Base octave must be a number; strings trigger a flash message."""
+
+    client = app.test_client()
+    resp = client.post(
+        "/",
+        data={
+            "key": "C",
+            "chords": "C",
+            "bpm": "120",
+            "timesig": "4/4",
+            "notes": "8",
+            "motif_length": "4",
+            "base_octave": "low",  # invalid
+        },
+    )
+    assert b"Base octave must be an integer" in resp.data
+
+
+def test_non_integer_harmony_lines_flash():
+    """Harmony line counts must be numeric to avoid crashes."""
+
+    client = app.test_client()
+    resp = client.post(
+        "/",
+        data={
+            "key": "C",
+            "chords": "C",
+            "bpm": "120",
+            "timesig": "4/4",
+            "notes": "8",
+            "motif_length": "4",
+            "base_octave": "4",
+            "harmony_lines": "two",  # invalid
+        },
+    )
+    assert b"Harmony lines must be an integer" in resp.data
+
+
 def test_negative_harmony_lines_flash():
     """Negative harmony line counts are rejected."""
 
