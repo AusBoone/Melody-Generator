@@ -21,6 +21,9 @@ Example
 # 2024-11-29: Added explicit validation of time signatures in
 # ``HarmonyGenerator.generate`` to prevent division errors and clarify
 # expected inputs.
+# 2024-12-07: Restricted allowable time signature denominators to common
+# simple values (1, 2, 4, 8, 16) to mirror ``validate_time_signature`` and
+# avoid unsupported meters.
 
 from __future__ import annotations
 
@@ -222,7 +225,8 @@ class HarmonyGenerator:
             Durations of the ``motif`` notes measured in beats.
         time_signature : tuple[int, int], optional
             Meter as ``(numerator, denominator)``. Both parts must be
-            positive integers and the denominator may not be zero.
+            positive integers and the denominator is restricted to the
+            common simple values ``{1, 2, 4, 8, 16}``.
 
         Returns
         -------
@@ -234,24 +238,26 @@ class HarmonyGenerator:
         ------
         ValueError
             If inputs are empty or the time signature components are
-            non-positive.
+            non-positive or use an unsupported denominator.
         """
         if not motif:
             raise ValueError("motif must not be empty")
         if not rhythm:
             raise ValueError("rhythm must not be empty")
 
-        # Validate the time signature before using it in calculations. A
-        # zero or negative denominator would cause division errors when
-        # computing beats per bar, and non-positive numerators are musically
-        # meaningless.
+        # Validate the time signature before using it in calculations. An
+        # invalid denominator could otherwise lead to division errors when
+        # computing beats per bar.  We limit the denominator to the common
+        # simple meter values handled elsewhere in the project so behaviour
+        # mirrors :func:`validate_time_signature`.
         numerator, denominator = time_signature
         if numerator <= 0:
             raise ValueError("time signature numerator must be positive")
-        if denominator == 0:
-            raise ValueError("time signature denominator must be non-zero")
-        if denominator < 0:
-            raise ValueError("time signature denominator must be positive")
+        valid_denominators = {1, 2, 4, 8, 16}
+        if denominator not in valid_denominators:
+            raise ValueError(
+                "time signature denominator must be one of 1, 2, 4, 8 or 16"
+            )
 
         num_bars = _downbeat_bars(rhythm, time_signature)
         beats_per_bar = numerator * (4 / denominator)
