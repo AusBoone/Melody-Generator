@@ -117,3 +117,22 @@ def test_enforce_voice_leading_corrects_crossing_and_spacing():
     assert voices["tenor"][0] == "C4"
 
 
+def test_enforce_voice_leading_rejects_mismatched_lengths():
+    """Voice lists of differing lengths should raise ``ValueError``.
+
+    The alto line intentionally contains fewer notes to trigger the
+    validation step inside :meth:`PolyphonicGenerator._enforce_voice_leading`.
+    """
+
+    gen = PolyphonicGenerator()
+    voices = {
+        "soprano": ["C4", "D4"],
+        "alto": ["E4"],  # shorter list triggers failure
+        "tenor": ["C3", "D3"],
+        "bass": ["C2", "D2"],
+    }
+
+    with pytest.raises(ValueError, match="same length"):
+        gen._enforce_voice_leading(voices)
+
+
