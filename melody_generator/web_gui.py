@@ -68,6 +68,10 @@ The latest revision introduces two major changes:
 #   * Asynchronous preview rendering now waits only a bounded time for Celery
 #     workers. If no result arrives within the timeout the request falls back
 #     to synchronous generation and the timeout is logged for diagnostics.
+# To further harden input handling, integer conversions for numeric form fields
+# now guard against ``ValueError``. When a user submits non-numeric text, the
+# view flashes a clear message and redisplays the form instead of bubbling up
+# an exception.
 
 from __future__ import annotations
 
@@ -256,7 +260,9 @@ def index():
 
     On ``GET`` the function simply renders the input form so the user can
     specify parameters for the melody generation. When submitted via ``POST``
-    a MIDI file is generated in memory and returned to the browser.
+    a MIDI file is generated in memory and returned to the browser. Invalid
+    numeric form values display a flash message and redisplay the form so the
+    user can correct the input instead of triggering an exception.
 
     @returns Response: Rendered template or audio playback page.
     """
@@ -271,13 +277,76 @@ def index():
             flash("Invalid key selected. Please choose a valid key.")
             return render_template('index.html', scale=sorted(SCALE.keys()), instruments=INSTRUMENTS.keys(), styles=STYLE_VECTORS.keys())
 
-        bpm = int(request.form.get('bpm') or 120)
+        # Convert tempo to an integer, flashing an error when non-numeric text
+        # is supplied. The surrounding ``try`` guards against ``ValueError``
+        # raised by ``int`` when the input cannot be parsed.
+        try:
+            bpm = int(request.form.get('bpm') or 120)
+        except ValueError:
+            flash("BPM must be an integer.")
+            return render_template(
+                'index.html',
+                scale=sorted(SCALE.keys()),
+                instruments=INSTRUMENTS.keys(),
+                styles=STYLE_VECTORS.keys(),
+            )
+
         timesig = request.form.get('timesig') or '4/4'
-        notes = int(request.form.get('notes') or 16)
-        motif_length = int(request.form.get('motif_length') or 4)
-        base_octave = int(request.form.get('base_octave') or 4)
+
+        # Number of notes must parse as an integer so generation knows how many
+        # pitches to create. Invalid strings are reported to the user via a
+        # flash message.
+        try:
+            notes = int(request.form.get('notes') or 16)
+        except ValueError:
+            flash("Number of notes must be an integer.")
+            return render_template(
+                'index.html',
+                scale=sorted(SCALE.keys()),
+                instruments=INSTRUMENTS.keys(),
+                styles=STYLE_VECTORS.keys(),
+            )
+
+        # Motif length likewise requires whole numbers; reject malformed input
+        # early so no downstream logic sees invalid data.
+        try:
+            motif_length = int(request.form.get('motif_length') or 4)
+        except ValueError:
+            flash("Motif length must be an integer.")
+            return render_template(
+                'index.html',
+                scale=sorted(SCALE.keys()),
+                instruments=INSTRUMENTS.keys(),
+                styles=STYLE_VECTORS.keys(),
+            )
+
+        # Users may enter a textual ``base_octave`` which would otherwise crash
+        # ``int``. Handle the failure gracefully and re-render the form.
+        try:
+            base_octave = int(request.form.get('base_octave') or 4)
+        except ValueError:
+            flash("Base octave must be an integer.")
+            return render_template(
+                'index.html',
+                scale=sorted(SCALE.keys()),
+                instruments=INSTRUMENTS.keys(),
+                styles=STYLE_VECTORS.keys(),
+            )
+
         instrument = request.form.get('instrument') or 'Piano'
-        harmony_lines = int(request.form.get('harmony_lines') or 0)
+
+        # ``harmony_lines`` may legally be zero but must still parse as an
+        # integer. Non-numeric input results in a flash message.
+        try:
+            harmony_lines = int(request.form.get('harmony_lines') or 0)
+        except ValueError:
+            flash("Harmony lines must be an integer.")
+            return render_template(
+                'index.html',
+                scale=sorted(SCALE.keys()),
+                instruments=INSTRUMENTS.keys(),
+                styles=STYLE_VECTORS.keys(),
+            )
 
         # Basic sanity checks for numeric inputs. Values less than or equal to
         # zero cannot produce a valid melody so the form is redisplayed with an
