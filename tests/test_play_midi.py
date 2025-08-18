@@ -21,10 +21,11 @@ from __future__ import annotations
 
 import builtins
 import importlib
-import sys
-from pathlib import Path
-import types
+import logging
 import subprocess
+import sys
+import types
+from pathlib import Path
 
 import pytest
 
@@ -197,3 +198,60 @@ def test_render_midi_missing_file(tmp_path, monkeypatch):
         playback.render_midi_to_wav("missing.mid", str(output))
 
     assert not called
+
+
+def test_cli_playback_error_logs_and_falls_back(monkeypatch, tmp_path, caplog):
+    """CLI should log playback errors and use default player as a fallback.
+
+    ``run_cli`` previews the generated MIDI when ``--play`` is supplied. If
+    FluidSynth is unavailable or ``play_midi`` fails, the exception should be
+    logged for debugging while ``_open_default_player`` is invoked so the user
+    can still hear the output. This test simulates that failure path by forcing
+    ``play_midi`` to raise and asserting both behaviours occur.
+    """
+
+    import melody_generator as mg
+    import melody_generator.cli as cli
+
+    midi_path = tmp_path / "out.mid"
+
+    # Minimal stub for ``create_midi_file`` to avoid heavy MIDI handling.
+    monkeypatch.setattr(mg, "create_midi_file", lambda *a, **k: None)
+    # Ensure melody generation returns deterministic output.
+    monkeypatch.setattr(mg, "generate_melody", lambda *a, **k: ["C4"])
+
+    # Force ``play_midi`` to fail so the fallback path is exercised.
+    def fail_play(*_a, **_k):
+        raise RuntimeError("synthesis boom")
+
+    monkeypatch.setattr(playback, "play_midi", fail_play)
+
+    # Capture invocations of the default player helper.
+    opened: list[str] = []
+    monkeypatch.setattr(mg, "_open_default_player", lambda path: opened.append(path))
+
+    argv = [
+        "prog",
+        "--key",
+        "C",
+        "--chords",
+        "C",
+        "--bpm",
+        "120",
+        "--timesig",
+        "4/4",
+        "--notes",
+        "4",
+        "--output",
+        str(midi_path),
+        "--play",
+    ]
+    monkeypatch.setattr(sys, "argv", argv)
+
+    with caplog.at_level(logging.ERROR):
+        cli.run_cli()
+
+    # The default player should be invoked with the output path.
+    assert opened == [str(midi_path)]
+    # The error message should be present in the logs for debugging.
+    assert "synthesis boom" in caplog.text
