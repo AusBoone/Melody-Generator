@@ -19,6 +19,9 @@ Design Notes
   library is unavailable.
 - The interval-to-tension mapping is intentionally coarse so the computation
   remains fast and easily adjustable.
+- Weighting now explicitly checks for ``numpy.ndarray`` inputs so only true
+  NumPy arrays use vectorised operations; other iterable types fall back to
+  the pure Python implementation.
 """
 
 from __future__ import annotations
@@ -50,11 +53,41 @@ def tension_for_notes(prev: str, cand: str) -> float:
     return interval_tension(interval)
 
 
-def apply_tension_weights(weights, tensions: Iterable[float], target: float):
-    """Bias ``weights`` toward the ``target`` tension level."""
+def apply_tension_weights(
+    weights: Iterable[float], tensions: Iterable[float], target: float
+) -> Iterable[float]:
+    """Bias ``weights`` toward the ``target`` tension level.
 
+    Parameters
+    ----------
+    weights:
+        Sequence of base weights for each candidate note. This may be a list,
+        tuple or ``numpy.ndarray`` when NumPy is installed.
+    tensions:
+        Iterable of pre-computed tension values corresponding to each weight.
+    target:
+        Desired tension level to bias toward; values closer to this number will
+        receive a higher weighting.
+
+    Returns
+    -------
+    Iterable[float]
+        Adjusted weights. If ``weights`` is a ``numpy.ndarray`` the returned
+        object will also be an array; otherwise a new list is produced.
+
+    Notes
+    -----
+    NumPy arrays are detected explicitly using :func:`isinstance` so that
+    only genuine arrays take the fast vectorised path. All other iterable
+    inputs fall back to a pure Python list comprehension.
+    """
+
+    # Compute scaling values that bias tensions toward the desired target.
     values = [1 / (1 + abs(t - target)) for t in tensions]
-    if hasattr(weights, "__mul__") and not isinstance(weights, list) and np is not None:
-        # NumPy may be missing so guard the vectorized path to avoid attribute errors
+
+    # Use vectorised multiplication only when ``weights`` is a real NumPy array.
+    if np is not None and isinstance(weights, np.ndarray):
         return weights * np.array(values)
+
+    # For lists, tuples, and other iterables we fall back to a Python loop.
     return [w * v for w, v in zip(weights, values)]

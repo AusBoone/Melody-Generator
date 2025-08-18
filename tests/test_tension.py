@@ -28,6 +28,26 @@ def test_apply_tension_weights_numpy():
     assert pytest.approx(result.tolist()) == expected.tolist()
 
 
+def test_apply_tension_weights_list():
+    """List inputs should return a new list with adjusted weights."""
+    weights = [1.0, 2.0]
+    tensions = [0.2, 0.7]
+    result = tension.apply_tension_weights(weights, tensions, 0.5)
+    expected = [w * (1 / (1 + abs(t - 0.5))) for w, t in zip(weights, tensions)]
+    assert result == expected
+    assert isinstance(result, list)
+
+
+def test_apply_tension_weights_tuple():
+    """Tuple inputs should fall back to list processing."""
+    weights = (1.0, 2.0)
+    tensions = [0.2, 0.7]
+    result = tension.apply_tension_weights(weights, tensions, 0.5)
+    expected = [w * (1 / (1 + abs(t - 0.5))) for w, t in zip(weights, tensions)]
+    assert result == expected
+    assert isinstance(result, list)
+
+
 def test_apply_tension_weights_no_numpy(monkeypatch):
     """Fallback path should operate when numpy cannot be imported."""
     # By removing ``numpy`` from ``sys.modules`` and reloading the module we
