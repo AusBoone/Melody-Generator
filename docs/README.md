@@ -15,6 +15,8 @@ additional background on how the system works or how to configure audio playback
   model, style embeddings and tension weighting used in the generator.
 - [Musician's Overview](README_MUSICAL_OVERVIEW.md) – Introduction to the
   project for classical performers and composers.
+- [Training Larger Models](README_TRAINING.md) – Guide for fitting
+  Transformer/ VAE models on genre-specific MIDI datasets.
 
 Each document is self-contained so you can jump directly to the topic that
 interests you.

@@ -152,6 +152,7 @@ from .sequence_model import (
     MelodyLSTM,  # noqa: F401
     predict_next,  # noqa: F401
     load_sequence_model,  # noqa: F401
+    load_genre_sequence_model,  # noqa: F401
 )  # noqa: F401
 # Re-export the full module so ``melody_generator.style_embeddings`` exists for
 # callers that rely on the submodule attribute.  Tests importing the web GUI

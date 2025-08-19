@@ -11,6 +11,9 @@ Modification summary
 * Ensured the output directory exists and gracefully handles ``OSError`` when
   writing MIDI files.
 * Linked the ``--style`` argument help text to style weight documentation.
+* Added ``--genre`` and ``--model-dir`` options so users can select
+  genre-specific checkpoints at runtime with safe fallback to untrained
+  weights.
 
 This module implements the console entry points for the project. The
 ``run_cli`` function parses command line arguments and performs melody
@@ -101,6 +104,22 @@ def run_cli() -> None:
     parser.add_argument("--no-humanize", dest="humanize", action="store_false", help="Disable timing and velocity randomization")
     parser.add_argument("--enable-ml", action="store_true", help="Activate ML-based weighting using a small sequence model")
     parser.add_argument(
+        "--genre",
+        type=str,
+        help=(
+            "Optional genre name selecting a specific sequence model checkpoint "
+            "from --model-dir"
+        ),
+    )
+    parser.add_argument(
+        "--model-dir",
+        type=str,
+        default="models",
+        help=(
+            "Directory containing genre-specific checkpoints (default: models)"
+        ),
+    )
+    parser.add_argument(
         "--style",
         type=str,
         help=(
@@ -163,6 +182,7 @@ def run_cli() -> None:
             generate_counterpoint_melody,
             create_midi_file,
             load_sequence_model,
+            load_genre_sequence_model,
             get_style_vector,
             _open_default_player,
         )
@@ -211,7 +231,11 @@ def run_cli() -> None:
     seq_model = None
     if args.enable_ml:
         try:
-            seq_model = load_sequence_model(None, len(SCALE[args.key]))
+            seq_model = load_genre_sequence_model(
+                args.genre,
+                args.model_dir,
+                len(SCALE[args.key]),
+            )
         except RuntimeError as exc:
             logging.error(str(exc))
             sys.exit(1)

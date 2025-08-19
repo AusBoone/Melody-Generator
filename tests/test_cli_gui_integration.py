@@ -256,8 +256,9 @@ def test_cli_enable_ml_and_style(tmp_path, monkeypatch):
     output = tmp_path / "out.mid"
     called = {}
 
-    def fake_load(path, vocab):
-        called["loaded"] = True
+    def fake_load(genre, directory, vocab):
+        # Record that the loader was invoked with the expected signature.
+        called["loaded"] = (genre, directory, vocab)
         return object()
 
     def gen_mel(*args, **kwargs):
@@ -265,7 +266,7 @@ def test_cli_enable_ml_and_style(tmp_path, monkeypatch):
         called["style"] = kwargs.get("style")
         return ["C4"]
 
-    monkeypatch.setattr(mod, "load_sequence_model", fake_load)
+    monkeypatch.setattr(mod, "load_genre_sequence_model", fake_load)
     monkeypatch.setattr(mod, "generate_melody", gen_mel)
     argv = [
         "prog",
