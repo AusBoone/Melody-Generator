@@ -20,14 +20,20 @@ load the resulting weights via :func:`load_sequence_model`.
 # requests for the same model avoid costly disk reads.
 # - Introduced ``load_genre_sequence_model`` which resolves genre-specific
 #   checkpoints and falls back to untrained weights when unavailable.
-# - ``load_sequence_model`` ensures models are returned in evaluation mode
-#   so stochastic layers like dropout remain inactive during inference.
+# - ``load_genre_sequence_model`` now logs a warning when it falls back, making
+#   misconfigured checkpoint paths easier to diagnose during debugging.
+# - ``load_sequence_model`` ensures models are returned in evaluation mode so
+#   stochastic layers like dropout remain inactive during inference.
 
 from __future__ import annotations
 
+import logging
 import os
 from functools import lru_cache
 from typing import List, Optional, Protocol
+
+
+logger = logging.getLogger(__name__)
 
 try:
     import torch
@@ -200,7 +206,8 @@ def load_genre_sequence_model(
     ``load_sequence_model`` performs the heavy lifting and raises ``ValueError``
     when loading fails. This wrapper catches those errors so callers can safely
     request a genre that lacks a checkpoint without surrounding try/except
-    blocks.
+    blocks. When a fallback occurs the function logs a warning including the
+    problematic checkpoint path so misconfigurations are easier to diagnose.
     """
 
     if not genre or not directory:
@@ -212,7 +219,12 @@ def load_genre_sequence_model(
     try:
         return load_sequence_model(path, vocab_size)
     except ValueError:
-        # Missing or corrupt checkpoint – fall back to an untrained model.
+        # Missing or corrupt checkpoint – log a warning and fall back to an
+        # untrained model so generation can continue.
+        logger.warning(
+            "Falling back to untrained model; could not load checkpoint at %s",
+            path,
+        )
         return load_sequence_model(None, vocab_size)
 
 
