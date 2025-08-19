@@ -280,7 +280,7 @@ def test_extra_tracks_created(tmp_path):
     harmony = generate_harmony_line(melody)
     cp = generate_counterpoint_melody(melody, "C")
     out = tmp_path / "m.mid"
-    create_midi_file(
+    mid = create_midi_file(
         melody,
         120,
         (4, 4),
@@ -289,7 +289,6 @@ def test_extra_tracks_created(tmp_path):
         pattern=[0.25],
         extra_tracks=[harmony, cp],
     )
-    mid = DummyMidiFile.last_instance
     assert mid is not None
     assert len(mid.tracks) == 1 + 2
 
@@ -304,7 +303,7 @@ def test_extra_tracks_shorter_line(tmp_path):
     harmony = generate_harmony_line(melody)[:3]
     cp = generate_counterpoint_melody(melody, "C")[:5]
     out = tmp_path / "short.mid"
-    create_midi_file(
+    mid = create_midi_file(
         melody,
         120,
         (4, 4),
@@ -313,7 +312,6 @@ def test_extra_tracks_shorter_line(tmp_path):
         pattern=[0.25],
         extra_tracks=[harmony, cp],
     )
-    mid = DummyMidiFile.last_instance
     assert mid is not None
     assert len(mid.tracks) == 1 + 2
     assert len(mid.tracks[1]) == 2 * len(harmony)
@@ -328,7 +326,7 @@ def test_chord_track_added(tmp_path):
     chords = ["C", "G"]
     melody = generate_melody("C", 4, chords, motif_length=4)
     out = tmp_path / "ch.mid"
-    create_midi_file(
+    mid = create_midi_file(
         melody,
         120,
         (4, 4),
@@ -337,7 +335,6 @@ def test_chord_track_added(tmp_path):
         pattern=[0.25],
         chord_progression=chords,
     )
-    mid = DummyMidiFile.last_instance
     assert mid is not None
     assert len(mid.tracks) == 2
 
@@ -350,7 +347,7 @@ def test_chords_on_same_track(tmp_path):
     chords = ["C", "G"]
     melody = generate_melody("C", 4, chords, motif_length=4)
     out = tmp_path / "merge.mid"
-    create_midi_file(
+    mid = create_midi_file(
         melody,
         120,
         (4, 4),
@@ -360,7 +357,6 @@ def test_chords_on_same_track(tmp_path):
         chord_progression=chords,
         chords_separate=False,
     )
-    mid = DummyMidiFile.last_instance
     assert mid is not None
     assert len(mid.tracks) == 1
 
@@ -370,7 +366,7 @@ def test_merged_chords_start_at_zero(tmp_path):
     chords = ["C", "G"]
     melody = generate_melody("C", 4, chords, motif_length=4)
     out = tmp_path / "start.mid"
-    create_midi_file(
+    mid = create_midi_file(
         melody,
         120,
         (4, 4),
@@ -380,7 +376,6 @@ def test_merged_chords_start_at_zero(tmp_path):
         chord_progression=chords,
         chords_separate=False,
     )
-    mid = DummyMidiFile.last_instance
     assert mid is not None
     track = mid.tracks[0]
     abs_time = 0
@@ -402,7 +397,7 @@ def test_rest_values_in_pattern(tmp_path):
     chords = ["C", "G", "Am", "F"]
     melody = generate_melody("C", 4, chords, motif_length=4)
     out = tmp_path / "rest.mid"
-    create_midi_file(
+    mid = create_midi_file(
         melody,
         120,
         (4, 4),
@@ -410,7 +405,6 @@ def test_rest_values_in_pattern(tmp_path):
         harmony=False,
         pattern=[0.25, 0],
     )
-    mid = DummyMidiFile.last_instance
     assert mid is not None
     # Tempo, time signature, program change and one pair per non-rest note
     assert len(mid.tracks[0]) == 7
@@ -619,7 +613,7 @@ def test_chord_duration_respects_time_signature(tmp_path, monkeypatch):
 
     melody = ["C4"] * 8
     out = tmp_path / "ts.mid"
-    melody_generator.create_midi_file(
+    mid = melody_generator.create_midi_file(
         melody,
         120,
         (6, 8),
@@ -630,8 +624,7 @@ def test_chord_duration_respects_time_signature(tmp_path, monkeypatch):
         # validation against the expected 6/8 measure length.
         humanize=False,
     )
-
-    mid = melody_generator.mido.MidiFile.last_instance
+    assert mid is not None
     chord_track = mid.tracks[1]
     off_times = [m.time for m in chord_track if m.type == "note_off"]
     assert off_times and off_times[0] == 1440
@@ -650,7 +643,7 @@ def test_chord_track_covers_extra_note(tmp_path, monkeypatch):
 
     melody = ["C4", "D4", "E4", "F4"]  # One 4/4 measure.
     out = tmp_path / "extra.mid"
-    melody_generator.create_midi_file(
+    mid = melody_generator.create_midi_file(
         melody,
         120,
         (4, 4),
@@ -659,8 +652,6 @@ def test_chord_track_covers_extra_note(tmp_path, monkeypatch):
         chord_progression=["C"],
         humanize=False,
     )
-
-    mid = DummyMidiFile.last_instance
     assert mid is not None
     melody_track = mid.tracks[0]
     chord_track = mid.tracks[1]
@@ -716,9 +707,7 @@ def test_velocity_accent_on_downbeats(tmp_path):
 
     melody = ["C4", "D4", "E4", "F4"]
     out = tmp_path / "vel.mid"
-    create_midi_file(melody, 120, (4, 4), str(out), pattern=[0.25])
-
-    mid = DummyMidiFile.last_instance
+    mid = create_midi_file(melody, 120, (4, 4), str(out), pattern=[0.25])
     velocities = [m.velocity for m in mid.tracks[0] if m.type == "note_on"]
     # The first note falls on a strong beat so its velocity includes the accent
     # of ``+10`` on top of the base dynamic curve. Without the accent the value
@@ -779,7 +768,7 @@ def test_create_midi_file_accepts_lowercase(tmp_path):
 
     melody = ["C4"] * 4
     out = tmp_path / "lower.mid"
-    create_midi_file(
+    mid = create_midi_file(
         melody,
         120,
         (4, 4),
@@ -788,7 +777,6 @@ def test_create_midi_file_accepts_lowercase(tmp_path):
         chord_progression=["c", "g"],
     )
 
-    mid = DummyMidiFile.last_instance
     assert mid is not None
     assert len(mid.tracks) == 2
 

@@ -118,7 +118,7 @@ def test_harmony_and_counterpoint_intervals_and_tracks(tmp_path):
     for m, c in zip(melody, counter):
         assert abs(mod.note_to_midi(c) - mod.note_to_midi(m)) in valid
     out = tmp_path / "t.mid"
-    mod.create_midi_file(
+    mid = mod.create_midi_file(
         melody,
         120,
         (4, 4),
@@ -127,7 +127,6 @@ def test_harmony_and_counterpoint_intervals_and_tracks(tmp_path):
         pattern=[0.25],
         extra_tracks=[harmony, counter],
     )
-    mid = DummyMidiFile.last_instance
     assert mid is not None and len(mid.tracks) == 1 + 1 + 2
 
 

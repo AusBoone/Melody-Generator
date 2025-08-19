@@ -72,6 +72,12 @@ The latest revision introduces two major changes:
 # now guard against ``ValueError``. When a user submits non-numeric text, the
 # view flashes a clear message and redisplays the form instead of bubbling up
 # an exception.
+#
+# The current revision enforces critical configuration in production
+# deployments. The application factory now emits ``CRITICAL`` log messages and
+# raises :class:`RuntimeError` when either ``FLASK_SECRET`` or
+# ``CELERY_BROKER_URL`` are missing while debug mode is disabled. This prevents
+# accidentally running the web interface with insecure default settings.
 
 from __future__ import annotations
 
@@ -541,18 +547,36 @@ def create_app() -> Flask:
 
     This factory enables running the web interface under a production WSGI
     server such as Gunicorn. It configures the session secret, attaches CSRF
-    protection, and registers the routes defined in this module.
+    protection, and registers the routes defined in this module. In production
+    (non-debug) mode the factory requires ``FLASK_SECRET`` and
+    ``CELERY_BROKER_URL`` to be present. Missing values trigger a
+    :class:`RuntimeError` after emitting a ``CRITICAL`` log entry so the
+    application never runs with insecure defaults.
 
     Returns:
         Flask: Configured application ready for use by a WSGI server.
+    Raises:
+        RuntimeError: If required environment variables are absent when debug
+            mode is disabled.
     """
 
     app = Flask(__name__, template_folder="templates", static_folder="static")
 
-    # Configure the session secret used to sign cookies. A random key is
-    # generated when ``FLASK_SECRET`` is missing so the app remains usable but
-    # sessions reset between restarts.
+    # Read security-related environment variables so we can validate their presence.
     secret = os.environ.get("FLASK_SECRET")
+    broker = os.environ.get("CELERY_BROKER_URL")
+
+    if not app.debug:
+        # Running without these variables in production would leave sessions
+        # unsigned or Celery unable to dispatch tasks. Treat missing values as
+        # fatal configuration errors.
+        if not secret:
+            logger.critical("FLASK_SECRET environment variable must be set in production.")
+            raise RuntimeError("Missing FLASK_SECRET")
+        if not broker:
+            logger.critical("CELERY_BROKER_URL environment variable must be set in production.")
+            raise RuntimeError("Missing CELERY_BROKER_URL")
+
     if not secret:
         secret = secrets.token_urlsafe(32)
         logger.warning(

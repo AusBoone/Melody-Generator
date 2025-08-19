@@ -2,9 +2,12 @@
 
 The web interface exposes the same melody generation functionality as the
 desktop application. These tests post various form values to the Flask app and
-verify that invalid input is rejected and valid input renders correctly."""
+verify that invalid input is rejected and valid input renders correctly. This
+suite also asserts that required configuration such as ``FLASK_SECRET`` and
+``CELERY_BROKER_URL`` is enforced in production mode."""
 
 import importlib
+import os
 import sys
 import types
 from pathlib import Path
@@ -56,6 +59,11 @@ sys.modules.setdefault("tkinter", stub_tk)
 sys.modules.setdefault("tkinter.filedialog", stub_tk.filedialog)
 sys.modules.setdefault("tkinter.messagebox", stub_tk.messagebox)
 sys.modules.setdefault("tkinter.ttk", stub_tk.ttk)
+
+# Provide required configuration so module import and the default ``create_app``
+# call succeed during tests. Individual tests override these values as needed.
+os.environ.setdefault("FLASK_SECRET", "testing-secret")
+os.environ.setdefault("CELERY_BROKER_URL", "memory://")
 
 web_gui = importlib.import_module("melody_generator.web_gui")
 
@@ -965,3 +973,19 @@ def test_temp_files_cleaned_on_failure(tmp_path, monkeypatch):
 
     for path in created:
         assert not path.exists()
+
+
+def test_create_app_requires_flask_secret(monkeypatch):
+    """Factory aborts when ``FLASK_SECRET`` is missing in production."""
+    monkeypatch.delenv("FLASK_SECRET", raising=False)
+    monkeypatch.setenv("CELERY_BROKER_URL", "memory://")
+    with pytest.raises(RuntimeError):
+        web_gui.create_app()
+
+
+def test_create_app_requires_broker(monkeypatch):
+    """Factory aborts when ``CELERY_BROKER_URL`` is missing in production."""
+    monkeypatch.setenv("FLASK_SECRET", "testing-secret")
+    monkeypatch.delenv("CELERY_BROKER_URL", raising=False)
+    with pytest.raises(RuntimeError):
+        web_gui.create_app()
