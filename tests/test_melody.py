@@ -50,7 +50,10 @@ stub_mido.MidiFile = DummyMidiFile
 stub_mido.MidiTrack = DummyMidiTrack
 stub_mido.MetaMessage = lambda *args, **kwargs: DummyMessage("meta", **kwargs)
 stub_mido.bpm2tempo = lambda bpm: bpm
-sys.modules.setdefault("mido", stub_mido)
+# Override any existing ``mido`` stub so tests remain isolated regardless of
+# execution order. ``setdefault`` would retain a previous stub that might not
+# expose ``last_instance``, causing later assertions to fail.
+sys.modules["mido"] = stub_mido
 
 # Provide a minimal stub for the 'tkinter' module so the import succeeds
 tk_stub = types.ModuleType("tkinter")
@@ -64,7 +67,9 @@ sys.modules.setdefault("tkinter.ttk", tk_stub.ttk)
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-melody_generator = importlib.import_module("melody_generator")
+# Reload ``melody_generator`` so it binds to the newly installed stubs even if
+# previous tests imported the package earlier in the session.
+melody_generator = importlib.reload(importlib.import_module("melody_generator"))
 note_to_midi = melody_generator.note_to_midi
 generate_melody = melody_generator.generate_melody
 generate_harmony_line = melody_generator.generate_harmony_line

@@ -160,8 +160,8 @@ while keeping the algorithm efficient and deterministic.
   ``SequenceModel`` interface so alternative architectures can be swapped in.
   When PyTorch is unavailable the code falls back to heuristic weighting.
 - **Style Embeddings** – A small VAE learns continuous style latents. Call
-  ``set_style`` to activate a vector or ``interpolate_vectors`` to blend
-  genres like Baroque, jazz and pop.
+  ``set_style`` to activate a thread-local vector or ``interpolate_vectors`` to
+  blend genres like Baroque, jazz and pop.
 - **Independent Rhythm Engine** – Rhythmic patterns are produced by a dedicated
   :class:`RhythmGenerator` which models transitions between common note lengths.
   Onset times are generated first and melodies are fitted onto that skeleton.
@@ -209,9 +209,9 @@ with NumPy when available for speed.
 
 Supplying a pretrained LSTM with ``sequence_model`` further shapes the melody.
 The last few scale degrees feed into ``SequenceModel.predict_logits``; the
-returned scores are added to candidate weights. When ``set_style`` provides a
-style vector its values are added as an offset so genres like Baroque or jazz
-subtly colour note choice.
+returned scores are added to candidate weights. When ``set_style`` has stored a
+thread-local style vector, its values are added as an offset so genres like
+Baroque or jazz subtly colour note choice.
 Parallel fifths and octaves against the chord root are halved to maintain basic
 counterpoint. Candidate weights also include a small bonus for contrary motion
 and a penalty for repeated perfect fifth or octave leaps as determined by

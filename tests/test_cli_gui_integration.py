@@ -1304,7 +1304,8 @@ def test_open_default_player_waits_linux(monkeypatch, tmp_path):
 
     calls = []
 
-    def fake_run(cmd, check=False):
+    def fake_run(cmd, check=False, **kwargs):
+        """Simulate ``subprocess.run`` used by ``open_default_player``."""
         calls.append(cmd)
         time.sleep(0.05)
         return types.SimpleNamespace(returncode=0)
@@ -1330,7 +1331,8 @@ def test_gui_open_default_player_waits_linux(monkeypatch, tmp_path):
 
     calls = []
 
-    def fake_run(cmd, check=False):
+    def fake_run(cmd, check=False, **kwargs):
+        """Simulate ``subprocess.run`` used by ``open_default_player``."""
         calls.append(cmd)
         time.sleep(0.05)
         return types.SimpleNamespace(returncode=0)
