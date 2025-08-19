@@ -4,13 +4,18 @@ This guide explains the preset style vectors shipped with Melody‑Generator and
 
 ## Embedding Dimensions
 
-The compact style embedding uses three dimensions:
+The default style embedding uses three dimensions:
 
 1. **Counterpoint Influence** – higher values encourage stepwise motion and strict voice‑leading reminiscent of Baroque practices.
 2. **Harmonic Color** – emphasizes chromatic notes and extended chords common in jazz.
 3. **Hook Density** – biases toward repetitive, catchy motifs typical of contemporary pop.
 
-Each preset assigns a weight to these dimensions:
+Additional dimensions can be appended at runtime using :func:`load_styles`. When
+longer vectors are loaded, existing presets are padded with zeros so every style
+shares the same dimensionality. All vectors within a single style file must have
+identical lengths.
+
+Each preset assigns a weight to the current dimensions:
 
 | Name     | Vector           | Characteristics |
 |----------|-----------------|----------------|
@@ -20,7 +25,19 @@ Each preset assigns a weight to these dimensions:
 | blues    | `[0.5, 0.4, 0.1]` | Mixes expressive bends with moderate chromaticism. |
 | chiptune | `[0.1, 0.8, 0.1]` | Bright timbres and syncopated runs inspired by retro game music. |
 
-These vectors can be extended at runtime using `load_styles` with a JSON or YAML file. Any additional vectors must keep the same dimensionality.
+Vectors with more than three elements expand the embedding space. For example,
+the following JSON file introduces a fourth "Rhythmic Syncopation" dimension and
+adds a new preset:
+
+```json
+{
+  "electro": [0.2, 0.3, 0.1, 0.4]
+}
+```
+
+Loading this file will pad existing presets with a trailing zero so they become
+four‑dimensional, while `electro` receives the provided weights. Every vector in
+the file must share this four-element length.
 
 ## Usage Examples
 
