@@ -30,6 +30,8 @@ dictionary. Example (``docs/example_styles.json``)::
         "chiptune": [0.1, 0.8, 0.1]
     }
 
+For a detailed overview of preset vectors and how weight dimensions map to genres, see [README_STYLE_WEIGHTS.md](README_STYLE_WEIGHTS.md).
+
 
 ## Tension Modelling
 

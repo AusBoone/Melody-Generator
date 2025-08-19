@@ -28,6 +28,8 @@ counterpoint generation is delegated to :mod:`melody_generator`.
 # * ``__init__`` creates the Tk root before any ``BooleanVar`` or
 #   ``StringVar`` objects to comply with Python 3.12's stricter Tkinter
 #   initialization requirements.
+# * Added a help button next to the style selector linking to
+#   ``README_STYLE_WEIGHTS.md`` for preset vector documentation.
 # ---------------------------------------------------------------
 from __future__ import annotations
 
@@ -38,6 +40,8 @@ import os
 import threading
 from tempfile import NamedTemporaryFile
 import random
+import webbrowser
+from pathlib import Path
 
 from . import diatonic_chords, MIN_OCTAVE, MAX_OCTAVE
 from .sequence_model import load_sequence_model
@@ -142,6 +146,20 @@ class MelodyGeneratorGUI:
         # Apply theme again so newly created widgets inherit colors
         self._apply_theme()
         self._check_preview_available()
+
+    def _open_style_docs(self) -> None:
+        """Open the style weight documentation in the default viewer.
+
+        Clicking the help button next to the style selector opens the
+        ``README_STYLE_WEIGHTS.md`` file so users can explore the
+        available preset vectors and their musical implications.
+        """
+
+        docs = Path(__file__).resolve().parents[1] / "docs" / "README_STYLE_WEIGHTS.md"
+        try:
+            webbrowser.open(docs.as_uri())
+        except Exception as exc:  # pragma: no cover - platform-specific failures
+            messagebox.showerror("Documentation Error", f"Could not open {docs}: {exc}")
 
     def _setup_theme(self) -> None:
         """Configure ttk theme and basic colors.
@@ -432,6 +450,14 @@ class MelodyGeneratorGUI:
             state="readonly",
         )
         self.style_combo.grid(row=9, column=3)
+        self._create_tooltip(self.style_combo, "Select a preset style vector; click ? for descriptions")
+        ttk.Button(
+            frame,
+            text="?",
+            width=2,
+            command=self._open_style_docs,
+        ).grid(row=9, column=4, padx=(5, 0))
+
 
         # Harmony checkbox
         self.harmony_var = tk.BooleanVar(value=False)
