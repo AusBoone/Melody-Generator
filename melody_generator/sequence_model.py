@@ -18,6 +18,8 @@ load the resulting weights via :func:`load_sequence_model`.
 #   extraneous training information is ignored during inference.
 # ``load_sequence_model`` now uses ``functools.lru_cache`` so repeated
 # requests for the same model avoid costly disk reads.
+# - Introduced ``load_genre_sequence_model`` which resolves genre-specific
+#   checkpoints and falls back to untrained weights when unavailable.
 
 from __future__ import annotations
 
@@ -154,6 +156,53 @@ def load_sequence_model(path: Optional[str], vocab_size: int) -> SequenceModel:
         # contract to callers.
         raise ValueError(f"Unable to load model from {path!r}: {exc}") from exc
     return model
+
+
+@lru_cache(maxsize=None)
+def load_genre_sequence_model(
+    genre: Optional[str],
+    directory: Optional[str],
+    vocab_size: int,
+) -> SequenceModel:
+    """Return a model checkpoint for ``genre`` or a fresh model.
+
+    Parameters
+    ----------
+    genre:
+        Name of the musical genre whose checkpoint should be loaded. ``None``
+        or an empty string bypasses loading and returns an untrained model.
+    directory:
+        Filesystem directory containing genre-specific checkpoints named
+        ``{genre}.pt``. When ``None`` the function behaves as though no
+        checkpoint exists.
+    vocab_size:
+        Size of the note vocabulary used when constructing the model.
+
+    Returns
+    -------
+    SequenceModel
+        Loaded model instance. If the checkpoint is unavailable or invalid, an
+        untrained model is returned instead.
+
+    Notes
+    -----
+    ``load_sequence_model`` performs the heavy lifting and raises ``ValueError``
+    when loading fails. This wrapper catches those errors so callers can safely
+    request a genre that lacks a checkpoint without surrounding try/except
+    blocks.
+    """
+
+    if not genre or not directory:
+        # No specific genre requested; return a fresh model so the caller can
+        # still generate output without specialised weights.
+        return load_sequence_model(None, vocab_size)
+
+    path = os.path.join(directory, f"{genre}.pt")
+    try:
+        return load_sequence_model(path, vocab_size)
+    except ValueError:
+        # Missing or corrupt checkpoint – fall back to an untrained model.
+        return load_sequence_model(None, vocab_size)
 
 
 def predict_next(model: SequenceModel, history: List[int]) -> int:
