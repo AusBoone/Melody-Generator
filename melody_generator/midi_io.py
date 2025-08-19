@@ -51,14 +51,17 @@ def create_midi_file(
     chords_separate: bool = True,
     program: int = 0,
     humanize: bool = True,
-) -> None:
+    ) -> object:
     """Write ``melody`` to ``output_file`` as a MIDI file.
 
+    The generated ``MidiFile`` is returned so callers and tests can inspect the
+    in-memory representation without reading the written file back from disk.
     Chord names supplied via ``chord_progression`` are canonicalised using
     :func:`canonical_chord` so case-insensitive input is accepted. Unknown
     chords raise ``ValueError`` before any MIDI events are created. The parent
     directory of ``output_file`` is created automatically so callers may supply
-    paths in a new folder without preparing it beforehand.
+    paths in a new folder without preparing it beforehand. Notes starting a
+    measure receive a small velocity accent to provide a subtle rhythmic pulse.
     """
     # ``mido`` is imported lazily so projects depending on this module do not
     # need the optional MIDI dependency unless they actually render files.  A
@@ -137,7 +140,17 @@ def create_midi_file(
 
     for i, note in enumerate(melody):
         duration_fraction = pattern[i % len(pattern)]
-        velocity = random.randint(50, 90)
+        # Base dynamics are intentionally conservative so compositions retain
+        # headroom.  Values between ``40`` and ``60`` give a gentle curve while
+        # still leaving room for expressive accents.
+        base_velocity = random.randint(40, 60)
+        velocity = base_velocity
+        # Emphasise the first beat of each measure with a small velocity boost.
+        # ``beats_elapsed`` tracks progress within the current bar and resets
+        # to ``0`` once the end is reached, so a value of ``0`` indicates a
+        # downbeat.
+        if beats_elapsed == 0:
+            velocity = min(base_velocity + 10, 127)
         if duration_fraction == 0:
             rest_ticks += beat_ticks
             beats_elapsed += 1
@@ -257,6 +270,9 @@ def create_midi_file(
 
     mid.save(output_file)
     logging.info("MIDI file saved to %s", output_file)
+    # Returning the ``MidiFile`` instance allows callers and tests to inspect
+    # the in-memory representation without reloading the written file.
+    return mid
 
 
 def _open_default_player(path: str, *, delete_after: bool = False) -> None:

@@ -145,10 +145,14 @@ summarized in the [Environment Variables](#environment-variables) section.
   `/Library/Audio/Sounds/Banks/FluidR3_GM.sf2` on macOS and
   `/usr/share/sounds/sf2/TimGM6mb.sf2` on Linux (from the optional
   `fluid-soundfont-gm` package).
-- `FLASK_SECRET` – Secret key for the web interface session. If omitted a
-  random key is generated each run.
+- `FLASK_SECRET` – Secret key for the web interface session. **Must** be set to a
+  long, random value in production; the server now refuses to start when this
+  variable is missing. A random key is generated only during development to
+  keep sessions isolated between restarts.
 - `CELERY_BROKER_URL` – URL of the Celery broker used for asynchronous preview
-  generation. Defaults to `memory://` so the web interface works without
+  generation. In production this must reference a real broker such as Redis or
+  RabbitMQ. The application exits with an error if the variable is unset. During
+  development it defaults to `memory://` so the web interface works without
   additional services.
 
 # Usage
