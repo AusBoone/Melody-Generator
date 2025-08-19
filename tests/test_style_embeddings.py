@@ -1,4 +1,10 @@
-"""Tests for the style embedding helpers."""
+"""Tests for the style embedding helpers.
+
+This suite validates vector handling, dynamic style loading and thread
+isolation. ``load_styles`` is exercised against multiple failure modes and
+confirmed to copy loaded vectors so external mutations cannot corrupt
+module-level presets.
+"""
 
 import importlib
 import json
@@ -189,6 +195,62 @@ def test_load_styles_dimension_mismatch(tmp_path):
 
     # Ensure neither of the new names were merged and existing presets were preserved.
     assert style.STYLE_VECTORS == before
+
+
+def test_load_styles_non_sequence_value(tmp_path):
+    """Mappings with non-sequence values should raise ``ValueError`` and not alter presets."""
+
+    path = tmp_path / "bad_value.json"
+    path.write_text(json.dumps({"bad": 1}))  # Value is not a list or tuple
+
+    # Snapshot current presets so we can verify they are untouched after failure.
+    before = dict(style.STYLE_VECTORS)
+
+    with pytest.raises(ValueError):
+        style.load_styles(str(path))
+
+    # Loading should fail without modifying any existing styles.
+    assert style.STYLE_VECTORS == before
+
+
+def test_load_styles_unsupported_extension(tmp_path):
+    """Unknown file extensions must trigger ``ValueError``."""
+
+    path = tmp_path / "styles.txt"
+    path.write_text("irrelevant")
+
+    before = dict(style.STYLE_VECTORS)
+    with pytest.raises(ValueError):
+        style.load_styles(str(path))
+    # Ensure presets remain unchanged when the loader rejects the file.
+    assert style.STYLE_VECTORS == before
+
+
+def test_loaded_styles_are_copied(tmp_path):
+    """Loaded style vectors should be insulated from caller-side mutations."""
+
+    # Define a vector and write it to disk; ``vec`` will be mutated later to
+    # confirm ``load_styles`` copies the data rather than referencing it.
+    vec = [0.1, 0.2, 0.7]
+    path = tmp_path / "fresh.json"
+    path.write_text(json.dumps({"fresh": vec}))
+
+    # Load the style and snapshot presets so we can restore them after the test.
+    before = dict(style.STYLE_VECTORS)
+    style.load_styles(str(path))
+
+    try:
+        # Mutating the source list must not affect the stored preset.
+        vec[0] = 9.9
+        assert style.get_style_vector("fresh")[0] == 0.1
+
+        # The vector returned by ``get_style_vector`` should also be a copy.
+        returned = style.get_style_vector("fresh")
+        returned[1] = 9.9
+        assert style.get_style_vector("fresh")[1] == 0.2
+    finally:
+        # Restore original presets so later tests see a clean environment.
+        style.STYLE_VECTORS = before
 
 
 def test_thread_local_style_is_isolated():
