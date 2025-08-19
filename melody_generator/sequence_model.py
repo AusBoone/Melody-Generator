@@ -20,6 +20,8 @@ load the resulting weights via :func:`load_sequence_model`.
 # requests for the same model avoid costly disk reads.
 # - Introduced ``load_genre_sequence_model`` which resolves genre-specific
 #   checkpoints and falls back to untrained weights when unavailable.
+# - ``load_sequence_model`` ensures models are returned in evaluation mode
+#   so stochastic layers like dropout remain inactive during inference.
 
 from __future__ import annotations
 
@@ -113,8 +115,9 @@ def load_sequence_model(path: Optional[str], vocab_size: int) -> SequenceModel:
     Returns
     -------
     SequenceModel
-        Loaded model instance. Repeated calls with the same arguments
-        return the cached object to avoid redundant disk reads.
+        Loaded model instance configured for evaluation. Repeated calls with
+        the same arguments return the cached object to avoid redundant disk
+        reads.
 
     Raises
     ------
@@ -128,7 +131,11 @@ def load_sequence_model(path: Optional[str], vocab_size: int) -> SequenceModel:
 
     model = MelodyLSTM(vocab_size)
     if not path:
-        # ``None`` indicates that callers want a fresh, untrained model.
+        # ``None`` indicates that callers want a fresh, untrained model. Even
+        # without loaded weights we set the model to evaluation mode so calling
+        # code can immediately perform inference without worrying about
+        # training-specific behaviour such as dropout.
+        model.eval()
         return model
 
     try:
@@ -151,6 +158,10 @@ def load_sequence_model(path: Optional[str], vocab_size: int) -> SequenceModel:
             raise ValueError("checkpoint does not contain a state dict")
 
         model.load_state_dict(state)
+        # ``eval`` switches the module into inference mode, disabling features
+        # like dropout and ensuring deterministic behaviour. This call is safe
+        # even when the model lacks such layers.
+        model.eval()
     except Exception as exc:  # pragma: no cover - exercised via unit tests
         # Rewrap any underlying issue in a ``ValueError`` to provide a clear
         # contract to callers.

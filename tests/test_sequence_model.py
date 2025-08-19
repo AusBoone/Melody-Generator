@@ -168,6 +168,12 @@ def test_load_sequence_model_cached(monkeypatch):
     class DummyModel:
         def __init__(self, vocab):
             calls.append(vocab)
+            # Track training mode to match ``nn.Module``
+            self.training = True
+
+        def eval(self):  # pragma: no cover - trivial
+            # ``load_sequence_model`` now expects ``eval`` to exist so mimic it
+            self.training = False
 
     monkeypatch.setattr(seq_mod, "MelodyLSTM", DummyModel)
 
@@ -220,3 +226,35 @@ def test_load_sequence_model_rejects_corrupt(tmp_path, monkeypatch):
 
     with pytest.raises(ValueError):
         seq_mod.load_sequence_model(str(bad_file), 7)
+
+
+def test_load_sequence_model_returns_eval_mode(tmp_path, monkeypatch):
+    """``load_sequence_model`` should switch models to evaluation mode."""
+
+    seq_mod = importlib.reload(importlib.import_module("melody_generator.sequence_model"))
+
+    class DummyModel:
+        """Minimal stand-in that tracks training/eval transitions."""
+
+        def __init__(self, vocab):
+            self.training = True  # Mimic ``nn.Module``'s default state
+
+        def load_state_dict(self, state):  # pragma: no cover - trivial
+            pass
+
+        def eval(self):
+            # Mark the model as being in inference mode
+            self.training = False
+
+    # Use the dummy implementation so the test does not require PyTorch
+    monkeypatch.setattr(seq_mod, "MelodyLSTM", DummyModel)
+
+    # Create a placeholder checkpoint to trigger the weight-loading branch
+    ckpt = tmp_path / "weights.pt"
+    ckpt.write_text("unused")
+    monkeypatch.setattr(seq_mod.torch, "load", lambda *a, **k: {})
+
+    model = seq_mod.load_sequence_model(str(ckpt), 7)
+
+    # The helper should place the model into evaluation mode before returning
+    assert model.training is False
