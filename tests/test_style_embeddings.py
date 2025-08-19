@@ -5,6 +5,7 @@ import json
 import sys
 from pathlib import Path
 import types
+import threading
 import pytest
 
 # Ensure the repository root is on ``sys.path`` so the package imports.
@@ -13,6 +14,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 # Provide a minimal ``mido`` stub so importing the package does not fail.
 stub_mido = types.ModuleType("mido")
 stub_mido.Message = object
+
+
 class _DummyMidiFile:
     """Minimal ``MidiFile`` stub used during import."""
 
@@ -36,7 +39,7 @@ def test_style_vector_lookup():
 
 
 def test_set_and_get_active_style():
-    """``set_style`` should store and return the vector provided."""
+    """``set_style`` should store a thread-local vector and retrieve a copy."""
 
     style.set_style([0.2, 0.3, 0.5])
     vec = style.get_active_style()
@@ -57,6 +60,7 @@ def test_vectors_are_copied():
     active = style.get_active_style()
     active[0] = 42
     assert style.get_active_style()[0] != 42
+    style.set_style(None)
 
 
 def test_interpolate_vectors():
@@ -185,4 +189,29 @@ def test_load_styles_dimension_mismatch(tmp_path):
 
     # Ensure neither of the new names were merged and existing presets were preserved.
     assert style.STYLE_VECTORS == before
+
+
+def test_thread_local_style_is_isolated():
+    """Styles set in separate threads must not leak between contexts."""
+
+    results = {}
+
+    def worker(name, vec):
+        """Set and retrieve a style in a background thread."""
+
+        style.set_style(vec)
+        results[name] = list(style.get_active_style())
+
+    t1 = threading.Thread(target=worker, args=("a", [1.0, 0.0, 0.0]))
+    t2 = threading.Thread(target=worker, args=("b", [0.0, 1.0, 0.0]))
+    t1.start()
+    t2.start()
+    t1.join()
+    t2.join()
+
+    # Each thread should observe only the style it set.
+    assert results["a"] == [1.0, 0.0, 0.0]
+    assert results["b"] == [0.0, 1.0, 0.0]
+    # The main thread never set a style so it should still return ``None``.
+    assert style.get_active_style() is None
 

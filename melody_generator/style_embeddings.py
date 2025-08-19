@@ -16,13 +16,19 @@ helper functions return copies rather than references so callers cannot mutate
 module-level state by accident.
 """
 
-# Modification summary: ``load_styles`` was expanded to verify that imported
-# style vectors have the same dimensionality as existing presets. Rejecting
-# mismatched vectors early prevents confusing runtime errors in components that
-# assume a fixed-length embedding.
+# ---------------------------------------------------------------
+# Modification Summary
+# ---------------------------------------------------------------
+# * ``load_styles`` verifies that imported vectors share the same
+#   dimensionality as presets, preventing later matrix shape errors.
+# * Module-wide ``_ACTIVE_STYLE`` global was replaced with thread-local
+#   storage so concurrent calls can each maintain their own style vector
+#   without interference.
+# ---------------------------------------------------------------
 
 from __future__ import annotations
 
+import threading
 from typing import Dict, Iterable, Optional, Sequence
 
 try:  # Attempt to use numpy when available for vector operations
@@ -52,8 +58,10 @@ else:
         "pop": [0.0, 0.0, 1.0],
     }
 
-# Global style vector applied when ``set_style`` is called.
-_ACTIVE_STYLE: Optional[Sequence[float]] = None
+# ``_STYLE_CTX`` holds the active style vector for the current thread. Using
+# ``threading.local`` ensures that concurrent melody generation in different
+# threads cannot accidentally read or mutate each other's style configuration.
+_STYLE_CTX = threading.local()
 
 
 def load_styles(path: str) -> None:
@@ -161,20 +169,24 @@ def blend_styles(a: str, b: str, ratio: float) -> Sequence[float]:
 
 
 def set_style(vec: Optional[Iterable[float]]) -> None:
-    """Set the global style vector used during melody generation.
+    """Store ``vec`` as the active style for the current thread.
 
-    Passing ``None`` clears the active style so note weights are unaffected.
-    The provided iterable is converted to a plain list or ``numpy.ndarray`` to
-    decouple external mutations from internal state.
+    The style is saved in thread-local storage so parallel melody generation
+    can use different styles without interfering with each other. Supplying
+    ``None`` clears the active style for the calling thread. The vector is
+    copied into a concrete container to prevent external mutations from leaking
+    into subsequent generations.
     """
 
-    global _ACTIVE_STYLE
     if vec is None:
-        _ACTIVE_STYLE = None
+        # Remove the attribute entirely so ``get_active_style`` falls back to
+        # ``None`` when no style has been set in this thread.
+        if hasattr(_STYLE_CTX, "value"):
+            delattr(_STYLE_CTX, "value")
         return
     # Convert to a concrete container so subsequent caller mutations do not
     # affect the stored style.
-    _ACTIVE_STYLE = (
+    _STYLE_CTX.value = (
         np.array(list(vec), dtype=float)
         if USE_NUMPY
         else [float(v) for v in vec]
@@ -182,14 +194,16 @@ def set_style(vec: Optional[Iterable[float]]) -> None:
 
 
 def get_active_style() -> Optional[Sequence[float]]:
-    """Return the style vector previously set via :func:`set_style`.
+    """Return the thread-local style vector previously set via :func:`set_style`.
 
-    A copy is returned to prevent accidental mutation of the global state.
+    A copy is returned so callers cannot mutate the stored value. ``None`` is
+    returned when no style has been configured in the calling thread.
     """
 
-    if _ACTIVE_STYLE is None:
+    vec = getattr(_STYLE_CTX, "value", None)
+    if vec is None:
         return None
-    return np.array(_ACTIVE_STYLE, dtype=float) if USE_NUMPY else list(_ACTIVE_STYLE)
+    return np.array(vec, dtype=float) if USE_NUMPY else list(vec)
 
 
 def interpolate_vectors(a: Iterable[float], b: Iterable[float], ratio: float) -> Sequence[float]:

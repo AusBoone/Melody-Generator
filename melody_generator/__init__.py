@@ -45,7 +45,8 @@ Features include:
   before notes are generated.
 - Lightweight LSTM integration for probabilistic weighting when PyTorch is
   installed.
-- VAE-based style embeddings with ``set_style`` for genre interpolation.
+- VAE-based style embeddings with thread-local ``set_style`` for genre
+  interpolation.
 - Multi-voice generation via ``PolyphonicGenerator`` for four-part counterpoint.
 - Both GUI (Tkinter) and CLI interfaces.
 - Detailed logging and improved documentation.
@@ -104,7 +105,8 @@ __version__ = "0.1.0"
 #   exhibit clearer A/B structure.
 # * Introduced ``SequenceModel`` interface; LSTM logits now bias candidate
 #   weights when provided.
-# * Added style embedding VAE with ``set_style`` for genre transfer.
+# * Added style embedding VAE with thread-local ``set_style`` for genre
+#   transfer.
 # * Counterpoint penalty discourages parallel fifths/octaves and rewards
 #   contrary motion during note selection.
 # * Introduced ``RhythmGenerator`` so onset patterns are produced
@@ -883,7 +885,8 @@ def generate_melody(
         :func:`generate_rhythm` helper is used.
     @param style (str|None): Name of a style defined in
         :mod:`style_embeddings` used to nudge note selection. When ``None``,
-        the vector previously set via :func:`set_style` is used if present.
+        the thread-local vector previously stored via :func:`set_style` is used
+        if present.
     @param refine (bool): When ``True`` apply a Frechet Music Distance based
         hill-climb to tweak up to five percent of notes and clamp the melody
         to the planned pitch range.
@@ -956,8 +959,9 @@ def generate_melody(
     plan_min_oct, plan_max_oct = phrase_plan.pitch_range
     base_octave = max(plan_min_oct, min(base_octave, plan_max_oct - 1))
 
-    # Style vectors may be provided directly via ``style`` or globally using
-    # :func:`set_style`. When both are absent, no stylistic bias is applied.
+    # Style vectors may be provided directly via ``style`` or retrieved from
+    # thread-local storage via :func:`set_style`. When both are absent, no
+    # stylistic bias is applied.
     style_vec = get_style_vector(style) if style else get_active_style()
     from .voice_leading import (
         parallel_fifth_or_octave,
