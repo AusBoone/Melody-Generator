@@ -10,6 +10,7 @@ Modification summary
   debugging.
 * Ensured the output directory exists and gracefully handles ``OSError`` when
   writing MIDI files.
+* Linked the ``--style`` argument help text to style weight documentation.
 
 This module implements the console entry points for the project. The
 ``run_cli`` function parses command line arguments and performs melody
@@ -99,7 +100,14 @@ def run_cli() -> None:
     parser.add_argument("--seed", type=int, help="Random seed for reproducible output")
     parser.add_argument("--no-humanize", dest="humanize", action="store_false", help="Disable timing and velocity randomization")
     parser.add_argument("--enable-ml", action="store_true", help="Activate ML-based weighting using a small sequence model")
-    parser.add_argument("--style", type=str, help="Optional style name to bias note selection")
+    parser.add_argument(
+        "--style",
+        type=str,
+        help=(
+            "Optional style name to bias note selection; see "
+            "docs/README_STYLE_WEIGHTS.md for presets"
+        ),
+    )
     parser.add_argument("--soundfont", type=str, help="Path to a SoundFont (.sf2) file used when previewing with --play")
     parser.add_argument("--play", action="store_true", help="Play the MIDI file after it is created")
     parser.add_argument(
