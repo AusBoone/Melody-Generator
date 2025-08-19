@@ -1,9 +1,15 @@
 """Tests for genre-specific model selection helpers."""
 
 import importlib
+import logging
+import sys
 from pathlib import Path
 
-import pytest
+import pytest  # noqa: F401 - fixtures are injected by name
+
+
+# Ensure the package root is importable when tests are executed directly.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 
 def _reload_module():
@@ -29,11 +35,11 @@ def test_existing_genre_loads_checkpoint(tmp_path, monkeypatch):
     assert calls == [str(tmp_path / "jazz.pt")]
 
 
-def test_missing_genre_falls_back(tmp_path, monkeypatch):
-    """Errors from ``load_sequence_model`` should trigger a fallback to ``None``."""
+def test_missing_genre_falls_back(tmp_path, monkeypatch, caplog):
+    """Fallback should occur and warn when the checkpoint is unavailable."""
     seq_mod = _reload_module()
 
-    calls = []
+    calls: list[str | None] = []
 
     def fake_loader(path, vocab):
         calls.append(path)
@@ -43,7 +49,11 @@ def test_missing_genre_falls_back(tmp_path, monkeypatch):
 
     monkeypatch.setattr(seq_mod, "load_sequence_model", fake_loader)
 
-    result = seq_mod.load_genre_sequence_model("rock", str(tmp_path), 8)
+    with caplog.at_level(logging.WARNING, logger=seq_mod.__name__):
+        result = seq_mod.load_genre_sequence_model("rock", str(tmp_path), 8)
+
     # ``fake_loader`` should first be called with the checkpoint path then ``None``.
     assert calls == [str(tmp_path / "rock.pt"), None]
     assert result == "default"
+    # The warning message should mention the missing checkpoint path.
+    assert str(tmp_path / "rock.pt") in caplog.text
