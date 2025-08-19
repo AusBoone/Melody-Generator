@@ -80,3 +80,30 @@ def test_unwritable_output_directory(
     assert exc.value.code == 1
     assert "could not write midi file" in caplog.text.lower()
 
+
+def test_list_keys_exits_via_argparse(cli_env, monkeypatch, capsys) -> None:
+    """``--list-keys`` should print supported keys without needing other args.
+
+    The new pre-parser handles listing flags before the main parser enforces
+    required options, so invoking ``run_cli`` with only ``--list-keys`` is
+    sufficient and exits cleanly after printing.
+    """
+
+    run_cli, pkg = cli_env
+    monkeypatch.setattr(sys, "argv", ["prog", "--list-keys"])
+    run_cli()
+    captured = capsys.readouterr()
+    expected = "\n".join(sorted(pkg.SCALE.keys())) + "\n"
+    assert captured.out == expected
+
+
+def test_list_chords_exits_via_argparse(cli_env, monkeypatch, capsys) -> None:
+    """``--list-chords`` should print supported chords without extra options."""
+
+    run_cli, pkg = cli_env
+    monkeypatch.setattr(sys, "argv", ["prog", "--list-chords"])
+    run_cli()
+    captured = capsys.readouterr()
+    expected = "\n".join(sorted(pkg.CHORDS.keys())) + "\n"
+    assert captured.out == expected
+

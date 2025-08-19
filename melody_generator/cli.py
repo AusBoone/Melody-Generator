@@ -14,6 +14,9 @@ Modification summary
 * Added ``--genre`` and ``--model-dir`` options so users can select
   genre-specific checkpoints at runtime with safe fallback to untrained
   weights.
+* Replaced manual command-line scans for listing keys or chords with an
+  ``argparse`` pre-parser so these options operate independently of required
+  generation arguments.
 
 This module implements the console entry points for the project. The
 ``run_cli`` function parses command line arguments and performs melody
@@ -68,17 +71,29 @@ def run_cli() -> None:
     invoked so users still hear the result.
     """
 
-    if "--list-keys" in sys.argv[1:]:
+    # A preliminary parser handles listing requests so users can query supported
+    # keys or chords without providing the other required arguments.  The options
+    # are mutually exclusive to prevent confusing combinations.
+    list_parser = argparse.ArgumentParser(add_help=False)
+    list_group = list_parser.add_mutually_exclusive_group()
+    list_group.add_argument(
+        "--list-keys", action="store_true", help="List all supported keys and exit"
+    )
+    list_group.add_argument(
+        "--list-chords", action="store_true", help="List all supported chords and exit"
+    )
+    list_args, remaining = list_parser.parse_known_args()
+    if list_args.list_keys:
         print("\n".join(sorted(SCALE.keys())))
         return
-    if "--list-chords" in sys.argv[1:]:
+    if list_args.list_chords:
         print("\n".join(sorted(CHORDS.keys())))
         return
+
     parser = argparse.ArgumentParser(
-        description="Generate a random melody and save as a MIDI file."
+        description="Generate a random melody and save as a MIDI file.",
+        parents=[list_parser],
     )
-    parser.add_argument("--list-keys", action="store_true", help="List all supported keys and exit")
-    parser.add_argument("--list-chords", action="store_true", help="List all supported chords and exit")
     parser.add_argument("--key", type=str, required=True, help="Musical key (e.g., C, Dm, etc.).")
     parser.add_argument("--chords", type=str, help="Comma-separated chord progression (e.g., C,Am,F,G).")
     parser.add_argument("--random-chords", type=int, metavar="N", help="Generate a random chord progression of N chords, ignoring --chords.")
@@ -134,7 +149,10 @@ def run_cli() -> None:
         type=str,
         help="Path to the JSON settings file used by the GUI",
     )
-    args = parser.parse_args()
+    # Parse the remaining arguments after listing options have been stripped
+    # out.  ``remaining`` contains only the generation-specific flags at this
+    # point.
+    args = parser.parse_args(remaining)
 
     if args.bpm <= 0:
         logging.error("BPM must be a positive integer.")
