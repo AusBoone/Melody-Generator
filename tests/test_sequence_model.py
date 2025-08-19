@@ -27,6 +27,11 @@ torch_stub.tensor = _tensor
 torch_stub.softmax = lambda x, dim=0: [0.5, 0.5]
 torch_stub.no_grad = _no_grad
 torch_stub.randint = lambda *args, **kwargs: "dummy"
+# Basic serialization helpers used by ``load_sequence_model`` tests. They don't
+# perform real PyTorch serialisation but provide placeholders that mimic the
+# interface.
+torch_stub.load = lambda *args, **kwargs: {}
+torch_stub.save = lambda obj, path: None
 torch_stub.onnx = types.SimpleNamespace(export=lambda *a, **kw: kw)
 sys.modules.setdefault("torch", torch_stub)
 
@@ -171,3 +176,47 @@ def test_load_sequence_model_cached(monkeypatch):
 
     assert m1 is m2
     assert calls == [5]
+
+
+def test_load_sequence_model_missing_file(tmp_path, monkeypatch):
+    """Providing a nonexistent checkpoint should raise ``ValueError``."""
+
+    seq_mod = importlib.reload(importlib.import_module("melody_generator.sequence_model"))
+
+    # Replace ``MelodyLSTM`` with a dummy so the test does not require real
+    # neural network layers from PyTorch.
+    class DummyModel:
+        def __init__(self, vocab):
+            pass
+
+        def load_state_dict(self, state):
+            pass
+
+    monkeypatch.setattr(seq_mod, "MelodyLSTM", DummyModel)
+
+    with pytest.raises(ValueError):
+        seq_mod.load_sequence_model(str(tmp_path / "missing.pt"), 7)
+
+
+def test_load_sequence_model_rejects_corrupt(tmp_path, monkeypatch):
+    """Non-mapping checkpoints must be rejected to avoid state corruption."""
+
+    seq_mod = importlib.reload(importlib.import_module("melody_generator.sequence_model"))
+    bad_file = tmp_path / "corrupt.pt"
+    bad_file.write_text("not a real checkpoint")
+
+    class DummyModel:
+        def __init__(self, vocab):
+            pass
+
+        def load_state_dict(self, state):
+            pass
+
+    monkeypatch.setattr(seq_mod, "MelodyLSTM", DummyModel)
+
+    # Force ``torch.load`` to return a value that ``load_state_dict`` cannot
+    # consume, simulating a corrupt or malicious file.
+    monkeypatch.setattr(seq_mod.torch, "load", lambda *a, **k: 123)
+
+    with pytest.raises(ValueError):
+        seq_mod.load_sequence_model(str(bad_file), 7)

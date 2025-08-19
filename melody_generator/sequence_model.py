@@ -11,6 +11,11 @@ dependencies remain optional.
 Real applications would train a much larger network on MIDI corpora and
 load the resulting weights via :func:`load_sequence_model`.
 """
+# Modification Summary:
+# - Hardened ``load_sequence_model`` to validate checkpoints and surface
+#   clear ``ValueError`` messages when files are missing or malformed.
+# - ``torch.load`` now uses the ``weights_only`` flag when supported so
+#   extraneous training information is ignored during inference.
 # ``load_sequence_model`` now uses ``functools.lru_cache`` so repeated
 # requests for the same model avoid costly disk reads.
 
@@ -108,14 +113,46 @@ def load_sequence_model(path: Optional[str], vocab_size: int) -> SequenceModel:
     SequenceModel
         Loaded model instance. Repeated calls with the same arguments
         return the cached object to avoid redundant disk reads.
+
+    Raises
+    ------
+    ValueError
+        If ``path`` is provided but the checkpoint is missing or malformed.
+    RuntimeError
+        If PyTorch is unavailable.
     """
     if torch is None:
         raise RuntimeError("PyTorch is required to load the sequence model")
 
     model = MelodyLSTM(vocab_size)
-    if path and os.path.exists(path):
-        state = torch.load(path, map_location="cpu")
+    if not path:
+        # ``None`` indicates that callers want a fresh, untrained model.
+        return model
+
+    try:
+        if not os.path.exists(path):
+            # Surface a consistent error message for nonexistent files.
+            raise FileNotFoundError(path)
+
+        # ``weights_only`` is available in PyTorch >= 2.0 and avoids loading
+        # optimizer state or other training artefacts.  Older versions simply
+        # fall back to the traditional behaviour.
+        try:
+            state = torch.load(path, weights_only=True, map_location="cpu")
+        except TypeError:
+            # ``weights_only`` unsupported; fall back to standard loading.
+            state = torch.load(path, map_location="cpu")
+
+        if not isinstance(state, dict):
+            # ``load_state_dict`` expects a mapping of parameter tensors; any
+            # other object is treated as a corrupt checkpoint.
+            raise ValueError("checkpoint does not contain a state dict")
+
         model.load_state_dict(state)
+    except Exception as exc:  # pragma: no cover - exercised via unit tests
+        # Rewrap any underlying issue in a ``ValueError`` to provide a clear
+        # contract to callers.
+        raise ValueError(f"Unable to load model from {path!r}: {exc}") from exc
     return model
 
 
