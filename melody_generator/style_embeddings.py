@@ -8,8 +8,10 @@ embedding from a reference MIDI file.
 
 ``load_styles`` allows additional style vectors to be imported from JSON or
 YAML files at runtime so experiments can easily extend the built-in presets.
-The loader now enforces that every imported vector has the same dimensionality
-as existing presets to prevent downstream matrix shape errors.
+The loader validates that each imported vector shares a common dimension and
+will expand the embedding space when longer vectors are supplied. Existing
+presets are padded with zeros to match the new dimensionality, while mismatched
+dimensions trigger clear ``ValueError`` exceptions.
 
 ``STYLE_VECTORS`` is now defined unconditionally for better static analysis and
 helper functions return copies rather than references so callers cannot mutate
@@ -19,8 +21,8 @@ module-level state by accident.
 # ---------------------------------------------------------------
 # Modification Summary
 # ---------------------------------------------------------------
-# * ``load_styles`` verifies that imported vectors share the same
-#   dimensionality as presets, preventing later matrix shape errors.
+# * ``load_styles`` validates dimensionality and pads existing presets when
+#   new vectors expand the embedding space, preventing shape errors.
 # * Module-wide ``_ACTIVE_STYLE`` global was replaced with thread-local
 #   storage so concurrent calls can each maintain their own style vector
 #   without interference.
@@ -58,6 +60,10 @@ else:
         "pop": [0.0, 0.0, 1.0],
     }
 
+# Track the dimensionality of the embedding space. This value is updated when
+# ``load_styles`` imports vectors with additional elements.
+STYLE_DIMENSION = len(next(iter(STYLE_VECTORS.values()))) if STYLE_VECTORS else 0
+
 # ``_STYLE_CTX`` holds the active style vector for the current thread. Using
 # ``threading.local`` ensures that concurrent melody generation in different
 # threads cannot accidentally read or mutate each other's style configuration.
@@ -81,7 +87,8 @@ def load_styles(path: str) -> None:
     ------
     ValueError
         If the file cannot be parsed, does not contain a mapping of vectors or
-        supplies vectors with dimensions that differ from existing presets.
+        supplies vectors whose dimensions are inconsistent or smaller than the
+        current preset size.
     RuntimeError
         If a YAML file is supplied but the ``yaml`` package is missing.
     """
@@ -111,27 +118,51 @@ def load_styles(path: str) -> None:
     if not isinstance(data, dict):
         raise ValueError("style file must contain a mapping of names to vectors")
 
-    # Determine the dimensionality of existing style vectors so new vectors can
-    # be validated before mutating the global mapping. ``len`` works for both
-    # lists and ``numpy.ndarray`` instances.
-    expected_dim = None
-    if STYLE_VECTORS:
-        expected_dim = len(next(iter(STYLE_VECTORS.values())))
+    # Determine the current embedding dimensionality so new vectors can be
+    # validated. ``STYLE_DIMENSION`` is kept in sync with ``STYLE_VECTORS``.
+    global STYLE_DIMENSION
+    current_dim = STYLE_DIMENSION if STYLE_DIMENSION else None
 
     # Convert and validate the incoming vectors in a temporary dictionary so
-    # partial updates are avoided when an error occurs.
+    # partial updates are avoided when an error occurs. ``new_dim`` tracks the
+    # dimensionality declared by the file and ensures all entries match.
     converted: Dict[str, Sequence[float]] = {}
+    new_dim: Optional[int] = None
     for name, vec in data.items():
         if not isinstance(vec, (list, tuple)):
             raise ValueError(f"vector for {name!r} must be a sequence")
         values = [float(v) for v in vec]
-        if expected_dim is not None and len(values) != expected_dim:
+        size = len(values)
+        if new_dim is None:
+            new_dim = size
+        elif size != new_dim:
+            raise ValueError("all vectors in style file must have the same dimension")
+        if current_dim is not None and size < current_dim:
             raise ValueError(
-                f"vector for {name!r} has dimension {len(values)} but expected {expected_dim}"
+                f"vector for {name!r} has dimension {size} but current dimension is {current_dim}"
             )
         converted[name] = (
             np.array(values, dtype=float) if USE_NUMPY else values
         )
+
+    # Expand existing presets when new vectors introduce additional dimensions by
+    # padding with zeros. This keeps all vectors aligned for later operations.
+    if new_dim is not None:
+        if current_dim is None:
+            STYLE_DIMENSION = new_dim
+        elif new_dim > current_dim:
+            for key, vec in list(STYLE_VECTORS.items()):
+                if USE_NUMPY:
+                    STYLE_VECTORS[key] = np.pad(
+                        np.array(vec, dtype=float), (0, new_dim - current_dim)
+                    )
+                else:
+                    STYLE_VECTORS[key] = list(vec) + [0.0] * (new_dim - current_dim)
+            STYLE_DIMENSION = new_dim
+        elif new_dim < current_dim:
+            raise ValueError(
+                f"new vectors have dimension {new_dim} but existing presets use {current_dim}"
+            )
 
     # Merge the validated vectors into the module-level presets.
     STYLE_VECTORS.update(converted)

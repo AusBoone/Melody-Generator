@@ -41,7 +41,8 @@ style = importlib.import_module("melody_generator.style_embeddings")
 def test_style_vector_lookup():
     """Known style names should return fixed-length vectors."""
     vec = style.get_style_vector("jazz")
-    assert getattr(vec, "shape", (len(vec),))[0] == 3
+    # Verify the retrieved vector matches the module's current dimensionality.
+    assert getattr(vec, "shape", (len(vec),))[0] == style.STYLE_DIMENSION
 
 
 def test_set_and_get_active_style():
@@ -179,22 +180,48 @@ def test_load_styles_yaml(tmp_path):
     assert list(style.get_style_vector("folk")) == [0.1, 0.6, 0.3]
 
 
-def test_load_styles_dimension_mismatch(tmp_path):
-    """Vectors of differing lengths should trigger ``ValueError`` and not modify presets."""
+def test_load_styles_inconsistent_dimensions(tmp_path):
+    """Mixed-dimensional vectors in one file should raise ``ValueError``."""
 
-    # Prepare a JSON file that mixes a valid 3D vector with an invalid 4D one.
+    # Create a file containing both 3D and 4D vectors, which should be rejected
+    # because all vectors in the file must share a common dimensionality.
     path = tmp_path / "bad_dim.json"
     path.write_text(json.dumps({"good": [0.1, 0.2, 0.7], "bad": [1, 2, 3, 4]}))
 
-    # Snapshot the current presets so we can verify they remain untouched.
     before = dict(style.STYLE_VECTORS)
-
-    # Loading should fail because "bad" has more dimensions than the existing presets.
     with pytest.raises(ValueError):
         style.load_styles(str(path))
-
-    # Ensure neither of the new names were merged and existing presets were preserved.
     assert style.STYLE_VECTORS == before
+
+
+def test_load_styles_shrinking_dimension_fails(tmp_path):
+    """Vectors shorter than existing presets should be rejected."""
+
+    path = tmp_path / "shrink.json"
+    path.write_text(json.dumps({"mini": [0.1, 0.2]}))
+
+    before = dict(style.STYLE_VECTORS)
+    with pytest.raises(ValueError):
+        style.load_styles(str(path))
+    assert style.STYLE_VECTORS == before
+
+
+def test_load_styles_expands_dimension(tmp_path):
+    """Longer vectors should expand the embedding and pad existing presets."""
+
+    path = tmp_path / "expand.json"
+    path.write_text(json.dumps({"electro": [0.1, 0.2, 0.3, 0.4]}))
+
+    before_vectors = dict(style.STYLE_VECTORS)
+    before_dim = style.STYLE_DIMENSION
+    style.load_styles(str(path))
+    try:
+        assert style.STYLE_DIMENSION == before_dim + 1
+        assert list(style.get_style_vector("baroque"))[-1] == 0.0
+        assert list(style.get_style_vector("electro")) == [0.1, 0.2, 0.3, 0.4]
+    finally:
+        style.STYLE_VECTORS = before_vectors
+        style.STYLE_DIMENSION = before_dim
 
 
 def test_load_styles_non_sequence_value(tmp_path):
