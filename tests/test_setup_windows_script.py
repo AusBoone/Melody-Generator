@@ -31,3 +31,11 @@ def test_python_refresh() -> None:
     """``Get-Command python`` should appear at least twice to refresh the environment."""
     content = SCRIPT_PATH.read_text(encoding="utf-8")
     assert content.count("Get-Command python") >= 2
+
+
+def test_run_command_exit_check() -> None:
+    """Run-Command must halt on failures to avoid partial installations."""
+    content = SCRIPT_PATH.read_text(encoding="utf-8")
+    # The script should explicitly reference $LASTEXITCODE and raise a clear error.
+    assert "$LASTEXITCODE" in content
+    assert "Command failed with exit code" in content
