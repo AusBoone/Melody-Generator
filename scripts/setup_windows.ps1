@@ -37,6 +37,8 @@ Modification summary:
 - Pin ``numpy`` to versions below 2 when optionally installing machine
   learning dependencies. The pin avoids conflicts with the project's core
   dependency constraints which currently expect the 1.x series.
+- Capture command exit codes in ``Run-Command`` and abort on failure to avoid
+  silently continuing after errors.
 #>
 
 $ErrorActionPreference = 'Stop'
@@ -66,20 +68,29 @@ function Run-Command($cmd) {
         When ``DRY_RUN`` is set, commands are echoed instead of executed. This
         helps users preview operations without making changes.
         ``Run-Command`` writes the command to the console so the caller can
-        observe what would run.
+        observe what would run. After executing a command it inspects
+        ``$LASTEXITCODE`` and throws if the command fails, ensuring the overall
+        setup process never proceeds in a corrupted state.
 
         .PARAMETER cmd
         Command string to execute or display.
 
         .NOTES
         Output is not captured; callers should handle errors from the invoked
-        command themselves.
+        command themselves. Each execution also checks ``$LASTEXITCODE`` so a
+        non-zero exit status halts setup immediately, preventing partial or
+        inconsistent installs.
     #>
     if ($env:DRY_RUN -eq '1') {
         Write-Host "DRY RUN: $cmd"
     }
     else {
         Invoke-Expression $cmd
+        $exitCode = $LASTEXITCODE  # Preserve exit code for explicit failure detection.
+        if ($exitCode -ne 0) {
+            # Fail fast with a descriptive error to maintain setup integrity.
+            throw "Command failed with exit code $exitCode: $cmd"
+        }
     }
 }
 
