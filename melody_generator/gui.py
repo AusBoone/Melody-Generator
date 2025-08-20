@@ -25,6 +25,9 @@ counterpoint generation is delegated to :mod:`melody_generator`.
 # * ``_generate_button_click`` now validates ``base_octave`` against
 #   ``MIN_OCTAVE`` and ``MAX_OCTAVE`` so the register remains within the
 #   MIDI specification.
+# * ``_generate_button_click`` performs heavy work in a background thread,
+#   displaying a progress bar and disabling inputs until completion so the
+#   interface stays responsive.
 # * ``__init__`` creates the Tk root before any ``BooleanVar`` or
 #   ``StringVar`` objects to comply with Python 3.12's stricter Tkinter
 #   initialization requirements.
@@ -320,6 +323,11 @@ class MelodyGeneratorGUI:
         frame = ttk.Frame(self.root, padding=(10, 10))
         frame.grid(row=0, column=0)
 
+        # ``self.inputs`` tracks interactive widgets that should be disabled
+        # while long-running tasks execute. Keeping references simplifies
+        # toggling their ``state`` en masse.
+        self.inputs: List[tk.Widget] = []
+
         # Key selection
         ttk.Label(frame, text="Key:").grid(row=0, column=0, sticky="w")
         self.key_var = tk.StringVar()
@@ -330,6 +338,7 @@ class MelodyGeneratorGUI:
             state="readonly",
         )
         key_combobox.grid(row=0, column=1)
+        self.inputs.append(key_combobox)
         key_combobox.current(0)
         key_combobox.bind("<<ComboboxSelected>>", lambda _e: self._update_chord_list())
 
@@ -342,6 +351,7 @@ class MelodyGeneratorGUI:
         )
         self._update_chord_list()
         self.chord_listbox.grid(row=1, column=1)
+        self.inputs.append(self.chord_listbox)
 
         # BPM slider and value label
         ttk.Label(frame, text="BPM:").grid(row=2, column=0, sticky="w")
@@ -355,6 +365,7 @@ class MelodyGeneratorGUI:
             command=self._update_bpm_label,
         )
         bpm_scale.grid(row=2, column=1)
+        self.inputs.append(bpm_scale)
         self.bpm_label = ttk.Label(frame, text=str(self.bpm_var.get()))
         self.bpm_label.grid(row=2, column=2, padx=(5, 0))
         self._create_tooltip(bpm_scale, "Beats per minute")
@@ -370,6 +381,7 @@ class MelodyGeneratorGUI:
             state="readonly",
         )
         timesig_box.grid(row=3, column=1)
+        self.inputs.append(timesig_box)
         self._create_tooltip(timesig_box, "Time signature of the piece")
 
         # Number of notes slider and value label
@@ -384,6 +396,7 @@ class MelodyGeneratorGUI:
             command=self._update_notes_label,
         )
         notes_scale.grid(row=4, column=1)
+        self.inputs.append(notes_scale)
         self.notes_label = ttk.Label(frame, text=str(self.notes_var.get()))
         self.notes_label.grid(row=4, column=2, padx=(5, 0))
         self._update_notes_label(self.notes_var.get())
@@ -400,6 +413,7 @@ class MelodyGeneratorGUI:
             command=self._update_octave_label,
         )
         octave_scale.grid(row=5, column=1)
+        self.inputs.append(octave_scale)
         self.octave_label = ttk.Label(frame, text=str(self.base_octave_var.get()))
         self.octave_label.grid(row=5, column=2, padx=(5, 0))
         self._update_octave_label(self.base_octave_var.get())
@@ -414,6 +428,7 @@ class MelodyGeneratorGUI:
             state="readonly",
         )
         inst_box.grid(row=6, column=1)
+        self.inputs.append(inst_box)
 
         # SoundFont selection path used by FluidSynth
         ttk.Label(frame, text="SoundFont:").grid(row=7, column=0, sticky="w")
@@ -422,25 +437,33 @@ class MelodyGeneratorGUI:
             frame, textvariable=self.soundfont_var, width=25
         )
         self.soundfont_entry.grid(row=7, column=1)
-        ttk.Button(
+        self.inputs.append(self.soundfont_entry)
+        sf_button = ttk.Button(
             frame,
             text="Browse",
             command=self._browse_soundfont,
-        ).grid(row=7, column=2, padx=(5, 0))
+        )
+        sf_button.grid(row=7, column=2, padx=(5, 0))
+        self.inputs.append(sf_button)
         # Motif length entry
         ttk.Label(frame, text="Motif Length:").grid(row=8, column=0, sticky="w")
         self.motif_entry = ttk.Spinbox(frame, from_=1, to=32, width=5)
         self.motif_entry.grid(row=8, column=1)
+        self.inputs.append(self.motif_entry)
         self._create_tooltip(self.motif_entry, "Length of repeating motif")
         self.motif_entry.set(4)
         ttk.Label(frame, text="Seed:").grid(row=8, column=2, sticky="w")
-        ttk.Entry(frame, textvariable=self.seed_var, width=6).grid(row=8, column=3)
+        seed_entry = ttk.Entry(frame, textvariable=self.seed_var, width=6)
+        seed_entry.grid(row=8, column=3)
+        self.inputs.append(seed_entry)
 
-        ttk.Checkbutton(
+        ml_check = ttk.Checkbutton(
             frame,
             text="Use ML Model",
             variable=self.ml_var,
-        ).grid(row=9, column=0, columnspan=2)
+        )
+        ml_check.grid(row=9, column=0, columnspan=2)
+        self.inputs.append(ml_check)
 
         ttk.Label(frame, text="Style:").grid(row=9, column=2, sticky="w")
         self.style_combo = ttk.Combobox(
@@ -450,78 +473,100 @@ class MelodyGeneratorGUI:
             state="readonly",
         )
         self.style_combo.grid(row=9, column=3)
+        self.inputs.append(self.style_combo)
         self._create_tooltip(self.style_combo, "Select a preset style vector; click ? for descriptions")
-        ttk.Button(
+        style_help = ttk.Button(
             frame,
             text="?",
             width=2,
             command=self._open_style_docs,
-        ).grid(row=9, column=4, padx=(5, 0))
+        )
+        style_help.grid(row=9, column=4, padx=(5, 0))
+        self.inputs.append(style_help)
 
 
         # Harmony checkbox
         self.harmony_var = tk.BooleanVar(value=False)
-        ttk.Checkbutton(
+        harmony_check = ttk.Checkbutton(
             frame,
             text="Add Harmony",
             variable=self.harmony_var,
-        ).grid(row=10, column=0, columnspan=2)
+        )
+        harmony_check.grid(row=10, column=0, columnspan=2)
+        self.inputs.append(harmony_check)
 
         self.counterpoint_var = tk.BooleanVar(value=False)
-        ttk.Checkbutton(
+        counterpoint_check = ttk.Checkbutton(
             frame,
             text="Add Counterpoint",
             variable=self.counterpoint_var,
-        ).grid(row=11, column=0, columnspan=2)
+        )
+        counterpoint_check.grid(row=11, column=0, columnspan=2)
+        self.inputs.append(counterpoint_check)
 
         ttk.Label(frame, text="Harmony Lines:").grid(row=12, column=0, sticky="w")
         self.harmony_lines = ttk.Spinbox(frame, from_=0, to=4, width=5)
         self.harmony_lines.set(0)
         self.harmony_lines.grid(row=12, column=1)
+        self.inputs.append(self.harmony_lines)
 
         self.include_chords_var = tk.BooleanVar(value=False)
-        ttk.Checkbutton(
+        include_chords_check = ttk.Checkbutton(
             frame,
             text="Include Chords",
             variable=self.include_chords_var,
-        ).grid(row=13, column=0, columnspan=2)
+        )
+        include_chords_check.grid(row=13, column=0, columnspan=2)
+        self.inputs.append(include_chords_check)
 
         self.chords_same_var = tk.BooleanVar(value=False)
-        ttk.Checkbutton(
+        merge_chords_check = ttk.Checkbutton(
             frame,
             text="Merge Chords With Melody",
             variable=self.chords_same_var,
-        ).grid(row=14, column=0, columnspan=2)
+        )
+        merge_chords_check.grid(row=14, column=0, columnspan=2)
+        self.inputs.append(merge_chords_check)
 
-        ttk.Checkbutton(
+        humanize_check = ttk.Checkbutton(
             frame,
             text="Humanize Performance",
             variable=self.humanize_var,
-        ).grid(row=15, column=0, columnspan=2)
+        )
+        humanize_check.grid(row=15, column=0, columnspan=2)
+        self.inputs.append(humanize_check)
 
         # Randomize buttons
-        ttk.Button(
+        rand_chords_btn = ttk.Button(
             frame,
             text="Randomize Chords",
             command=self._randomize_chords,
-        ).grid(row=16, column=0, columnspan=2, pady=(5, 0))
-        ttk.Button(
+        )
+        rand_chords_btn.grid(row=16, column=0, columnspan=2, pady=(5, 0))
+        self.inputs.append(rand_chords_btn)
+        rand_rhythm_btn = ttk.Button(
             frame,
             text="Randomize Rhythm",
             command=self._randomize_rhythm,
-        ).grid(row=17, column=0, columnspan=2, pady=(5, 0))
+        )
+        rand_rhythm_btn.grid(row=17, column=0, columnspan=2, pady=(5, 0))
+        self.inputs.append(rand_rhythm_btn)
 
-        ttk.Button(
+        load_prefs_btn = ttk.Button(
             frame,
             text="Load Preferences",
             command=self._load_preferences,
-        ).grid(row=18, column=0, columnspan=2, pady=(5, 0))
+        )
+        load_prefs_btn.grid(row=18, column=0, columnspan=2, pady=(5, 0))
+        self.inputs.append(load_prefs_btn)
 
-        ttk.Button(
+        preview_btn = ttk.Button(
             frame,
             text="Preview Melody",
             command=self._preview_button_click,
-        ).grid(row=19, column=0, columnspan=2, pady=(5, 0))
+        )
+        preview_btn.grid(row=19, column=0, columnspan=2, pady=(5, 0))
+        self.inputs.append(preview_btn)
         self.preview_notice = ttk.Label(
             frame,
             text="",
@@ -530,26 +575,55 @@ class MelodyGeneratorGUI:
         self.preview_notice.grid(row=19, column=2, sticky="w")
 
         # Generate button
-        ttk.Button(
+        generate_btn = ttk.Button(
             frame,
             text="Generate Melody",
             command=self._generate_button_click,
-        ).grid(row=20, column=0, columnspan=2, pady=10)
+        )
+        generate_btn.grid(row=20, column=0, columnspan=2, pady=10)
+        self.inputs.append(generate_btn)
 
         self.theme_var = tk.BooleanVar(value=self.dark_mode)
-        ttk.Checkbutton(
+        theme_toggle = ttk.Checkbutton(
             frame,
             text="Toggle Dark Mode",
             command=self._toggle_theme,
             variable=self.theme_var,
-        ).grid(row=21, column=0, columnspan=2, pady=(5, 0))
+        )
+        theme_toggle.grid(row=21, column=0, columnspan=2, pady=(5, 0))
+        self.inputs.append(theme_toggle)
+
+        # Progress bar shown while generation runs. Hidden by default.
+        self.progress = ttk.Progressbar(frame, mode="indeterminate")
+        self.progress.grid(row=22, column=0, columnspan=5, pady=(5, 0))
+        self.progress.grid_remove()
 
         # Apply persisted settings if available
         if self.load_settings is not None:
             self._apply_settings(self.load_settings())
 
+    def _set_inputs_state(self, state: str) -> None:
+        """Set ``state`` on all interactive widgets.
+
+        Disabling widgets prevents user interaction while background tasks
+        execute, avoiding race conditions or accidental re-entry.
+
+        @param state: Tkinter widget state such as ``"disabled"`` or
+            ``"normal"``.
+        @returns None: All known input widgets are updated best effort.
+        """
+
+        for widget in self.inputs:
+            try:
+                widget.configure(state=state)
+            except tk.TclError:
+                # Not every widget type supports a ``state`` option; those are
+                # safely ignored.
+                continue
+
     def _generate_button_click(self) -> None:
-        """Validate inputs and generate a MIDI file from the selections."""
+        """Validate inputs and start background MIDI generation."""
+
         key = self.key_var.get()
         selected_indices = self.chord_listbox.curselection()
         if not selected_indices:
@@ -602,81 +676,144 @@ class MelodyGeneratorGUI:
         output_file = filedialog.asksaveasfilename(
             defaultextension=".mid", filetypes=[("MIDI files", "*.mid")]
         )
-        if output_file:
-            style_name = self.style_var.get() or None
-            if style_name:
-                try:
-                    get_style_vector(style_name)
-                except KeyError:
-                    messagebox.showerror("Input Error", f"Unknown style: {style_name}")
-                    return
+        if not output_file:
+            return
 
-            seq_model = None
-            if self.ml_var.get():
-                try:
-                    seq_model = load_sequence_model(None, len(self.scale[key]))
-                except RuntimeError as exc:
-                    messagebox.showerror("Dependency Error", str(exc))
-                    return
+        style_name = self.style_var.get() or None
+        if style_name:
+            try:
+                get_style_vector(style_name)
+            except KeyError:
+                messagebox.showerror("Input Error", f"Unknown style: {style_name}")
+                return
 
-            seed_val = self.seed_var.get()
-            if seed_val:
-                try:
-                    seed = int(seed_val)
-                    random.seed(seed)
-                    try:  # pragma: no cover - numpy optional
-                        import numpy as _np
+        seq_model = None
+        if self.ml_var.get():
+            try:
+                seq_model = load_sequence_model(None, len(self.scale[key]))
+            except RuntimeError as exc:
+                messagebox.showerror("Dependency Error", str(exc))
+                return
 
-                        _np.random.seed(seed)
-                    except Exception:
-                        pass
-                except ValueError:
-                    messagebox.showerror("Input Error", "Seed must be an integer")
-                    return
+        seed_val = self.seed_var.get()
+        if seed_val:
+            try:
+                seed = int(seed_val)
+                random.seed(seed)
+                try:  # pragma: no cover - numpy optional
+                    import numpy as _np
 
+                    _np.random.seed(seed)
+                except Exception:
+                    pass
+            except ValueError:
+                messagebox.showerror("Input Error", "Seed must be an integer")
+                return
+
+        try:
+            lines = int(self.harmony_lines.get() or 0)
+        except ValueError:
+            lines = 0
+
+        params = {
+            "key": key,
+            "notes_count": notes_count,
+            "chord_progression": chord_progression,
+            "motif_length": motif_length,
+            "base_octave": base_octave,
+            "bpm": bpm,
+            "timesig": (numerator, denominator),
+            "output_file": output_file,
+            "style_name": style_name,
+            "seq_model": seq_model,
+            "harmony_lines": lines,
+            "add_counterpoint": self.counterpoint_var.get(),
+            "harmony": self.harmony_var.get(),
+            "include_chords": self.include_chords_var.get(),
+            "chords_same": self.chords_same_var.get(),
+            "program": INSTRUMENTS.get(self.instrument_var.get(), 0),
+            "humanize": self.humanize_var.get() if hasattr(self, "humanize_var") else True,
+            "rhythm_pattern": self.rhythm_pattern,
+        }
+
+        # Disable controls and show progress indicator while the worker runs.
+        self._set_inputs_state("disabled")
+        self.progress.grid()
+        self.progress.start()
+        threading.Thread(target=self._generate_worker, args=(params,), daemon=True).start()
+
+    def _generate_worker(self, params: Dict) -> None:
+        """Perform melody generation and MIDI export in a background thread.
+
+        All Tk interactions are postponed to the main thread via
+        ``root.after`` to respect Tkinter's thread-safety constraints.
+
+        @param params: Pre-validated options collected from the GUI.
+        @returns None: Completion is signaled through ``_generation_complete``.
+        """
+
+        try:
             melody = self.generate_melody(
-                key,
-                notes_count,
-                chord_progression,
-                motif_length=motif_length,
-                base_octave=base_octave,
-                sequence_model=seq_model,
-                style=style_name,
+                params["key"],
+                params["notes_count"],
+                params["chord_progression"],
+                motif_length=params["motif_length"],
+                base_octave=params["base_octave"],
+                sequence_model=params["seq_model"],
+                style=params["style_name"],
             )
             extra: List[List[str]] = []
             if self.harmony_line_fn is not None:
-                try:
-                    lines = int(self.harmony_lines.get() or 0)
-                except ValueError:
-                    lines = 0
-                # Generate the requested number of harmony tracks
-                for _ in range(max(0, lines)):
+                for _ in range(max(0, params["harmony_lines"])):
                     extra.append(self.harmony_line_fn(melody))
-            if self.counterpoint_fn is not None and self.counterpoint_var.get():
-                # Optionally add a counterpoint melody line
-                extra.append(self.counterpoint_fn(melody, key))
+            if self.counterpoint_fn is not None and params["add_counterpoint"]:
+                extra.append(self.counterpoint_fn(melody, params["key"]))
             self.create_midi_file(
                 melody,
-                bpm,
-                (numerator, denominator),
-                output_file,
-                harmony=self.harmony_var.get(),
-                pattern=self.rhythm_pattern,
+                params["bpm"],
+                params["timesig"],
+                params["output_file"],
+                harmony=params["harmony"],
+                pattern=params["rhythm_pattern"],
                 extra_tracks=extra,
                 chord_progression=(
-                    chord_progression if self.include_chords_var.get() else None
+                    params["chord_progression"] if params["include_chords"] else None
                 ),
-                chords_separate=not self.chords_same_var.get(),
-                program=INSTRUMENTS.get(self.instrument_var.get(), 0),
-                humanize=self.humanize_var.get()
-                if hasattr(self, "humanize_var")
-                else True,
+                chords_separate=not params["chords_same"],
+                program=params["program"],
+                humanize=params["humanize"],
             )
-            messagebox.showinfo("Success", f"MIDI file saved to {output_file}")
-            if self.save_settings is not None and messagebox.askyesno(
-                "Save Preferences", "Save these settings as defaults?"
-            ):
-                self.save_settings(self._collect_settings())
+        except Exception as exc:  # pragma: no cover - rare failures
+            self.root.after(0, lambda: self._generation_complete(error=exc))
+        else:
+            self.root.after(
+                0,
+                lambda: self._generation_complete(output_file=params["output_file"]),
+            )
+
+    def _generation_complete(
+        self, *, output_file: Optional[str] = None, error: Optional[Exception] = None
+    ) -> None:
+        """Re-enable widgets and report generation result.
+
+        This callback executes on the main GUI thread.
+
+        @param output_file: Path to the saved MIDI file when successful.
+        @param error: Exception raised by the worker, if any.
+        @returns None: Widgets are restored and dialogs displayed.
+        """
+
+        self.progress.stop()
+        self.progress.grid_remove()
+        self._set_inputs_state("normal")
+        if error is not None:
+            messagebox.showerror("Generation Error", str(error))
+            return
+        messagebox.showinfo("Success", f"MIDI file saved to {output_file}")
+        if self.save_settings is not None and messagebox.askyesno(
+            "Save Preferences", "Save these settings as defaults?"
+        ):
+            self.save_settings(self._collect_settings())
 
     def _preview_button_click(self) -> None:
         """Generate and play a melody preview then clean up.
