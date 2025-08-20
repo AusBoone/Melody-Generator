@@ -119,6 +119,7 @@ def test_resolve_soundfont_platform_defaults(monkeypatch, platform, expected):
 
 def test_render_midi_invokes_subprocess(tmp_path, monkeypatch):
     """``render_midi_to_wav`` runs ``fluidsynth`` with expected arguments."""
+
     midi = tmp_path / "in.mid"
     wav = tmp_path / "out.wav"
     midi.write_text("midi")
@@ -126,12 +127,12 @@ def test_render_midi_invokes_subprocess(tmp_path, monkeypatch):
 
     called = {}
 
-    def fake_run(cmd, check=False, stdout=None, stderr=None):
+    def fake_run(cmd, check=False, capture_output=False, text=False):
         """Record ``subprocess.run`` arguments for assertion."""
         called["cmd"] = cmd
         called["check"] = check
-        called["stdout"] = stdout
-        called["stderr"] = stderr
+        called["capture_output"] = capture_output
+        called["text"] = text
 
     monkeypatch.setattr(
         playback, "_resolve_soundfont", lambda sf: str(tmp_path / "font.sf2")
@@ -149,8 +150,8 @@ def test_render_midi_invokes_subprocess(tmp_path, monkeypatch):
         str(midi),
     ]
     assert called["check"] is True
-    assert called["stdout"] == subprocess.DEVNULL
-    assert called["stderr"] == subprocess.DEVNULL
+    assert called["capture_output"] is True
+    assert called["text"] is True
 
 
 def test_render_midi_creates_parent_dir(tmp_path, monkeypatch):
@@ -170,7 +171,7 @@ def test_render_midi_creates_parent_dir(tmp_path, monkeypatch):
 
     called = {}
 
-    def fake_run(cmd, check=False, stdout=None, stderr=None):
+    def fake_run(cmd, check=False, capture_output=False, text=False):
         """Capture ``subprocess.run`` arguments for inspection."""
         called["cmd"] = cmd
 
@@ -296,6 +297,34 @@ def test_render_midi_missing_fluidsynth(monkeypatch, tmp_path):
         MidiPlaybackError,
         match="Install the FluidSynth library",
     ):
+        render_midi_to_wav(str(midi), str(wav))
+
+
+def test_render_midi_subprocess_error_includes_stderr(monkeypatch, tmp_path):
+    """Stderr from ``fluidsynth`` should appear in ``MidiPlaybackError``.
+
+    When the ``fluidsynth`` CLI exits with a non-zero status, the
+    captured stderr provides essential debugging information. The
+    exception raised by ``render_midi_to_wav`` must include this output
+    so callers can determine the underlying issue.
+    """
+
+    midi = tmp_path / "song.mid"
+    wav = tmp_path / "out.wav"
+    midi.write_text("midi")
+    wav.write_text("")
+
+    monkeypatch.setattr(playback, "_resolve_soundfont", lambda sf: "font.sf2")
+
+    def fake_run(cmd, check=False, capture_output=False, text=False):
+        """Simulate a failing ``fluidsynth`` invocation with stderr output."""
+        raise subprocess.CalledProcessError(
+            returncode=1, cmd=cmd, stderr="missing instrument"
+        )
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    with pytest.raises(MidiPlaybackError, match="missing instrument"):
         render_midi_to_wav(str(midi), str(wav))
 
 
