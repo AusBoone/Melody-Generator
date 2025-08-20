@@ -11,6 +11,9 @@
 #   * Refresh the APT package index unconditionally at the start of the
 #     ``main`` function. This prevents package lookup failures on freshly
 #     provisioned systems where the local cache may be empty.
+#   * Pin ``numpy`` to versions below 2 when optionally installing machine
+#     learning dependencies. The pin avoids conflicts with the project's
+#     core dependency constraints which currently expect the 1.x series.
 #
 # Usage:
 #   ./setup_linux.sh
@@ -19,7 +22,8 @@
 # executing them. This is useful for verifying the commands on systems
 # where sudo privileges might be restricted. Set INSTALL_ML_DEPS=1 to also
 # install optional machine learning libraries used by the sequence model
-# and style embedding features. When enabled the script installs ``numpy``,
+# and style embedding features. When enabled the script installs ``numpy``
+# (pinned to <2 to maintain compatibility with the rest of the project),
 # ``torch`` (CPU build), ``onnxruntime`` and ``numba`` in the virtual
 # environment.
 #----------------------------------------------------------------------
@@ -98,7 +102,7 @@ main() {
         echo "DRY RUN: pip install -r requirements.txt"
         echo "DRY RUN: pip install -e ."
         if [[ "${INSTALL_ML_DEPS:-0}" == "1" ]]; then
-            echo "DRY RUN: pip install numpy"
+            echo "DRY RUN: pip install \"numpy<2\""  # Pin <2 to prevent core dependency conflicts
             echo "DRY RUN: pip install torch --index-url https://download.pytorch.org/whl/cpu"
             echo "DRY RUN: pip install onnxruntime"
             echo "DRY RUN: pip install numba"
@@ -110,7 +114,7 @@ main() {
         run_cmd pip install -r requirements.txt
         run_cmd pip install -e .
         if [[ "${INSTALL_ML_DEPS:-0}" == "1" ]]; then
-            run_cmd pip install numpy
+            run_cmd pip install "numpy<2"  # Pin <2 to prevent core dependency conflicts
             run_cmd pip install torch --index-url https://download.pytorch.org/whl/cpu
             run_cmd pip install onnxruntime
             run_cmd pip install numba

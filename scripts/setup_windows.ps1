@@ -8,7 +8,14 @@ creates a virtual environment in ./venv and installs project dependencies.
 Set the environment variable DRY_RUN=1 to print commands without executing
 them. Set INSTALL_ML_DEPS=1 to install optional machine learning libraries
 (numpy, the CPU build of torch, onnxruntime and numba) used by the sequence
-model and style embedding features.
+model and style embedding features. ``numpy`` is pinned to versions below 2
+to remain compatible with the project's core dependency constraints.
+#
+.NOTES
+Modification summary:
+- Pin ``numpy`` to versions below 2 when optionally installing machine
+  learning dependencies. The pin avoids conflicts with the project's core
+  dependency constraints which currently expect the 1.x series.
 #>
 
 $ErrorActionPreference = 'Stop'
@@ -58,7 +65,7 @@ function main {
         Write-Host 'DRY RUN: pip install -r requirements.txt'
         Write-Host 'DRY RUN: pip install -e .'
         if ($env:INSTALL_ML_DEPS -eq '1') {
-            Write-Host 'DRY RUN: pip install numpy'
+            Write-Host 'DRY RUN: pip install "numpy<2"'  # Pin <2 to prevent core dependency conflicts
             Write-Host 'DRY RUN: pip install torch --index-url https://download.pytorch.org/whl/cpu'
             Write-Host 'DRY RUN: pip install onnxruntime'
             Write-Host 'DRY RUN: pip install numba'
@@ -70,7 +77,7 @@ function main {
         Run-Command 'pip install -r requirements.txt'
         Run-Command 'pip install -e .'
         if ($env:INSTALL_ML_DEPS -eq '1') {
-            Run-Command 'pip install numpy'
+            Run-Command 'pip install "numpy<2"'  # Pin <2 to prevent core dependency conflicts
             Run-Command 'pip install torch --index-url https://download.pytorch.org/whl/cpu'
             Run-Command 'pip install onnxruntime'
             Run-Command 'pip install numba'
