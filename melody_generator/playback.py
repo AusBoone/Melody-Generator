@@ -42,6 +42,10 @@ configuration.
 # non-zero status triggers a ``MidiPlaybackError`` with the captured stderr.
 # Cleanup of temporary files is performed in a best-effort manner so failures
 # do not mask playback errors.
+#
+# Error messages from ``render_midi_to_wav`` now also include the stderr
+# emitted by the ``fluidsynth`` subprocess. Surfacing this text gives users
+# actionable hints (e.g. missing SoundFonts) when rendering fails.
 
 from __future__ import annotations
 
@@ -224,11 +228,14 @@ def render_midi_to_wav(
         midi_path,
     ]
     try:
+        # ``capture_output`` collects ``stdout`` and ``stderr`` so any error
+        # details from ``fluidsynth`` can be surfaced in the raised exception.
+        # ``text=True`` decodes the output to ``str`` for easier consumption.
         subprocess.run(
             cmd,
             check=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
         )
     except FileNotFoundError as exc:
         # ``fluidsynth`` executable not present in ``PATH``
@@ -236,7 +243,14 @@ def render_midi_to_wav(
             "fluidsynth not installed. Install the FluidSynth library and "
             "pyFluidSynth package."
         ) from exc
+    except subprocess.CalledProcessError as exc:
+        # Provide the stderr output from ``fluidsynth`` so callers know why
+        # rendering failed (e.g. missing SoundFont or invalid MIDI).
+        err = exc.stderr.strip() if exc.stderr else str(exc)
+        raise MidiPlaybackError(f"Failed to render MIDI: {err}") from exc
     except Exception as exc:
+        # Catch-all for other unexpected issues such as ``OSError`` when
+        # spawning the process or writing to the output file.
         raise MidiPlaybackError(f"Failed to render MIDI: {exc}") from exc
 
 
