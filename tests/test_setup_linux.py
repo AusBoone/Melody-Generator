@@ -3,7 +3,9 @@
 This module exercises the script in dry-run mode by stubbing ``apt-get`` and
 ``python3`` executables. The goal is to ensure Python installation is skipped
 when a modern version exists, that required packages are still requested, and
-that an ``apt-get update`` is issued before any package installations.
+that a single ``apt-get update`` is issued before any package installations.
+Running the update exactly once at startup keeps the package index consistent
+for subsequent operations.
 """
 
 import os
@@ -12,10 +14,11 @@ from pathlib import Path
 
 
 def test_skip_python_install(tmp_path):
-    """Setup script should not install python when version >= 3.10.
+    """Setup script should not install Python when version >= 3.10.
 
-    The test also verifies that the package index is refreshed before any
-    package installations, preventing lookup failures on new systems.
+    The test verifies that the package index is refreshed once before any
+    package installations, preventing lookup failures on new systems and
+    avoiding redundant updates.
     """
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
@@ -60,9 +63,10 @@ def test_skip_python_install(tmp_path):
 
     assert "apt-get install -y python3 python3-venv" not in result.stdout
     assert "apt-get install -y fluidsynth" in result.stdout
-    assert "apt-get update" in result.stdout
+    assert result.stdout.count("apt-get update") == 1
 
-    # Ensure the update occurs before the first package installation.
+    # Ensure the update occurs before the first package installation to use
+    # the freshly refreshed index.
     lines = result.stdout.splitlines()
     update_idx = next(
         i for i, line in enumerate(lines) if "apt-get update" in line
