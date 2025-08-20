@@ -10,6 +10,9 @@
 #   * Pin ``numpy`` to versions below 2 when optionally installing machine
 #     learning dependencies. The pin avoids conflicts with the project's
 #     core dependency constraints which currently expect the 1.x series.
+#   * Refresh Homebrew's package index before installing packages and use the
+#     actively maintained ``fluid-soundfont`` formula instead of the deprecated
+#     ``fluid-soundfont-gm``.
 #
 # Usage:
 #   ./setup_mac.sh
@@ -86,9 +89,16 @@ main() {
         exit 1
     fi
 
+    # Ensure the package index is up to date so subsequent installs use the
+    # latest formula metadata. This prevents lookup failures on fresh systems.
+    run_cmd brew update
+
     check_python
     install_brew_pkg fluid-synth
-    install_brew_pkg fluid-soundfont-gm
+    # Install the supported General MIDI sound set. The ``fluid-soundfont``
+    # formula supersedes ``fluid-soundfont-gm`` and was confirmed available
+    # via ``brew search``.
+    install_brew_pkg fluid-soundfont
 
     if [[ ! -d venv ]]; then
         echo "Creating Python virtual environment in ./venv"

@@ -4,7 +4,9 @@ This module exercises the installation script in dry-run mode. It stubs out
 ``brew`` and ``python3`` binaries so that the script can be run without actually
 installing packages. The purpose is to ensure that logic such as skipping the
 Python install when a modern version is present works correctly. Each stub logs
-invocations to ``log.txt`` allowing assertions on the generated commands.
+invocations to ``log.txt`` allowing assertions on the generated commands. The
+tests additionally confirm that package indices are refreshed before
+installation and that the correct SoundFont formula is requested.
 """
 
 import os
@@ -12,13 +14,17 @@ import subprocess
 from pathlib import Path
 
 def test_skip_python_install(tmp_path):
-    """Verify setup script does not attempt to install Python when version is sufficient."""
+    """Verify setup script skips Python install, updates brew and requests proper SoundFont.
+
+    The test ensures ``brew update`` precedes any package installations and that
+    ``fluid-soundfont`` replaces the deprecated ``fluid-soundfont-gm`` formula.
+    """
     # Create directory for fake executables
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     log_file = tmp_path / "log.txt"
 
-    # Stub brew: exit code 1 for 'list' to force installation for other packages
+    # Stub brew: exit code 1 for 'list' to force installation for other packages.
     brew_path = bin_dir / "brew"
     brew_path.write_text(
         "#!/bin/bash\nif [ \"$1\" = list ]; then exit 1; fi\necho brew $@ >> '%s'\n" % log_file
@@ -55,7 +61,17 @@ def test_skip_python_install(tmp_path):
         check=True,
     )
 
-    # The script should not attempt to install python because version >=3.10
+    # The script should not attempt to install python because version >=3.10.
     assert "brew install python" not in result.stdout
-    # But it should attempt to install fluid-synth since brew list fails
+    # Brew should refresh its package index before installations to avoid stale metadata.
+    assert "brew update" in result.stdout
+    # The updated script installs fluid-synth and the modern fluid-soundfont package.
     assert "brew install fluid-synth" in result.stdout
+    assert "brew install fluid-soundfont" in result.stdout
+    assert "fluid-soundfont-gm" not in result.stdout
+
+    # ``brew update`` should occur before any ``brew install`` commands.
+    lines = result.stdout.splitlines()
+    update_idx = next(i for i, line in enumerate(lines) if "brew update" in line)
+    install_idx = next(i for i, line in enumerate(lines) if "brew install" in line)
+    assert update_idx < install_idx
