@@ -23,14 +23,14 @@ module-level state by accident.
 # ---------------------------------------------------------------
 # * ``load_styles`` validates dimensionality and pads existing presets when
 #   new vectors expand the embedding space, preventing shape errors.
-# * Module-wide ``_ACTIVE_STYLE`` global was replaced with thread-local
-#   storage so concurrent calls can each maintain their own style vector
-#   without interference.
+# * Module-wide style state now relies on ``contextvars.ContextVar`` so threads
+#   and asyncio tasks each maintain independent style vectors without
+#   interference.
 # ---------------------------------------------------------------
 
 from __future__ import annotations
 
-import threading
+from contextvars import ContextVar
 from typing import Dict, Iterable, Optional, Sequence
 
 try:  # Attempt to use numpy when available for vector operations
@@ -64,10 +64,11 @@ else:
 # ``load_styles`` imports vectors with additional elements.
 STYLE_DIMENSION = len(next(iter(STYLE_VECTORS.values()))) if STYLE_VECTORS else 0
 
-# ``_STYLE_CTX`` holds the active style vector for the current thread. Using
-# ``threading.local`` ensures that concurrent melody generation in different
-# threads cannot accidentally read or mutate each other's style configuration.
-_STYLE_CTX = threading.local()
+# ``_STYLE_CTX`` holds the active style vector for the current execution
+# context. ``ContextVar`` automatically isolates values across threads and
+# asynchronous tasks so concurrent melody generation cannot interfere with each
+# other's style configuration.
+_STYLE_CTX: ContextVar[Optional[Sequence[float]]] = ContextVar("style_ctx", default=None)
 
 
 def load_styles(path: str) -> None:
@@ -200,24 +201,22 @@ def blend_styles(a: str, b: str, ratio: float) -> Sequence[float]:
 
 
 def set_style(vec: Optional[Iterable[float]]) -> None:
-    """Store ``vec`` as the active style for the current thread.
+    """Store ``vec`` as the active style for the current execution context.
 
-    The style is saved in thread-local storage so parallel melody generation
-    can use different styles without interfering with each other. Supplying
-    ``None`` clears the active style for the calling thread. The vector is
-    copied into a concrete container to prevent external mutations from leaking
-    into subsequent generations.
+    ``ContextVar`` ensures that each thread or asyncio task maintains its own
+    style state. Passing ``None`` clears the style for the current context. The
+    vector is copied into a concrete container to prevent external mutations
+    from leaking into subsequent generations.
     """
 
     if vec is None:
-        # Remove the attribute entirely so ``get_active_style`` falls back to
-        # ``None`` when no style has been set in this thread.
-        if hasattr(_STYLE_CTX, "value"):
-            delattr(_STYLE_CTX, "value")
+        # Resetting to ``None`` isolates the calling context without touching
+        # styles stored in other tasks or threads.
+        _STYLE_CTX.set(None)
         return
     # Convert to a concrete container so subsequent caller mutations do not
     # affect the stored style.
-    _STYLE_CTX.value = (
+    _STYLE_CTX.set(
         np.array(list(vec), dtype=float)
         if USE_NUMPY
         else [float(v) for v in vec]
@@ -225,13 +224,13 @@ def set_style(vec: Optional[Iterable[float]]) -> None:
 
 
 def get_active_style() -> Optional[Sequence[float]]:
-    """Return the thread-local style vector previously set via :func:`set_style`.
+    """Return the context-local style vector previously set via :func:`set_style`.
 
     A copy is returned so callers cannot mutate the stored value. ``None`` is
-    returned when no style has been configured in the calling thread.
+    returned when no style has been configured in the current context.
     """
 
-    vec = getattr(_STYLE_CTX, "value", None)
+    vec = _STYLE_CTX.get()
     if vec is None:
         return None
     return np.array(vec, dtype=float) if USE_NUMPY else list(vec)

@@ -1,17 +1,19 @@
 """Tests for the style embedding helpers.
 
-This suite validates vector handling, dynamic style loading and thread
-isolation. ``load_styles`` is exercised against multiple failure modes and
-confirmed to copy loaded vectors so external mutations cannot corrupt
-module-level presets.
+This suite validates vector handling, dynamic style loading and context
+isolation across threads and asyncio tasks. ``load_styles`` is exercised
+against multiple failure modes and confirmed to copy loaded vectors so external
+mutations cannot corrupt module-level presets.
 """
 
+import asyncio
 import importlib
 import json
 import sys
-from pathlib import Path
-import types
 import threading
+import types
+from pathlib import Path
+
 import pytest
 
 # Ensure the repository root is on ``sys.path`` so the package imports.
@@ -46,7 +48,7 @@ def test_style_vector_lookup():
 
 
 def test_set_and_get_active_style():
-    """``set_style`` should store a thread-local vector and retrieve a copy."""
+    """``set_style`` should store a context-local vector and retrieve a copy."""
 
     style.set_style([0.2, 0.3, 0.5])
     vec = style.get_active_style()
@@ -302,5 +304,35 @@ def test_thread_local_style_is_isolated():
     assert results["a"] == [1.0, 0.0, 0.0]
     assert results["b"] == [0.0, 1.0, 0.0]
     # The main thread never set a style so it should still return ``None``.
+    assert style.get_active_style() is None
+
+
+def test_async_style_is_isolated():
+    """Styles set in asyncio tasks must remain isolated to each task."""
+
+    results = {}
+
+    async def worker(name, vec):
+        """Set and retrieve a style in an asyncio task."""
+
+        style.set_style(vec)
+        # Yield control to ensure tasks overlap and isolation is exercised.
+        await asyncio.sleep(0)
+        results[name] = list(style.get_active_style())
+
+    async def runner():
+        """Spawn two tasks that set distinct styles concurrently."""
+
+        await asyncio.gather(
+            worker("a", [1.0, 0.0, 0.0]),
+            worker("b", [0.0, 1.0, 0.0]),
+        )
+
+    asyncio.run(runner())
+
+    # Each task should observe only the style it set.
+    assert results["a"] == [1.0, 0.0, 0.0]
+    assert results["b"] == [0.0, 1.0, 0.0]
+    # The main task never set a style so it should still return ``None``.
     assert style.get_active_style() is None
 
