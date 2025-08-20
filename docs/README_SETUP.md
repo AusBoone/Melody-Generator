@@ -41,3 +41,17 @@ pip install torch --index-url https://download.pytorch.org/whl/cpu
 `numpy` is also recommended for the tension-weighting helpers. Additional optional packages are
 `onnxruntime` for running exported models and `numba` for JIT compiling hot loops.
 The code falls back to heuristic rules when any of these dependencies are absent.
+
+## Web Interface Protections
+
+The Flask-based web GUI includes basic safeguards that can be tuned via environment
+variables before launching the server:
+
+* `MAX_UPLOAD_MB` – maximum size, in megabytes, of an incoming request payload.
+  Requests exceeding this limit are rejected with HTTP 413. The default is `5`.
+* `RATE_LIMIT_PER_MINUTE` – maximum number of requests allowed from a single IP
+  address in a one-minute window. Exceeding the limit yields HTTP 429. Leaving
+  this variable unset disables rate limiting.
+
+These settings help protect small deployments from accidental large uploads or
+abusive traffic while remaining simple to configure.

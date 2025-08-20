@@ -4,7 +4,8 @@ The web interface exposes the same melody generation functionality as the
 desktop application. These tests post various form values to the Flask app and
 verify that invalid input is rejected and valid input renders correctly. This
 suite also asserts that required configuration such as ``FLASK_SECRET`` and
-``CELERY_BROKER_URL`` is enforced in production mode."""
+``CELERY_BROKER_URL`` is enforced in production mode. Recent tests further
+ensure that oversized requests are rejected based on ``MAX_CONTENT_LENGTH``."""
 
 import importlib
 import os
@@ -989,3 +990,18 @@ def test_create_app_requires_broker(monkeypatch):
     monkeypatch.delenv("CELERY_BROKER_URL", raising=False)
     with pytest.raises(RuntimeError):
         web_gui.create_app()
+
+
+def test_rejects_oversized_request():
+    """Payloads larger than ``MAX_CONTENT_LENGTH`` are rejected with HTTP 413."""
+
+    oversized_app = web_gui.create_app()
+    # Keep CSRF disabled to isolate the size check from token validation.
+    oversized_app.config["WTF_CSRF_ENABLED"] = False
+    # Limit uploads to an intentionally tiny size to trigger the 413 response.
+    oversized_app.config["MAX_CONTENT_LENGTH"] = 100
+
+    client = oversized_app.test_client()
+    large_value = "x" * 200  # Exceeds the 100-byte limit.
+    resp = client.post("/", data={"payload": large_value})
+    assert resp.status_code == 413
