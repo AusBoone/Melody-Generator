@@ -6,7 +6,7 @@ Tkinter interfaces. Users choose musical parameters through a form and the
 server renders a temporary MIDI (and optionally WAV) file for download and
 preview.
 
-The latest revision introduces two major changes:
+The latest revision introduces several changes:
 
 * **CSRF protection** – Flask-WTF's :class:`~flask_wtf.csrf.CSRFProtect` now
   injects and validates tokens for every POST request, securing the form
@@ -14,6 +14,10 @@ The latest revision introduces two major changes:
 * **WSGI-friendly entry point** – a :func:`create_app` factory builds and
   configures the Flask application so production servers like Gunicorn can
   serve it directly.
+* **Request size limiting** – Flask's ``MAX_CONTENT_LENGTH`` bounds the size of
+  uploaded form data so oversized payloads are rejected early.
+* **Rate limiting** – An in-memory per-IP throttle curbs abusive clients by
+  capping requests per minute.
 """
 # This revision introduces validation for the ``base_octave`` input so
 # out-of-range values (anything not between ``MIN_OCTAVE`` and
@@ -78,12 +82,19 @@ The latest revision introduces two major changes:
 # raises :class:`RuntimeError` when either ``FLASK_SECRET`` or
 # ``CELERY_BROKER_URL`` are missing while debug mode is disabled. This prevents
 # accidentally running the web interface with insecure default settings.
+#
+# This update adds two lightweight abuse protections:
+#   * ``MAX_CONTENT_LENGTH`` caps the size of incoming requests, guarding
+#     against accidental or malicious large uploads.
+#   * A simple in-memory rate limiter throttles clients making too many
+#     requests per minute to reduce the risk of denial-of-service attacks.
 
 from __future__ import annotations
 
 from importlib import import_module
 from tempfile import NamedTemporaryFile
-from typing import List, Optional
+from time import monotonic
+from typing import Dict, List, Optional, Tuple
 
 from melody_generator import playback
 from melody_generator.playback import MidiPlaybackError
@@ -102,7 +113,7 @@ try:  # pragma: no cover - optional dependency
 except Exception:
     CeleryTimeoutError = TimeoutError
 
-from flask import Flask, render_template, request, flash
+from flask import Flask, render_template, request, flash, current_app
 from flask_wtf.csrf import CSRFProtect
 import base64
 import os
@@ -155,6 +166,52 @@ if Celery is not None:
     celery_app = Celery(
         __name__, broker=os.environ.get("CELERY_BROKER_URL", "memory://")
     )
+
+
+# In-memory store tracking request counts per IP address. Each entry maps the
+# client IP to a ``(window_start, count)`` tuple representing the beginning of
+# the current rate-limit window and the number of requests seen in that window.
+REQUEST_LOG: Dict[str, Tuple[float, int]] = {}
+
+# Duration of a single rate-limit window in seconds. ``monotonic`` timestamps
+# ensure the calculation is unaffected by system clock adjustments.
+RATE_LIMIT_WINDOW = 60.0
+
+
+def rate_limit() -> Optional[tuple[str, int]]:
+    """Enforce a naive per-IP request limit.
+
+    The function is registered as a ``before_request`` hook and consults the
+    application configuration for ``RATE_LIMIT_PER_MINUTE``. When the limit is
+    exceeded, a ``429`` response is returned. Missing or invalid configuration
+    disables rate limiting entirely.
+
+    Returns:
+        Optional[tuple[str, int]]: Response tuple when the limit is exceeded,
+        otherwise ``None`` to allow the request to proceed.
+    """
+
+    limit = current_app.config.get("RATE_LIMIT_PER_MINUTE")
+    if not limit:
+        # Rate limiting is disabled when the limit is unset or zero.
+        return None
+
+    now = monotonic()
+    ip_addr = request.remote_addr or "unknown"
+    window_start, count = REQUEST_LOG.get(ip_addr, (0.0, 0))
+
+    if now - window_start >= RATE_LIMIT_WINDOW:
+        # A new window begins; reset the count for this IP.
+        REQUEST_LOG[ip_addr] = (now, 1)
+        return None
+
+    if count >= limit:
+        # Limit exceeded; reject the request with HTTP 429.
+        return "Too many requests", 429
+
+    # Increment the counter for this IP within the current window.
+    REQUEST_LOG[ip_addr] = (window_start, count + 1)
+    return None
 
 
 def _generate_preview(
@@ -551,7 +608,9 @@ def create_app() -> Flask:
     (non-debug) mode the factory requires ``FLASK_SECRET`` and
     ``CELERY_BROKER_URL`` to be present. Missing values trigger a
     :class:`RuntimeError` after emitting a ``CRITICAL`` log entry so the
-    application never runs with insecure defaults.
+    application never runs with insecure defaults. Additional safeguards limit
+    request size via ``MAX_CONTENT_LENGTH`` and optionally throttle clients
+    using ``RATE_LIMIT_PER_MINUTE``.
 
     Returns:
         Flask: Configured application ready for use by a WSGI server.
@@ -562,9 +621,23 @@ def create_app() -> Flask:
 
     app = Flask(__name__, template_folder="templates", static_folder="static")
 
-    # Read security-related environment variables so we can validate their presence.
+    # Read security-related environment variables so we can validate their
+    # presence and configure optional protections.
     secret = os.environ.get("FLASK_SECRET")
     broker = os.environ.get("CELERY_BROKER_URL")
+    try:
+        max_mb = int(os.environ.get("MAX_UPLOAD_MB", "5"))
+    except ValueError:
+        max_mb = 5
+        logger.warning("Invalid MAX_UPLOAD_MB value; defaulting to 5 MB.")
+    rate_limit_env = os.environ.get("RATE_LIMIT_PER_MINUTE")
+    try:
+        rate_limit_per_minute = int(rate_limit_env) if rate_limit_env else None
+    except ValueError:
+        logger.warning(
+            "RATE_LIMIT_PER_MINUTE must be an integer. Disabling rate limiting."
+        )
+        rate_limit_per_minute = None
 
     if not app.debug:
         # Running without these variables in production would leave sessions
@@ -584,6 +657,13 @@ def create_app() -> Flask:
             "Using a randomly generated key; sessions will not persist across restarts."
         )
     app.secret_key = secret
+    # Bound the size of incoming requests to protect the server from excessive
+    # memory usage. Flask will automatically return HTTP 413 when the limit is
+    # exceeded.
+    app.config["MAX_CONTENT_LENGTH"] = max_mb * 1024 * 1024
+    # Store the optional per-IP request limit for use by the ``rate_limit``
+    # hook. A ``None`` value disables the limiter.
+    app.config["RATE_LIMIT_PER_MINUTE"] = rate_limit_per_minute
 
     # Enable CSRF protection so every form submission must include a valid
     # token. ``csrf_token`` is injected into templates via context processor.
@@ -591,6 +671,14 @@ def create_app() -> Flask:
 
     # Register the primary form handler.
     app.add_url_rule("/", view_func=index, methods=["GET", "POST"])
+
+    # Apply the rate limiter to all requests.
+    app.before_request(rate_limit)
+
+    @app.errorhandler(413)
+    def handle_request_too_large(_err):
+        """Return a concise message when the client uploads too much data."""
+        return "Request exceeds configured size limit.", 413
 
     return app
 
