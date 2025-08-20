@@ -11,6 +11,9 @@
 #   * Refresh the APT package index unconditionally at the start of the
 #     ``main`` function. This prevents package lookup failures on freshly
 #     provisioned systems where the local cache may be empty.
+#   * Consolidate the index refresh so it runs once in ``main``; helper
+#     functions assume the cache is already updated for consistent
+#     package resolution.
 #   * Pin ``numpy`` to versions below 2 when optionally installing machine
 #     learning dependencies. The pin avoids conflicts with the project's
 #     core dependency constraints which currently expect the 1.x series.
@@ -50,8 +53,14 @@ verify_linux() {
     fi
 }
 
-# check_python ensures Python >=3.10 is installed. If python3 is missing or
-# too old the function installs a newer version using apt-get.
+# check_python ensures Python >=3.10 is installed.
+#
+# This function assumes the package index was refreshed once at script
+# startup by ``main``. Avoiding repeated ``apt-get update`` calls keeps the
+# environment consistent across all package installations.
+#
+# If ``python3`` is missing or too old the function installs a newer version
+# using ``apt-get``.
 check_python() {
     if command -v python3 >/dev/null 2>&1; then
         local version
@@ -66,7 +75,9 @@ check_python() {
     else
         echo "Python3 not found. Installing via apt-get..."
     fi
-    run_cmd sudo apt-get update
+    # ``apt-get update`` is intentionally omitted here because ``main``
+    # performs a single refresh at startup to maintain a consistent view of
+    # available packages for the remainder of the script's execution.
     run_cmd sudo apt-get install -y python3 python3-venv
 }
 
@@ -80,9 +91,9 @@ install_pkg() {
 
 main() {
     verify_linux
-    # Always refresh the package index so subsequent installations succeed.
-    # Running ``apt-get update`` unconditionally prevents lookup failures on
-    # newly provisioned systems with an empty package cache.
+    # Refresh the package index once at startup so subsequent installations
+    # (including those in helper functions such as ``check_python``) operate on
+    # a consistent view of available packages.
     run_cmd sudo apt-get update
 
     check_python
