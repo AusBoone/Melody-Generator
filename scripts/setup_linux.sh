@@ -7,6 +7,11 @@
 # and only installs a new version when the current one is older than 3.10.
 # A Python virtual environment is created under ./venv.
 #
+# Modification summary:
+#   * Refresh the APT package index unconditionally at the start of the
+#     ``main`` function. This prevents package lookup failures on freshly
+#     provisioned systems where the local cache may be empty.
+#
 # Usage:
 #   ./setup_linux.sh
 #
@@ -71,6 +76,10 @@ install_pkg() {
 
 main() {
     verify_linux
+    # Always refresh the package index so subsequent installations succeed.
+    # Running ``apt-get update`` unconditionally prevents lookup failures on
+    # newly provisioned systems with an empty package cache.
+    run_cmd sudo apt-get update
 
     check_python
     install_pkg fluidsynth
