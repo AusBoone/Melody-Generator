@@ -18,6 +18,8 @@ The latest revision introduces several changes:
   uploaded form data so oversized payloads are rejected early.
 * **Rate limiting** – An in-memory per-IP throttle curbs abusive clients by
   capping requests per minute.
+* **Thread-safe rate limiting** – The throttle now uses a lock for concurrent
+  access and purges stale entries each request to bound memory usage.
 """
 # This revision introduces validation for the ``base_octave`` input so
 # out-of-range values (anything not between ``MIN_OCTAVE`` and
@@ -119,6 +121,7 @@ import base64
 import os
 import secrets
 import logging
+from threading import Lock
 
 # Import the core melody generation package dynamically so the
 # Flask app can live in a separate module without circular imports.
@@ -171,7 +174,15 @@ if Celery is not None:
 # In-memory store tracking request counts per IP address. Each entry maps the
 # client IP to a ``(window_start, count)`` tuple representing the beginning of
 # the current rate-limit window and the number of requests seen in that window.
+# Access to this dictionary is synchronized by ``REQUEST_LOCK`` because Flask's
+# development server can process requests on multiple threads.
 REQUEST_LOG: Dict[str, Tuple[float, int]] = {}
+
+# Lock guarding ``REQUEST_LOG`` to prevent race conditions when multiple
+# requests attempt to read or modify the structure concurrently. Using a lock
+# keeps the rate limiter's bookkeeping consistent and avoids crashes from
+# unsynchronized dictionary mutations.
+REQUEST_LOCK = Lock()
 
 # Duration of a single rate-limit window in seconds. ``monotonic`` timestamps
 # ensure the calculation is unaffected by system clock adjustments.
@@ -184,7 +195,9 @@ def rate_limit() -> Optional[tuple[str, int]]:
     The function is registered as a ``before_request`` hook and consults the
     application configuration for ``RATE_LIMIT_PER_MINUTE``. When the limit is
     exceeded, a ``429`` response is returned. Missing or invalid configuration
-    disables rate limiting entirely.
+    disables rate limiting entirely. The log of requests is protected by a
+    :class:`threading.Lock` so concurrent threads cannot corrupt state, and
+    stale entries are purged before each new request is recorded.
 
     Returns:
         Optional[tuple[str, int]]: Response tuple when the limit is exceeded,
@@ -198,19 +211,34 @@ def rate_limit() -> Optional[tuple[str, int]]:
 
     now = monotonic()
     ip_addr = request.remote_addr or "unknown"
-    window_start, count = REQUEST_LOG.get(ip_addr, (0.0, 0))
 
-    if now - window_start >= RATE_LIMIT_WINDOW:
-        # A new window begins; reset the count for this IP.
-        REQUEST_LOG[ip_addr] = (now, 1)
-        return None
+    # ``REQUEST_LOG`` is shared across requests, so mutate it only while holding
+    # the lock. This prevents race conditions where two threads could
+    # simultaneously read and update the counters for the same IP.
+    with REQUEST_LOCK:
+        # Remove stale entries for all clients. Purging here keeps the data
+        # structure small and ensures old counts do not affect new windows.
+        expired = [
+            ip for ip, (start, _) in REQUEST_LOG.items()
+            if now - start >= RATE_LIMIT_WINDOW
+        ]
+        for ip in expired:
+            del REQUEST_LOG[ip]
 
-    if count >= limit:
-        # Limit exceeded; reject the request with HTTP 429.
-        return "Too many requests", 429
+        window_start, count = REQUEST_LOG.get(ip_addr, (now, 0))
 
-    # Increment the counter for this IP within the current window.
-    REQUEST_LOG[ip_addr] = (window_start, count + 1)
+        if now - window_start >= RATE_LIMIT_WINDOW:
+            # A new window begins; reset the count for this IP.
+            REQUEST_LOG[ip_addr] = (now, 1)
+            return None
+
+        if count >= limit:
+            # Limit exceeded; reject the request with HTTP 429.
+            return "Too many requests", 429
+
+        # Increment the counter for this IP within the current window.
+        REQUEST_LOG[ip_addr] = (window_start, count + 1)
+
     return None
 
 

@@ -1,0 +1,60 @@
+"""Tests for the ``rate_limit`` helper.
+
+These tests verify that the in-memory request log used by the Flask web
+interface remains correct under normal conditions, purges stale entries and
+handles concurrent access safely.
+"""
+
+import threading
+
+import test_web_gui as web_gui_tests
+
+# Reuse the already configured Flask app and imported ``web_gui`` module from
+# ``test_web_gui``. That module stubs external dependencies and sets required
+# environment variables, so importing it here provides a fully initialized
+# application instance suitable for exercising the rate limiter.
+web_gui = web_gui_tests.web_gui
+app = web_gui_tests.app
+
+
+def setup_function() -> None:
+    """Ensure each test runs with a fresh request log."""
+    web_gui.REQUEST_LOG.clear()
+
+
+def test_rate_limit_enforces_limit() -> None:
+    """Requests beyond the configured threshold should return HTTP 429."""
+    app.config["RATE_LIMIT_PER_MINUTE"] = 1
+    client = app.test_client()
+    assert client.get("/").status_code == 200
+    assert client.get("/").status_code == 429
+
+
+def test_rate_limit_purges_expired_entries() -> None:
+    """Entries older than the current window are removed before counting."""
+    app.config["RATE_LIMIT_PER_MINUTE"] = 5
+    old_time = web_gui.monotonic() - (web_gui.RATE_LIMIT_WINDOW * 2)
+    web_gui.REQUEST_LOG["stale"] = (old_time, 1)
+    client = app.test_client()
+    assert client.get("/").status_code == 200
+    assert "stale" not in web_gui.REQUEST_LOG
+
+
+def test_rate_limit_thread_safety() -> None:
+    """Concurrent requests increment counters without race conditions."""
+    app.config["RATE_LIMIT_PER_MINUTE"] = 100
+    ip_addr = "9.9.9.9"
+
+    def hit() -> None:
+        # Each thread creates its own request context so ``rate_limit`` can
+        # access ``flask.request`` safely.
+        with app.test_request_context("/", environ_overrides={"REMOTE_ADDR": ip_addr}):
+            assert web_gui.rate_limit() is None
+
+    threads = [threading.Thread(target=hit) for _ in range(10)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert web_gui.REQUEST_LOG[ip_addr][1] == 10

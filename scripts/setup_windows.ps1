@@ -40,6 +40,8 @@ Modification summary:
    below 2, keeping it compatible with the rest of the project.
 - Capture command exit codes in ``Run-Command`` and abort on failure to avoid
   silently continuing after errors.
+- Resolve a PowerShell parsing bug in ``Run-Command`` by delimiting ``$exitCode``
+  when constructing error messages so the colon is interpreted literally.
 #>
 
 $ErrorActionPreference = 'Stop'
@@ -90,7 +92,12 @@ function Run-Command($cmd) {
         $exitCode = $LASTEXITCODE  # Preserve exit code for explicit failure detection.
         if ($exitCode -ne 0) {
             # Fail fast with a descriptive error to maintain setup integrity.
-            throw "Command failed with exit code $exitCode: $cmd"
+            # Use `${}` around `$exitCode` so PowerShell treats the colon
+            # following the variable as a literal character instead of
+            # misinterpreting it as part of a scoped variable name. Without
+            # the braces, the message raises a ParserError and halts the setup
+            # script before reporting the actual failure.
+            throw "Command failed with exit code ${exitCode}: $cmd"
         }
     }
 }
