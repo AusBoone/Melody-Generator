@@ -21,6 +21,36 @@ additional background on how the system works or how to configure audio playback
 Each document is self-contained so you can jump directly to the topic that
 interests you.
 
+### Optional Dependencies & Deployment
+
+Some features rely on additional tools. Installing them enables audio previews
+and background processing but they are not strictly required.
+
+- **FluidSynth & SoundFont** – Render audio previews by installing FluidSynth
+  (e.g., ``sudo apt-get install fluidsynth`` or ``brew install fluidsynth``) and
+  providing a General MIDI ``.sf2`` soundfont. Point the ``SOUNDFONT``
+  environment variable at the file or pass ``--soundfont`` on the command line
+  so previews use the desired instrument bank.
+- **Celery Broker** – Asynchronous preview generation uses Celery. Install a
+  broker such as Redis and start a worker:
+
+  ```bash
+  pip install celery redis
+  export CELERY_BROKER_URL=redis://localhost:6379/0
+  celery -A melody_generator.web_gui.celery_app worker --loglevel=info
+  ```
+
+  If the broker is unreachable the application falls back to synchronous
+  preview generation.
+- **Machine Learning Libraries** – Style embeddings and tension weighting
+  require PyTorch and NumPy:
+
+  ```bash
+  pip install torch numpy
+  ```
+
+  These libraries are optional when using only the rule-based generator.
+
 ### Web Interface
 
 Launch the Flask application with `python -m melody_generator.web_gui` and open
