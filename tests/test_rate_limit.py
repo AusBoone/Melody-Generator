@@ -26,8 +26,16 @@ def test_rate_limit_enforces_limit() -> None:
     """Requests beyond the configured threshold should return HTTP 429."""
     app.config["RATE_LIMIT_PER_MINUTE"] = 1
     client = app.test_client()
-    assert client.get("/").status_code == 200
-    assert client.get("/").status_code == 429
+    first = client.get("/")
+    assert first.status_code == 200
+    # Successful requests should not include throttling headers.
+    assert "Retry-After" not in first.headers
+
+    second = client.get("/")
+    assert second.status_code == 429
+    # The rejection must advise the client when to retry.
+    assert "Retry-After" in second.headers
+    assert int(second.headers["Retry-After"]) > 0
 
 
 def test_rate_limit_purges_expired_entries() -> None:
