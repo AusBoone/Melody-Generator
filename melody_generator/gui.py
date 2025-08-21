@@ -45,6 +45,7 @@ from tempfile import NamedTemporaryFile
 import random
 import webbrowser
 from pathlib import Path
+from functools import partial
 
 from . import diatonic_chords, MIN_OCTAVE, MAX_OCTAVE
 from .sequence_model import load_sequence_model
@@ -784,7 +785,10 @@ class MelodyGeneratorGUI:
                 humanize=params["humanize"],
             )
         except Exception as exc:  # pragma: no cover - rare failures
-            self.root.after(0, lambda: self._generation_complete(error=exc))
+            # Use ``functools.partial`` to bind ``exc`` for the callback executed
+            # on the main thread, preventing linter warnings about an unused
+            # variable while still surfacing the original exception.
+            self.root.after(0, partial(self._generation_complete, error=exc))
         else:
             self.root.after(
                 0,
