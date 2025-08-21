@@ -410,6 +410,45 @@ def test_rest_values_in_pattern(tmp_path):
     assert len(mid.tracks[0]) == 7
 
 
+def test_chord_alignment_with_rests(tmp_path):
+    """Chord track remains in sync when rhythm pattern includes rests.
+
+    A pattern such as ``[0.25, 0]`` alternates between a sounded quarter note
+    and a full beat of silence. ``create_midi_file`` should count both note and
+    rest beats so the chord track spans the same overall duration as the melody
+    track."""
+
+    chords = ["C", "G"]
+    melody = ["C4", "D4", "E4", "F4", "G4", "A4", "B4", "C5"]
+    out = tmp_path / "rest_align.mid"
+    mid = create_midi_file(
+        melody,
+        120,
+        (4, 4),
+        str(out),
+        harmony=False,
+        pattern=[0.25, 0],
+        chord_progression=chords,
+    )
+
+    def last_off_time(track):
+        """Return absolute tick time of the final ``note_off`` event."""
+
+        abs_time = 0
+        last_time = 0
+        for msg in track:
+            abs_time += msg.time
+            if msg.type == "note_off":
+                last_time = abs_time
+        return last_time
+
+    melody_track = mid.tracks[0]
+    chord_track = mid.tracks[1]
+    # The chord track should extend at least as long as the melody track even
+    # when rests are present to ensure harmonic context is maintained.
+    assert last_off_time(chord_track) >= last_off_time(melody_track)
+
+
 def test_progression_chords_exist():
     """Random chord progressions never produce unknown chords.
 

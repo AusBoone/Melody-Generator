@@ -6,6 +6,8 @@ Modification summary
   callers can pass a path in a new folder without preparing it.
 * ``create_midi_file`` accounts for extra inserted beats when extending the
   melody so chord tracks remain aligned with the final note.
+* ``create_midi_file`` increments ``total_beats`` for rest pattern entries so
+  chord tracks remain aligned even when rhythms contain rests.
 * ``create_midi_file`` validates ``bpm`` is positive so invalid tempos are
   caught early.
 * ``create_midi_file`` applies ``humanize_events`` to all MIDI tracks so timing
@@ -154,6 +156,10 @@ def create_midi_file(
         if duration_fraction == 0:
             rest_ticks += beat_ticks
             beats_elapsed += 1
+            # ``total_beats`` tracks the full length of the piece for chord
+            # scheduling. Rests advance musical time just like sounded notes, so
+            # update the accumulator here to keep harmony alignment accurate.
+            total_beats += 1
             continue
 
         note_duration = int(duration_fraction * whole_note_ticks)
