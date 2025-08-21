@@ -522,6 +522,25 @@ def test_diatonic_chords_invalid_key():
         melody_generator.diatonic_chords("H")
 
 
+def test_random_progression_canonicalizes_key():
+    """Lowercase keys should produce the same progression as uppercase."""
+
+    random.seed(0)
+    upper = melody_generator.generate_random_chord_progression("C", 4)
+    random.seed(0)
+    lower = melody_generator.generate_random_chord_progression("c", 4)
+    assert upper == lower
+
+
+def test_diatonic_chords_canonicalizes_key():
+    """Key helpers normalise case via ``canonical_key``."""
+
+    # Major key canonicalisation
+    assert melody_generator.diatonic_chords("c") == melody_generator.diatonic_chords("C")
+    # Minor key canonicalisation
+    assert melody_generator.diatonic_chords("am") == melody_generator.diatonic_chords("Am")
+
+
 def test_counterpoint_invalid_key():
     """``generate_counterpoint_melody`` should validate the key argument."""
 

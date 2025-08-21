@@ -24,6 +24,8 @@ Example
 # 2024-12-07: Restricted allowable time signature denominators to common
 # simple values (1, 2, 4, 8, 16) to mirror ``validate_time_signature`` and
 # avoid unsupported meters.
+# 2025-02-16: Normalised key inputs with ``canonical_key`` so helpers accept
+# lowercase or mixed-case values.
 
 from __future__ import annotations
 
@@ -57,10 +59,15 @@ def _degree_to_chord(key: str, idx: int) -> str:
     Chords default to major, minor or diminished triads derived from the
     key signature.  When the resulting name is unknown a random fallback from
     ``CHORDS`` is used so the output always contains valid chord symbols.
+
+    The ``key`` argument is normalised via :func:`canonical_key` so callers
+    may supply any casing (e.g. ``"c"`` or ``"Am"``).
     """
 
-    from . import SCALE, CHORDS
+    from . import SCALE, CHORDS, canonical_key
 
+    # Normalise the key before looking up scale notes and qualities.
+    key = canonical_key(key)
     notes = SCALE[key]
     is_minor = key.endswith("m")
 
@@ -93,7 +100,8 @@ def generate_progression(key: str, length: int = 4) -> Tuple[List[str], List[flo
     Parameters
     ----------
     key:
-        Musical key used to derive chord qualities. Must exist in ``SCALE``.
+        Musical key used to derive chord qualities. The value is
+        case-insensitive and normalised via :func:`canonical_key`.
     length:
         Number of chords to return. Defaults to ``4``.
 
@@ -109,10 +117,11 @@ def generate_progression(key: str, length: int = 4) -> Tuple[List[str], List[flo
         If ``key`` is unknown or ``length`` is non-positive.
     """
 
-    from . import SCALE
+    from . import canonical_key
 
-    if key not in SCALE:
-        raise ValueError(f"Unknown key '{key}'")
+    # Normalize and validate the supplied key; ``canonical_key`` raises
+    # ``ValueError`` for unknown keys.
+    key = canonical_key(key)
     if length <= 0:
         raise ValueError("length must be positive")
 

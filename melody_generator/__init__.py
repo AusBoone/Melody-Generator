@@ -128,6 +128,9 @@ __version__ = "0.1.0"
 #   disable timing jitter for deterministic output.
 # * ``generate_melody`` and ``create_midi_file`` now canonicalise keys and
 #   chords so lowercase input is accepted by the public API.
+# * ``generate_random_chord_progression``, ``diatonic_chords`` and harmony
+#   helpers normalise keys with :func:`canonical_key` so callers may supply
+#   lowercase or mixed-case values.
 # * ``generate_random_chord_progression`` samples all seven scale degrees when
 #   padding progressions so the leading tone chord can be chosen.
 # ---------------------------------------------------------------
@@ -508,6 +511,10 @@ def generate_random_chord_progression(key: str, length: int = 4) -> List[str]:
     popular music.  Chords are derived from the selected key so the
     results fit naturally with generated melodies.
 
+    The ``key`` argument is case-insensitive; it is normalised via
+    :func:`canonical_key` so callers can provide lowercase or mixed-case
+    values.
+
     @param key (str): Musical key to base the chords on. ``ValueError`` is
         raised when the key is not defined in :data:`SCALE`.
     @param length (int): Number of chords to generate. Must be positive or a
@@ -515,14 +522,16 @@ def generate_random_chord_progression(key: str, length: int = 4) -> List[str]:
     @returns List[str]: Chord names forming the progression.
     """
 
+    # Normalize and validate the supplied key so lookups into ``SCALE``
+    # are always performed with canonical capitalization (e.g. ``"c"``
+    # becomes ``"C"``).
+    key = canonical_key(key)
+
     # Roman numeral progressions for major and minor keys encoded as
     # scale degrees (0 = I/i). These simple loops mimic typical pop
     # progressions and keep the harmony sounding familiar.
     major_patterns = [[0, 3, 4, 0], [0, 5, 3, 4], [0, 3, 0, 4]]
     minor_patterns = [[0, 3, 4, 0], [0, 5, 3, 4], [0, 5, 4, 0]]
-
-    if key not in SCALE:
-        raise ValueError(f"Unknown key '{key}'")
 
     if length <= 0:
         # Guard against nonsensical requests so callers always receive at least
@@ -592,13 +601,16 @@ def diatonic_chords(key: str) -> List[str]:
     distinguish them from their major counterparts. Unknown chords fall
     back to their enharmonic equivalents when possible.
 
+    The ``key`` argument is case-insensitive and is normalised with
+    :func:`canonical_key`.
+
     @param key (str): Musical key whose triads are requested. ``ValueError`` is
         raised when the key is not defined in :data:`SCALE`.
     @returns List[str]: All unique chords found in the key.
     """
 
-    if key not in SCALE:
-        raise ValueError(f"Unknown key '{key}'")
+    # Canonicalise the key so callers can use any casing.
+    key = canonical_key(key)
 
     is_minor = key.endswith("m")
     notes = SCALE[key]
