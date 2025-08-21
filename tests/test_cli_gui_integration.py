@@ -356,6 +356,42 @@ def test_generate_button_click(tmp_path, monkeypatch):
     gui.display_map = {"C": "C", "G": "G"}
     gui.sorted_chords = ["C", "G"]
 
+    # ``_generate_button_click`` disables widgets and shows a progress bar.
+    # Provide minimal stand-ins so the call does not raise ``AttributeError``.
+    class DummyProgress:
+        """Lightweight progress bar tracking method calls for the test."""
+
+        def grid(self):
+            """Pretend to place the widget."""
+
+        def start(self):
+            """Pretend to begin animation."""
+
+        def stop(self):
+            """Pretend to stop animation."""
+
+        def grid_remove(self):
+            """Pretend to hide the widget."""
+
+    gui.progress = DummyProgress()
+    gui.inputs = []  # ``_set_inputs_state`` iterates over this list
+    gui.root = types.SimpleNamespace(
+        after=lambda _d, f, *a: f(*a)
+    )  # Execute callbacks immediately
+
+    class DummyThread:
+        """Thread replacement that runs the target synchronously."""
+
+        def __init__(self, target, args=(), daemon=None):
+            self.target = target
+            self.args = args
+
+        def start(self) -> None:
+            """Immediately invoke the thread target."""
+            self.target(*self.args)
+
+    monkeypatch.setattr(gui_mod.threading, "Thread", DummyThread)
+
     monkeypatch.setattr(
         gui_mod.filedialog,
         "asksaveasfilename",

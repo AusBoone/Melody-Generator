@@ -213,10 +213,23 @@ def test_generate_runs_in_worker_thread(monkeypatch):
     monkeypatch.setattr(gui_mod.MelodyGeneratorGUI, "_build_widgets", minimal_build)
 
     # Prevent dialogs from blocking the test.
-    monkeypatch.setattr(gui_mod.filedialog, "asksaveasfilename", lambda **k: "out.mid")
-    monkeypatch.setattr(gui_mod.messagebox, "showinfo", lambda *a, **k: None)
-    monkeypatch.setattr(gui_mod.messagebox, "askyesno", lambda *a, **k: False)
-    monkeypatch.setattr(gui_mod.messagebox, "showerror", lambda *a, **k: None)
+    # ``tkinter.filedialog`` may lack ``asksaveasfilename`` in the stub module,
+    # so allow creation of the attribute during monkeypatching.
+    monkeypatch.setattr(
+        gui_mod.filedialog,
+        "asksaveasfilename",
+        lambda **k: "out.mid",
+        raising=False,
+    )
+    monkeypatch.setattr(
+        gui_mod.messagebox, "showinfo", lambda *a, **k: None, raising=False
+    )
+    monkeypatch.setattr(
+        gui_mod.messagebox, "askyesno", lambda *a, **k: False, raising=False
+    )
+    monkeypatch.setattr(
+        gui_mod.messagebox, "showerror", lambda *a, **k: None, raising=False
+    )
 
     thread_calls = {}
 

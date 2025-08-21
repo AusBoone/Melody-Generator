@@ -199,7 +199,6 @@ def run_cli() -> None:
             generate_harmony_line,
             generate_counterpoint_melody,
             create_midi_file,
-            load_sequence_model,
             load_genre_sequence_model,
             get_style_vector,
             _open_default_player,

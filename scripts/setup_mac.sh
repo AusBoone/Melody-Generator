@@ -7,9 +7,9 @@
 # installations are reused when possible.
 #
 # Modification summary:
-#   * Pin ``numpy`` to versions below 2 when optionally installing machine
-#     learning dependencies. The pin avoids conflicts with the project's
-#     core dependency constraints which currently expect the 1.x series.
+#   * Drop the explicit ``numpy`` installation from optional ML dependencies
+#     because ``requirements.txt`` already constrains NumPy to versions
+#     below 2, keeping it compatible with the rest of the project.
 #   * Refresh Homebrew's package index before installing packages and use the
 #     actively maintained ``fluid-soundfont`` formula instead of the deprecated
 #     ``fluid-soundfont-gm``.
@@ -20,10 +20,11 @@
 # Set the environment variable DRY_RUN=1 to print commands without
 # executing them. The FORCE_MAC=1 variable allows running the script on
 # non-macOS systems (useful for CI testing). Set INSTALL_ML_DEPS=1 to
-# also install optional machine learning libraries (``numpy`` pinned to
-# ``<2`` for compatibility with project dependencies, the CPU build of
+# also install optional machine learning libraries (the CPU build of
 # ``torch``, ``onnxruntime`` and ``numba``) required for the sequence
-# model and style embedding features.
+# model and style embedding features. NumPy is installed from
+# ``requirements.txt`` and pinned to ``<2`` there, so it is not repeated
+# in the optional section.
 #----------------------------------------------------------------------
 set -euo pipefail
 
@@ -111,7 +112,7 @@ main() {
         echo "DRY RUN: pip install -r requirements.txt"
         echo "DRY RUN: pip install -e ."
         if [[ "${INSTALL_ML_DEPS:-0}" == "1" ]]; then
-            echo "DRY RUN: pip install \"numpy<2\""  # Pin <2 to prevent core dependency conflicts
+            # NumPy is pinned to <2 in requirements.txt, so only ML extras are installed here.
             echo "DRY RUN: pip install torch --index-url https://download.pytorch.org/whl/cpu"
             echo "DRY RUN: pip install onnxruntime"
             echo "DRY RUN: pip install numba"
@@ -123,7 +124,7 @@ main() {
         run_cmd pip install -r requirements.txt
         run_cmd pip install -e .
         if [[ "${INSTALL_ML_DEPS:-0}" == "1" ]]; then
-            run_cmd pip install "numpy<2"  # Pin <2 to prevent core dependency conflicts
+            # requirements.txt already provides NumPy (<2); install only ML extras.
             run_cmd pip install torch --index-url https://download.pytorch.org/whl/cpu
             run_cmd pip install onnxruntime
             run_cmd pip install numba

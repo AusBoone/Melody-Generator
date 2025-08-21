@@ -7,9 +7,10 @@ Installs Python and supporting libraries using winget if necessary, then
 creates a virtual environment in ./venv and installs project dependencies.
 Set the environment variable DRY_RUN=1 to print commands without executing
 them. Set INSTALL_ML_DEPS=1 to install optional machine learning libraries
-(numpy, the CPU build of torch, onnxruntime and numba) used by the sequence
-model and style embedding features. ``numpy`` is pinned to versions below 2
-to remain compatible with the project's core dependency constraints.
+(the CPU build of torch, onnxruntime and numba) used by the sequence
+model and style embedding features. NumPy is installed from the project's
+``requirements.txt``, which already pins it to versions below 2 to remain
+compatible with the core dependency constraints.
 
 Safeguards:
 - Validates that ``winget`` exists before attempting installations to avoid
@@ -34,9 +35,9 @@ Modification summary:
 - Perform non-interactive ``winget`` installs by accepting agreements.
 - Refresh the environment after installing Python and warn if the interpreter
   cannot be located.
-- Pin ``numpy`` to versions below 2 when optionally installing machine
-  learning dependencies. The pin avoids conflicts with the project's core
-  dependency constraints which currently expect the 1.x series.
+ - Drop the explicit ``numpy`` installation from optional ML dependencies
+   because ``requirements.txt`` already constrains NumPy to versions
+   below 2, keeping it compatible with the rest of the project.
 - Capture command exit codes in ``Run-Command`` and abort on failure to avoid
   silently continuing after errors.
 #>
@@ -179,7 +180,7 @@ function main {
         Write-Host 'DRY RUN: pip install -r requirements.txt'
         Write-Host 'DRY RUN: pip install -e .'
         if ($env:INSTALL_ML_DEPS -eq '1') {
-            Write-Host 'DRY RUN: pip install "numpy<2"'  # Pin <2 to prevent core dependency conflicts
+            # NumPy is pinned to <2 in requirements.txt, so only ML extras are installed here.
             Write-Host 'DRY RUN: pip install torch --index-url https://download.pytorch.org/whl/cpu'
             Write-Host 'DRY RUN: pip install onnxruntime'
             Write-Host 'DRY RUN: pip install numba'
@@ -191,7 +192,7 @@ function main {
         Run-Command 'pip install -r requirements.txt'
         Run-Command 'pip install -e .'
         if ($env:INSTALL_ML_DEPS -eq '1') {
-            Run-Command 'pip install "numpy<2"'  # Pin <2 to prevent core dependency conflicts
+            # requirements.txt already provides NumPy (<2); install only ML extras.
             Run-Command 'pip install torch --index-url https://download.pytorch.org/whl/cpu'
             Run-Command 'pip install onnxruntime'
             Run-Command 'pip install numba'
