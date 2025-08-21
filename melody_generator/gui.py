@@ -33,12 +33,15 @@ counterpoint generation is delegated to :mod:`melody_generator`.
 #   initialization requirements.
 # * Added a help button next to the style selector linking to
 #   ``README_STYLE_WEIGHTS.md`` for preset vector documentation.
+# * ``_setup_theme`` now logs a warning when the ``clam`` theme is
+#   unavailable, providing visibility into fallback behavior.
 # ---------------------------------------------------------------
 from __future__ import annotations
 
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from typing import Callable, List, Tuple, Dict, Optional, Union
+import logging
 import os
 import threading
 from tempfile import NamedTemporaryFile
@@ -174,8 +177,13 @@ class MelodyGeneratorGUI:
         try:
             self.style.theme_use("clam")
         except tk.TclError:
-            # fall back to default
-            pass
+            # The platform may not ship with the ``clam`` theme. Instead of
+            # failing silently, log a warning so developers know the default
+            # theme will be used. ``warning`` keeps the GUI functional while
+            # surfacing the issue for troubleshooting.
+            logging.getLogger(__name__).warning(
+                "Requested ttk theme 'clam' is unavailable; falling back to the default theme."
+            )
 
         self.dark_mode = True
         self.root.option_add("*Font", "Helvetica 10")
