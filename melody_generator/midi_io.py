@@ -14,6 +14,8 @@ Modification summary
   jitter affects every part of the composition rather than only the melody.
 * Imports from ``mido`` are deferred inside ``create_midi_file`` so the module
   can load even when the optional dependency is missing.
+* ``create_midi_file`` advertises its ``MidiFile`` return type for clearer
+  static type checking and easier inspection in tests.
 
 This module contains the low-level helpers used to render melodies as MIDI and
 open the resulting files with the user's default player. It is separated from
@@ -28,7 +30,12 @@ import math
 import random
 import threading
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import TYPE_CHECKING, List, Optional, Tuple
+
+if TYPE_CHECKING:
+    # ``MidiFile`` is only needed for type checking to avoid requiring the
+    # optional dependency at import time.
+    from mido import MidiFile
 
 from . import (
     CHORDS,
@@ -53,7 +60,7 @@ def create_midi_file(
     chords_separate: bool = True,
     program: int = 0,
     humanize: bool = True,
-    ) -> object:
+    ) -> "MidiFile":
     """Write ``melody`` to ``output_file`` as a MIDI file.
 
     The generated ``MidiFile`` is returned so callers and tests can inspect the
@@ -64,6 +71,12 @@ def create_midi_file(
     directory of ``output_file`` is created automatically so callers may supply
     paths in a new folder without preparing it beforehand. Notes starting a
     measure receive a small velocity accent to provide a subtle rhythmic pulse.
+
+    Returns
+    -------
+    MidiFile
+        In-memory representation of the written file for further inspection or
+        reuse without reloading from disk.
     """
     # ``mido`` is imported lazily so projects depending on this module do not
     # need the optional MIDI dependency unless they actually render files.  A

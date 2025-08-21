@@ -1,9 +1,14 @@
-"""Unit tests for ``midi_io``'s error handling.
+"""Unit tests for ``midi_io``'s behaviour and error handling.
 
-These tests ensure ``create_midi_file`` provides a helpful message when the
-optional ``mido`` dependency is absent.  ``monkeypatch`` is used to simulate the
-module being unavailable so the function's error path can be exercised without
-manipulating the environment.
+The suite verifies two key aspects:
+
+* ``create_midi_file`` returns a ``MidiFile`` instance when the ``mido``
+  dependency is available. This ensures callers can rely on the object type for
+  further processing or inspection without reloading the written file.
+* ``create_midi_file`` provides a helpful message when the optional ``mido``
+  dependency is absent. ``monkeypatch`` simulates the module being unavailable so
+  the function's error path can be exercised without manipulating the
+  environment.
 
 Example
 -------
@@ -23,6 +28,23 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from melody_generator import midi_io  # noqa: E402  # isort:skip
+
+
+def test_create_midi_file_returns_midifile(tmp_path):
+    """``create_midi_file`` should return the ``MidiFile`` object it writes.
+
+    A minimal one-note melody is rendered to a temporary path. The function
+    returns the in-memory ``MidiFile`` instance so callers can further inspect
+    or modify the result without reloading it from disk. The test asserts the
+    returned object is of the expected type.
+    """
+
+    from mido import MidiFile
+
+    out = tmp_path / "song.mid"
+    mid = midi_io.create_midi_file(["C4"], 120, (4, 4), str(out))
+
+    assert isinstance(mid, MidiFile)
 
 
 def test_create_midi_file_missing_mido(monkeypatch, tmp_path):
