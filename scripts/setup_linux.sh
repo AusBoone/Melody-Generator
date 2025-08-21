@@ -17,6 +17,9 @@
 #   * Drop the explicit ``numpy`` installation from optional ML dependencies
 #     because ``requirements.txt`` already constrains NumPy to versions
 #     below 2, keeping it compatible with the rest of the project.
+#   * Invoke ``pip`` through ``python3 -m pip`` inside the virtual
+#     environment so the interpreter's associated installation utility is
+#     always used.
 #
 # Usage:
 #   ./setup_linux.sh
@@ -109,26 +112,30 @@ main() {
 
     if [[ "${DRY_RUN:-0}" == "1" ]]; then
         echo "DRY RUN: source venv/bin/activate"
-        echo "DRY RUN: pip install --upgrade pip"
-        echo "DRY RUN: pip install -r requirements.txt"
-        echo "DRY RUN: pip install -e ."
+        # Show pip operations using the interpreter to avoid ambiguity
+        echo "DRY RUN: python3 -m pip install --upgrade pip"
+        echo "DRY RUN: python3 -m pip install -r requirements.txt"
+        echo "DRY RUN: python3 -m pip install -e ."
         if [[ "${INSTALL_ML_DEPS:-0}" == "1" ]]; then
             # NumPy is pinned to <2 in requirements.txt, so only ML extras are installed here.
-            echo "DRY RUN: pip install torch --index-url https://download.pytorch.org/whl/cpu"
-            echo "DRY RUN: pip install onnxruntime"
-            echo "DRY RUN: pip install numba"
+            echo "DRY RUN: python3 -m pip install torch --index-url https://download.pytorch.org/whl/cpu"
+            echo "DRY RUN: python3 -m pip install onnxruntime"
+            echo "DRY RUN: python3 -m pip install numba"
         fi
     else
         # shellcheck source=/dev/null
         source venv/bin/activate
-        run_cmd pip install --upgrade pip
-        run_cmd pip install -r requirements.txt
-        run_cmd pip install -e .
+        # Using "python3 -m pip" guarantees that the pip corresponding to the
+        # active interpreter handles the installation, avoiding cross-environment
+        # confusion when multiple Python versions exist on the system.
+        run_cmd python3 -m pip install --upgrade pip
+        run_cmd python3 -m pip install -r requirements.txt
+        run_cmd python3 -m pip install -e .
         if [[ "${INSTALL_ML_DEPS:-0}" == "1" ]]; then
             # requirements.txt already provides NumPy (<2); install only ML extras.
-            run_cmd pip install torch --index-url https://download.pytorch.org/whl/cpu
-            run_cmd pip install onnxruntime
-            run_cmd pip install numba
+            run_cmd python3 -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+            run_cmd python3 -m pip install onnxruntime
+            run_cmd python3 -m pip install numba
         fi
         deactivate
     fi
