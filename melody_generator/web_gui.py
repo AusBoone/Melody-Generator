@@ -18,6 +18,9 @@ The latest revision introduces several changes:
   uploaded form data so oversized payloads are rejected early.
 * **Rate limiting** – An in-memory per-IP throttle curbs abusive clients by
   capping requests per minute.
+* **Retry guidance** – When the limit is exceeded the ``429`` response now
+  carries a ``Retry-After`` header indicating how many seconds remain in the
+  current window.
 * **Thread-safe rate limiting** – The throttle now uses a lock for concurrent
   access and purges stale entries each request to bound memory usage.
 """
@@ -115,12 +118,21 @@ try:  # pragma: no cover - optional dependency
 except Exception:
     CeleryTimeoutError = TimeoutError
 
-from flask import Flask, render_template, request, flash, current_app
+from flask import (
+    Flask,
+    render_template,
+    request,
+    flash,
+    current_app,
+    make_response,
+    Response,
+)
 from flask_wtf.csrf import CSRFProtect
 import base64
+import logging
+import math
 import os
 import secrets
-import logging
 from threading import Lock
 
 # Import the core melody generation package dynamically so the
@@ -189,18 +201,20 @@ REQUEST_LOCK = Lock()
 RATE_LIMIT_WINDOW = 60.0
 
 
-def rate_limit() -> Optional[tuple[str, int]]:
+def rate_limit() -> Optional[Response]:
     """Enforce a naive per-IP request limit.
 
     The function is registered as a ``before_request`` hook and consults the
     application configuration for ``RATE_LIMIT_PER_MINUTE``. When the limit is
-    exceeded, a ``429`` response is returned. Missing or invalid configuration
-    disables rate limiting entirely. The log of requests is protected by a
-    :class:`threading.Lock` so concurrent threads cannot corrupt state, and
-    stale entries are purged before each new request is recorded.
+    exceeded, a ``429`` response is returned with a ``Retry-After`` header
+    indicating how long the client should wait before retrying. Missing or
+    invalid configuration disables rate limiting entirely. The log of requests
+    is protected by a :class:`threading.Lock` so concurrent threads cannot
+    corrupt state, and stale entries are purged before each new request is
+    recorded.
 
     Returns:
-        Optional[tuple[str, int]]: Response tuple when the limit is exceeded,
+        Optional[Response]: ``Response`` object when the limit is exceeded,
         otherwise ``None`` to allow the request to proceed.
     """
 
@@ -233,8 +247,16 @@ def rate_limit() -> Optional[tuple[str, int]]:
             return None
 
         if count >= limit:
-            # Limit exceeded; reject the request with HTTP 429.
-            return "Too many requests", 429
+            # Limit exceeded. Build an explicit ``Response`` so we can supply a
+            # ``Retry-After`` header. The remaining time is calculated using
+            # ``math.ceil`` to avoid telling the client to retry immediately
+            # when fractional seconds remain in the window.
+            remaining = math.ceil(
+                max(0.0, RATE_LIMIT_WINDOW - (now - window_start))
+            )
+            response = make_response("Too many requests", 429)
+            response.headers["Retry-After"] = str(remaining)
+            return response
 
         # Increment the counter for this IP within the current window.
         REQUEST_LOG[ip_addr] = (window_start, count + 1)
