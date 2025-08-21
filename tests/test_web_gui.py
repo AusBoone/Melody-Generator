@@ -5,7 +5,9 @@ desktop application. These tests post various form values to the Flask app and
 verify that invalid input is rejected and valid input renders correctly. This
 suite also asserts that required configuration such as ``FLASK_SECRET`` and
 ``CELERY_BROKER_URL`` is enforced in production mode. Recent tests further
-ensure that oversized requests are rejected based on ``MAX_CONTENT_LENGTH``."""
+ensure that oversized requests are rejected based on ``MAX_CONTENT_LENGTH``.
+The suite additionally verifies that preview rendering falls back to
+synchronous generation when the Celery broker is unreachable."""
 
 import importlib
 import os
@@ -738,6 +740,80 @@ def test_delay_arguments_match_preview_parameters(monkeypatch):
     assert called.get("task")
     assert called.get("args") == ()
     assert called.get("kwargs") == expected_params
+
+
+def test_preview_falls_back_on_broker_failure(monkeypatch):
+    """Unreachable brokers should trigger in-process preview rendering."""
+
+    # Point the web GUI at an invalid Celery broker to simulate network
+    # connectivity issues.
+    monkeypatch.setenv("CELERY_BROKER_URL", "amqp://invalid")
+
+    celery_mod = types.ModuleType("celery")
+    called: dict = {}
+
+    class DummyTask:
+        """Task wrapper that raises when dispatched to simulate failure."""
+
+        def __init__(self, fn):
+            self.fn = fn
+
+        def delay(self, **_kw):
+            # Record that the async path was attempted before raising an error
+            # as a real Celery client would when the broker is unreachable.
+            called["delay"] = True
+            raise RuntimeError("broker unreachable")
+
+    class DummyCelery:
+        """Minimal stand-in returning the dummy task."""
+
+        def __init__(self, *a, **k):
+            pass
+
+        def task(self, fn):
+            return DummyTask(fn)
+
+    celery_mod.Celery = DummyCelery
+    monkeypatch.setitem(sys.modules, "celery", celery_mod)
+
+    # Reload the module so it picks up the patched environment variable and the
+    # stub Celery implementation.
+    gui = importlib.reload(importlib.import_module("melody_generator.web_gui"))
+    gui.app.config["WTF_CSRF_ENABLED"] = False
+    client = gui.app.test_client()
+
+    called_sync: dict = {}
+
+    def fake_preview(**_kw):
+        """Return empty preview data and record synchronous execution."""
+
+        called_sync["called"] = True
+        return "", ""
+
+    # Replace the heavy preview generator so the test remains fast and
+    # deterministic.
+    monkeypatch.setattr(gui, "_generate_preview", fake_preview)
+
+    resp = client.post(
+        "/",
+        data={
+            "key": "C",
+            "chords": "C",
+            "bpm": "120",
+            "timesig": "4/4",
+            "notes": "1",
+            "motif_length": "1",
+            "base_octave": "4",
+            "harmony_lines": "1",
+        },
+    )
+
+    assert resp.status_code == 200
+    assert called.get("delay")
+    assert called_sync.get("called")
+    # Users should be informed that the background worker could not be reached
+    # and the preview was generated synchronously instead.
+    assert b"background worker" in resp.data
 
 
 def test_celery_failure_falls_back_to_sync(monkeypatch):
