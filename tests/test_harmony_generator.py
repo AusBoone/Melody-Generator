@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 import types
 import pytest
+import random
 
 # Stub optional GUI/MIDI libs so the package imports cleanly.
 stub_mido = types.ModuleType("mido")
@@ -68,7 +69,8 @@ def _patch_deps(monkeypatch):
 def test_generate_progression_lengths():
     """Progression generator returns chords and rhythm of requested length."""
     harmony = importlib.import_module("melody_generator.harmony_generator")
-    chords, rhythm = harmony.generate_progression("C", length=4)
+    # Use lowercase key to ensure canonicalisation works transparently.
+    chords, rhythm = harmony.generate_progression("c", length=4)
     assert len(chords) == 4
     assert len(rhythm) == 4
 
@@ -78,8 +80,21 @@ def test_degree_to_chord_diminished():
 
     harmony = importlib.import_module("melody_generator.harmony_generator")
     # In C major the leading tone (degree seven) forms a B diminished triad.
-    chord = harmony._degree_to_chord("C", 6)
+    # Pass the key in lowercase to verify case-insensitive handling.
+    chord = harmony._degree_to_chord("c", 6)
     assert chord == "Bdim"
+
+
+def test_generate_progression_canonicalizes_key():
+    """Lowercase keys should yield the same results as uppercase keys."""
+
+    harmony = importlib.import_module("melody_generator.harmony_generator")
+    random.seed(0)
+    chords_upper, rhythm_upper = harmony.generate_progression("C", length=4)
+    random.seed(0)
+    chords_lower, rhythm_lower = harmony.generate_progression("c", length=4)
+    assert chords_upper == chords_lower
+    assert rhythm_upper == rhythm_lower
 
 
 def test_harmony_generator_rule_based():
