@@ -37,6 +37,8 @@ counterpoint generation is delegated to :mod:`melody_generator`.
 #   unavailable, providing visibility into fallback behavior.
 # * Issued warnings when NumPy seeding fails so users understand that missing
 #   the optional dependency limits deterministic behaviour.
+# * Temporary preview files that cannot be deleted now log a warning, making
+#   it clear that melody generation still succeeded even when cleanup fails.
 # ---------------------------------------------------------------
 from __future__ import annotations
 
@@ -977,10 +979,15 @@ class MelodyGeneratorGUI:
             if playback_succeeded:
                 try:
                     os.remove(tmp_path)
-                except OSError:
-                    # Deletion failures aren't critical for preview playback and
-                    # are ignored silently.
-                    pass
+                except OSError as exc:
+                    # Log cleanup issues without interrupting the user. Even if
+                    # the temporary file remains, melody generation succeeded so
+                    # the leftover file can be removed manually later.
+                    logging.getLogger(__name__).warning(
+                        "Could not remove preview file %s; generation succeeded: %s",
+                        tmp_path,
+                        exc,
+                    )
 
     def _open_default_player(self, path: str, *, delete_after: bool = False) -> None:
         """Launch ``path`` in the user's default MIDI player.
