@@ -17,6 +17,8 @@ Modification summary
 * Replaced manual command-line scans for listing keys or chords with an
   ``argparse`` pre-parser so these options operate independently of required
   generation arguments.
+* Logged a warning when NumPy seeding fails so users know determinism may be
+  reduced without the optional dependency.
 
 This module implements the console entry points for the project. The
 ``run_cli`` function parses command line arguments and performs melody
@@ -59,6 +61,30 @@ from .utils import validate_time_signature
 
 
 __all__ = ["run_cli", "main"]
+
+
+def _seed_rng(seed: int) -> None:
+    """Seed Python and NumPy RNGs with logging on failure.
+
+    NumPy is an optional dependency; seeding its generator ensures that any
+    vectorised operations depending on ``numpy.random`` are deterministic when
+    a seed is provided.  If NumPy is unavailable or its seeding fails, only
+    Python's ``random`` module is seeded which may reduce reproducibility.
+
+    @param seed: Integer seed applied to available RNGs.
+    @returns None: Logging warns when NumPy cannot be seeded.
+    """
+
+    random.seed(seed)
+    try:  # pragma: no cover - NumPy may be absent
+        import numpy as _np
+
+        _np.random.seed(seed)
+    except Exception as exc:  # pragma: no cover - log optional dependency issues
+        logging.getLogger(__name__).warning(
+            "NumPy seeding failed; deterministic behaviour may be limited: %s",
+            exc,
+        )
 
 
 def run_cli() -> None:
@@ -183,13 +209,10 @@ def run_cli() -> None:
         sys.exit(1)
 
     if args.seed is not None:
-        random.seed(args.seed)
-        try:  # pragma: no cover - numpy may be absent
-            import numpy as _np
-
-            _np.random.seed(args.seed)
-        except Exception:
-            pass
+        # Seeding both Python and NumPy enables reproducible melody generation
+        # when the optional ``numpy`` dependency is installed. Failure to seed
+        # NumPy is logged so users understand that determinism may be partial.
+        _seed_rng(args.seed)
 
     try:
         from . import (
