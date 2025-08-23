@@ -35,6 +35,8 @@ counterpoint generation is delegated to :mod:`melody_generator`.
 #   ``README_STYLE_WEIGHTS.md`` for preset vector documentation.
 # * ``_setup_theme`` now logs a warning when the ``clam`` theme is
 #   unavailable, providing visibility into fallback behavior.
+# * Issued warnings when NumPy seeding fails so users understand that missing
+#   the optional dependency limits deterministic behaviour.
 # ---------------------------------------------------------------
 from __future__ import annotations
 
@@ -69,6 +71,31 @@ INSTRUMENTS = {
     "Violin": 40,
     "Flute": 73,
 }
+
+
+def _seed_rng(seed: int) -> None:
+    """Seed Python and NumPy RNGs while logging failures.
+
+    NumPy is optional for this project. When present, seeding its random
+    generator alongside Python's ``random`` module ensures full reproducibility
+    for features that leverage NumPy. If the import or seeding fails, a warning
+    is emitted so users know that only Python's RNG was initialised, which may
+    reduce determinism for NumPy-based operations.
+
+    @param seed: Integer applied to available RNGs.
+    @returns None: Logging captures any NumPy seeding issues.
+    """
+
+    random.seed(seed)
+    try:  # pragma: no cover - NumPy may not be installed
+        import numpy as _np
+
+        _np.random.seed(seed)
+    except Exception as exc:  # pragma: no cover - log import/seed failures
+        logging.getLogger(__name__).warning(
+            "NumPy seeding failed; deterministic behaviour may be limited: %s",
+            exc,
+        )
 
 
 class MelodyGeneratorGUI:
@@ -708,13 +735,10 @@ class MelodyGeneratorGUI:
         if seed_val:
             try:
                 seed = int(seed_val)
-                random.seed(seed)
-                try:  # pragma: no cover - numpy optional
-                    import numpy as _np
-
-                    _np.random.seed(seed)
-                except Exception:
-                    pass
+                # Seed Python and, when installed, NumPy to provide fully
+                # deterministic output. Any failure to seed NumPy is logged so
+                # users know why reproducibility might be incomplete.
+                _seed_rng(seed)
             except ValueError:
                 messagebox.showerror("Input Error", "Seed must be an integer")
                 return
@@ -893,13 +917,9 @@ class MelodyGeneratorGUI:
         if seed_val:
             try:
                 seed = int(seed_val)
-                random.seed(seed)
-                try:  # pragma: no cover - numpy optional
-                    import numpy as _np
-
-                    _np.random.seed(seed)
-                except Exception:
-                    pass
+                # Mirror CLI behaviour: seed both RNGs and warn when NumPy is
+                # unavailable so preview results remain transparent to users.
+                _seed_rng(seed)
             except ValueError:
                 messagebox.showerror("Input Error", "Seed must be an integer")
                 return
