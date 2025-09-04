@@ -4,7 +4,7 @@ Purpose: Provide a high-level architecture overview for the Melody Generator pro
 Usage: View in Markdown renderers that support Mermaid to visualize component relationships.
 Assumptions: Diagram abstracts implementation details; consult module docs for specifics.
 
-Update: Expanded the diagram and explanations to cover the validation layer, model and style data inputs, optional Celery worker, and the training pipeline that produces model artifacts.
+Update: Consolidated runtime and training views into a single left-to-right flowchart, added user and platform nodes, and clarified how offline artifacts feed the core engine.
 -->
 
 # Architecture Overview
@@ -12,58 +12,41 @@ Update: Expanded the diagram and explanations to cover the validation layer, mod
 This document outlines the major components of the Melody Generator system and how they interact. It is intended to give newcomers context on the project's structure and supported platforms.
 
 ```mermaid
-flowchart TB
-    subgraph Interfaces
+flowchart LR
+    %% User interaction and runtime generation
+    User((User)) --> Interfaces
+    subgraph Interfaces["User Interfaces"]
         CLI[Command-Line Interface]
         GUI[Desktop GUI]
         WebGUI[Flask Web GUI / API]
     end
+    Interfaces --> Validation[Input Validation]
+    Validation --> Engine[Core Melody Engine]
+    Engine --> Midi[(MIDI Output)]
+    Midi --> Playback[Playback / FluidSynth]
 
-    subgraph Validation["Input Validation"]
-        Params[Parameter Sanitization]
+    %% Offline training artifacts feeding the engine
+    subgraph Training["Offline Training Pipeline"]
+        Dataset[(MIDI Dataset)] --> Preprocess[Preprocessing]
+        Preprocess --> TrainSeq[Train Sequence Model]
+        Preprocess --> TrainStyle[Train Style Embeddings]
+        TrainSeq --> ModelWeights[Sequence Model Weights]
+        TrainStyle --> StyleFiles[Style Weight Files]
     end
+    ModelWeights --> Engine
+    StyleFiles --> Engine
+    SoundFonts[(SoundFonts)] --> Playback
 
-    subgraph CoreEngine["Core Melody Engine"]
-        Harmony[Harmony Generator]
-        Rhythm[Rhythm Engine]
-        Sequence[Sequence Model]
-        Style[Style Embeddings]
-        Melody[Melody Synthesizer]
-    end
-
-    subgraph Data["Model & Style Data"]
-        Styles[Style Weight Files]
-        Models[Sequence Model Weights]
-        SoundFonts[(SoundFonts)]
-    end
-
-    Interfaces --> Validation --> CoreEngine
-    Styles --> Style
-    Models --> Sequence
-    CoreEngine --> MIDI[(MIDI Output)]
-    MIDI --> Playback[Playback / FluidSynth]
-    SoundFonts --> Playback
-
-    subgraph Platforms
+    %% Deployment platforms
+    subgraph Platforms["Execution Platforms"]
         Local[Local Python Runtime]
         Server[Flask Server]
         Docker[Container Image]
         Worker[Celery Worker]
     end
-
     Interfaces <--> Platforms
-    Platforms --> Data
+    Platforms --> Engine
+    Platforms --> Playback
 ```
 
-The CLI and desktop GUI execute locally, while the web interface exposes a REST-style API served by Flask. All interfaces route through a validation layer that sanitizes user parameters before invoking the core melody engine. The engine orchestrates harmony, rhythm, sequence modeling, and style embeddings, drawing on external model and style data. It produces MIDI for playback or export, optionally previewed via FluidSynth. Model weights, style files, and soundfonts live outside the engine but are loaded on demand.
-
-```mermaid
-flowchart LR
-    Dataset[(MIDI Dataset)] --> Preprocess[Preprocessing]
-    Preprocess --> TrainSeq[Train Sequence Model]
-    Preprocess --> TrainStyle[Train Style Embeddings]
-    TrainSeq --> ModelWeights[Sequence Model Weights]
-    TrainStyle --> StyleFiles[Style Weight Files]
-```
-
-Training artifacts such as sequence model weights and style embeddings are produced offline. The runtime architecture above consumes these generated files to bias note selection and timbre.
+The consolidated diagram above illustrates the full lifecycle. The left portion shows the offline training pipeline that generates sequence-model weights and style-embedding files. These artifacts flow into the core melody engine at runtime, where users interact through command-line, desktop, or web interfaces. Input parameters are first sanitized by the validation layer before the core engine orchestrates harmony, rhythm, sequence modeling, and style embeddings. The engine emits MIDI data, which can be rendered through FluidSynth or saved for later use. Soundfonts feed directly into the playback stage, while the various execution platforms host both interface and playback components as needed.
