@@ -17,6 +17,10 @@ additional background on how the system works or how to configure audio playback
   project for classical performers and composers.
 - [Training Larger Models](README_TRAINING.md) – Guide for fitting
   Transformer/ VAE models on genre-specific MIDI datasets.
+- [Development Guide](README_DEVELOPMENT.md) – Coding standards, testing
+  strategy and release process for contributors.
+- [Troubleshooting & FAQ](README_TROUBLESHOOTING.md) – Practical fixes for
+  installation, audio and deployment issues.
 
 Each document is self-contained so you can jump directly to the topic that
 interests you.

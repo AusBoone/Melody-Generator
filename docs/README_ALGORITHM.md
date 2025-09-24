@@ -19,6 +19,10 @@ overview of the process.
 11. [Complexity Analysis](#complexity-analysis)
 12. [Further Reading](#further-reading)
 
+> **Design Summary** – This revision clarifies how the heuristic engine maps
+> tonic/predominant/dominant functions, treats cadential formulas (authentic,
+> half, plagal and deceptive) and enforces classical voice-leading resolutions.
+
 ## Overview
 
 At a high level the algorithm constructs a short motif and repeats it with small
@@ -65,8 +69,32 @@ additional bias toward smooth contours and genre-specific styles.
 9. **Final Cadence** – The melody's last note is forced to the root of the
    final chord to provide a simple resolution.
 10. **Optional Parts** – Additional helper functions create harmony lines,
-   counterpoint melodies and chord tracks. These follow the same scale and chord
-   rules so they blend with the main melody.
+    counterpoint melodies and chord tracks. These follow the same scale and chord
+    rules so they blend with the main melody.
+
+### Functional Harmony & Cadences
+
+The restriction to chord-aware note pools is complemented by a lightweight
+functional harmony module:
+
+- **Function Labelling** – Each chord in the progression is mapped to tonic (T),
+  predominant (PD) or dominant (D) function. Applied dominants (e.g., `V/ii`)
+  are classified as dominant, while modal mixture chords (♭VI in major) inherit
+  predominant behaviour.
+- **Cadential Preparation** – When the planner detects a D→T motion at the end
+  of a phrase, it prioritises ^2–^1 or ^7–^1 soprano motion to deliver a perfect
+  authentic cadence. Predominant→Dominant transitions near mid-phrase trigger
+  half cadences with ^2 or ^5 in the melody.
+- **Plagal Option** – If the optional plagal cadence flag is set, the final
+  measure inserts IV before I and the melody resolves ^4–^3–^1 to approximate
+  Anglican-chorale endings.
+- **Deceptive Cadence Handling** – Progressions containing `V → vi` mark the
+  bass for 5→6 motion while the melody favours ^3→^6, ensuring the deceptive
+  resolution sounds intentional rather than erroneous.
+- **Augmented-Sixth and Leading-Tone Diminished Chords** – Altered predominant
+  chords (Ger+6, Fr+6, viio7/V) expose raised scale degrees. The candidate pools
+  include the necessary chromatic notes and enforce their classical resolutions
+  (e.g., ♯^4 resolves to ^5).
 
 ## Pseudocode
 
@@ -115,6 +143,21 @@ Intervals of seven semitones or larger are treated as leaps. The variable
 ``leap_dir`` stores their direction so the following note can bias motion back
 toward the center of the melody. This keeps the overall contour smooth even when
 large jumps occur.
+
+**Voice-Leading Safeguards**
+
+The generator maintains common-practice counterpoint constraints even when
+chromatic alterations are present:
+
+- Perfect intervals approached by similar motion trigger a penalty weight to
+  discourage hidden fifths and octaves between melody and bass voices.
+- Suspensions are prepared and resolved according to their species. For example,
+  a 4–3 suspension requires the preceding note to match the suspended pitch and
+  resolves downward by step.
+- Melodic sevenths resolve downward unless the active style vector explicitly
+  relaxes the rule for jazz-inspired lines.
+- In minor keys, raised leading tones are respelled enharmonically to avoid
+  augmented seconds, mirroring melodic minor practice.
 
 **Overall Contour**
 The phrase is intentionally asymmetrical. The first half trends upward by

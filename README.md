@@ -6,12 +6,44 @@ file for use in digital audio workstations. For a formal exposition of the algor
 
 ## Documentation
 
-The [docs/README.md](docs/README.md) index links to the algorithm description,
-setup guide, FluidSynth notes and soundfont resources. Separate guides cover
-the machine learning components used for style embeddings and sequence models
-([docs/README_ML_CONCEPTS.md](docs/README_ML_CONCEPTS.md)) and offer a brief
-musician's perspective
-([docs/README_MUSICAL_OVERVIEW.md](docs/README_MUSICAL_OVERVIEW.md)).
+The [docs/README.md](docs/README.md) index links to deep dives on the
+generation algorithm, setup automation, audio dependencies and optional
+machine-learning features. It now also includes focused guides for development
+workflow and troubleshooting the most common runtime issues so you can move
+from installation to experimentation without guesswork.
+
+If you are unsure where to begin, skim the [Quick Start](#quick-start)
+checklist below and then consult the dedicated guides when you need additional
+background information.
+
+## Quick Start
+
+The following flow walks through the minimum steps required to generate your
+first melody and verify that audio playback works end-to-end:
+
+1. **Install system dependencies** – Ensure Python 3.10+ is available and, if
+   you want audio previews, install FluidSynth together with at least one
+   General MIDI soundfont (see
+   [docs/README_FLUIDSYNTH.md](docs/README_FLUIDSYNTH.md)).
+2. **Create and activate a virtual environment** – Avoid polluting your global
+   interpreter by running `python -m venv .venv` followed by
+   `source .venv/bin/activate` (or `.venv\Scripts\activate` on Windows).
+3. **Install the package** – Run `pip install .` from the repository root. Use
+   `pip install -e .` instead if you plan to edit the codebase.
+4. **Verify the CLI** – Execute `melody-generator --list-keys` to confirm the
+   command-line entry point is on your `PATH` and the Python package imports
+   correctly.
+5. **Launch the GUI** – Run `melody-generator` with no arguments, change a few
+   parameters and click **Preview Melody**. If audio fails to play back, refer
+   to [docs/README_TROUBLESHOOTING.md](docs/README_TROUBLESHOOTING.md) for
+   platform-specific fixes.
+6. **Explore advanced features** – Enable **Use ML Model** and select a style
+   such as `blues` or `retro_chip` to hear how the optional PyTorch model
+   changes the generated phrases.
+
+This process ensures the core components (Python environment, optional audio
+tooling and entry points) work before you dive deeper into customization or
+deployment.
 
 ## Getting Started
 
@@ -86,6 +118,36 @@ musician's perspective
 - Sequence models cached to avoid reloading weights from disk
 - Cross-platform setup scripts ship with executable permissions for one-step
   installation
+
+## Architecture Overview
+
+Melody-Generator is deliberately modular so you can adopt only the pieces that
+fit your workflow:
+
+- **Core engine (`melody_generator/generator.py`)** – Implements the
+  rule-based heuristics for melody, harmony and counterpoint generation. The
+  module exposes helpers for selecting scales, weighting notes and exporting
+  MIDI files.
+- **Style layer (`melody_generator/style`)** – Provides optional PyTorch-based
+  sequence models and embedding loaders that bias note selection toward a
+  genre. If PyTorch or NumPy are unavailable the engine falls back to the
+  deterministic heuristics without failing.
+- **User interfaces** –
+  - **CLI (`melody_generator/__main__.py`)** drives the generator through a
+    comprehensive set of arguments intended for automation.
+  - **Desktop GUI (`melody_generator/gui.py`)** wraps the engine in a Tkinter
+    application with live preview controls.
+  - **Web interface (`melody_generator/web_gui`)** exposes the same controls
+    over HTTP via Flask and optionally delegates audio rendering to Celery
+    workers.
+- **Supporting utilities** – Shared helpers handle persistence of user
+  settings, MIDI playback fallbacks and dataset loading for training custom
+  models.
+
+Understanding this separation makes it easier to extend the system. For
+instance, you can build a custom front-end by importing the generator module or
+swap in a new ML model by updating the style layer while leaving the CLI/GUI
+unchanged.
 
 # Requirements
 - Python 3.x
@@ -240,6 +302,25 @@ gunicorn 'melody_generator.web_gui:create_app()'
    server falls back to synchronous generation so your request still succeeds.
 
 
+## Verifying Your Installation
+
+After completing the Quick Start steps you can run the following commands to
+ensure everything is wired up correctly:
+
+- `pytest` – Executes nearly 300 unit tests that cover the generator, CLI/GUI
+  integrations and web endpoints. A passing run confirms the package and its
+  mocked dependencies are importable.
+- `ruff check .` – Lints the repository using the project's configuration in
+  `ruff.toml`. Running the linter ensures your local editor and CI environment
+  agree on formatting and style.
+- `python -m melody_generator.web_gui` – Starts the Flask development server.
+  Open `http://localhost:5000` and submit a form to confirm Celery fallbacks
+  and audio previews behave as expected.
+
+If any of these commands fail, consult the
+[Troubleshooting guide](docs/README_TROUBLESHOOTING.md) for diagnostic steps.
+
+
 ## Docker Usage
 Build the image and run the web interface:
 ```bash
@@ -303,6 +384,9 @@ ruff check .
 The linter is configured via `ruff.toml`, which enforces a 100 character
 line length and targets Python 3.10. Adjust this file if different rules
 are required.
+
+For a deeper dive into module responsibilities, testing strategy and release
+management, read [docs/README_DEVELOPMENT.md](docs/README_DEVELOPMENT.md).
 
 ## Continuous Integration
 
