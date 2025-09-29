@@ -322,14 +322,89 @@ If any of these commands fail, consult the
 
 
 ## Docker Usage
-Build the image and run the web interface:
+Melody-Generator ships with a fully configured `Dockerfile` that installs the
+Python dependencies together with FluidSynth and a General MIDI soundfont so the
+web preview works out of the box. This section walks through building and
+running the container as well as the most common configuration knobs.
+
+### Prerequisites
+- Docker Engine 20.10+ (or a compatible runtime such as Podman).
+- At least 1 GB of free disk space for the base Python image and installed
+  dependencies.
+
+### Build the image
+Build the image from the project root:
+
 ```bash
 docker build -t melody-generator .
-docker run -p 5000:5000 melody-generator
 ```
 
-The container launches the Flask server so you can open `http://localhost:5000`
-and use the web interface without installing Python locally.
+The build installs the packages listed in `requirements.txt` and configures the
+container entry point to launch the Flask web interface
+(`python -m melody_generator.web_gui`).
+
+### Run the web interface
+Start the container and expose the Flask development server on port 5000:
+
+```bash
+docker run --rm -p 5000:5000 melody-generator
+```
+
+This command binds the container's port 5000 to the same port on the host so
+you can open `http://localhost:5000` and use the web UI without installing
+Python locally.
+
+### Configure environment variables
+The web interface reads a handful of environment variables for production
+deployments:
+
+- `FLASK_SECRET` – Session signing key. Required when running with Flask debug
+  mode disabled. A random key is generated automatically for development runs,
+  but sessions will reset between container restarts.
+- `CELERY_BROKER_URL` – Connection string for the optional Celery worker used to
+  render previews asynchronously. Required in production mode. Omit the
+  variable to use the in-memory broker for local experiments.
+- `MAX_UPLOAD_MB` – Maximum request size (defaults to 5 MB). Increase this if
+  you expect larger form submissions.
+- `RATE_LIMIT_PER_MINUTE` – Optional integer throttle applied per client IP.
+
+You can pass these variables to `docker run` with repeated `-e` flags, for
+example:
+
+```bash
+docker run --rm -p 5000:5000 \
+    -e FLASK_SECRET="change-me" \
+    -e CELERY_BROKER_URL="redis://redis:6379/0" \
+    melody-generator
+```
+
+Set `FLASK_DEBUG=1` or `FLASK_ENV=development` if you want Flask's live reload
+inside the container.
+
+### Persist generated files
+Any MIDI files exported through the container live inside `/app`. Mount a host
+directory if you want to keep them after the container exits:
+
+```bash
+docker run --rm -p 5000:5000 \
+    -v "$(pwd)/exports:/app/exports" \
+    melody-generator
+```
+
+The web interface saves downloads to a temporary directory by default, but the
+volume mount ensures anything you explicitly export within `/app/exports`
+survives container restarts.
+
+### Command-line usage inside the container
+The image also bundles the CLI entry point. Use `docker run` with `--entrypoint`
+to access it without running the web server:
+
+```bash
+docker run --rm -it --entrypoint python melody-generator -m melody_generator.cli --help
+```
+
+Refer to [docs/README_DOCKER.md](docs/README_DOCKER.md) for an end-to-end
+workflow covering multi-container setups and troubleshooting.
 
 # Parameters
 - **Key**: Enter the key for the melody (e.g., C, C#, Dm, etc.). Both major and minor keys are supported.
