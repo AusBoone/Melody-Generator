@@ -15,7 +15,8 @@ dimensions trigger clear ``ValueError`` exceptions.
 
 ``STYLE_VECTORS`` is now defined unconditionally for better static analysis and
 helper functions return copies rather than references so callers cannot mutate
-module-level state by accident.
+module-level state by accident. The built-in presets now include ``blues`` and
+``chiptune`` so the defaults match the documentation and CLI examples.
 """
 
 # ---------------------------------------------------------------
@@ -26,6 +27,8 @@ module-level state by accident.
 # * Module-wide style state now relies on ``contextvars.ContextVar`` so threads
 #   and asyncio tasks each maintain independent style vectors without
 #   interference.
+# * Added built-in ``blues`` and ``chiptune`` presets so defaults align with
+#   ``docs/README_STYLE_WEIGHTS.md`` and the example configuration files.
 # ---------------------------------------------------------------
 
 from __future__ import annotations
@@ -48,16 +51,26 @@ USE_NUMPY = np is not None
 # see a single assignment.
 STYLE_VECTORS: Dict[str, Sequence[float]]
 if USE_NUMPY:
+    # Preset vectors cover multiple musical aesthetics so newcomers can hear
+    # stylistic differences without crafting their own embeddings immediately.
     STYLE_VECTORS = {
         "baroque": np.array([1.0, 0.0, 0.0], dtype=float),
         "jazz": np.array([0.0, 1.0, 0.0], dtype=float),
         "pop": np.array([0.0, 0.0, 1.0], dtype=float),
+        # ``blues`` emphasises expressive bends and chromatic colouration while
+        # maintaining a modest hook density to keep the groove grounded.
+        "blues": np.array([0.5, 0.4, 0.1], dtype=float),
+        # ``chiptune`` leans on bright harmonic colouration with tight hooks to
+        # mimic retro game soundtracks where melodic loops are concise.
+        "chiptune": np.array([0.1, 0.8, 0.1], dtype=float),
     }
 else:
     STYLE_VECTORS = {
         "baroque": [1.0, 0.0, 0.0],
         "jazz": [0.0, 1.0, 0.0],
         "pop": [0.0, 0.0, 1.0],
+        "blues": [0.5, 0.4, 0.1],
+        "chiptune": [0.1, 0.8, 0.1],
     }
 
 # Track the dimensionality of the embedding space. This value is updated when

@@ -40,6 +40,23 @@ sys.modules.setdefault("mido", stub_mido)
 style = importlib.import_module("melody_generator.style_embeddings")
 
 
+def test_builtin_style_vectors_match_documentation():
+    """Default presets should match the values advertised in the docs."""
+
+    # The README documents five starter presets so ensure the implementation
+    # ships with identical vectors. ``list`` normalises NumPy arrays and Python
+    # lists for comparison.
+    expected = {
+        "baroque": [1.0, 0.0, 0.0],
+        "jazz": [0.0, 1.0, 0.0],
+        "pop": [0.0, 0.0, 1.0],
+        "blues": [0.5, 0.4, 0.1],
+        "chiptune": [0.1, 0.8, 0.1],
+    }
+    for name, values in expected.items():
+        assert list(style.get_style_vector(name)) == values
+
+
 def test_style_vector_lookup():
     """Known style names should return fixed-length vectors."""
     vec = style.get_style_vector("jazz")
