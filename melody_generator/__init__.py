@@ -97,6 +97,10 @@ __version__ = "0.1.0"
 # * Melody generation caches candidate note pools for each chord to avoid
 #   repeated list construction and adds an optional ``structure`` parameter for
 #   repeating sections.
+# * Section-based generation now forwards advanced options (style, ML models,
+#   phrase planning, tritone filtering and refinement) to each sub-call and
+#   slices the supplied :class:`PhrasePlan` so every section respects the same
+#   pitch range and tension curve.
 # * MIDI output uses a crescendo-decrescendo velocity curve with downbeat
 #   accents for a more musical performance.
 # * Candidate weighting now uses a simple transition matrix and the final note
@@ -1008,10 +1012,29 @@ def generate_melody(
 
         sections: dict[str, List[str]] = {}
         final: List[str] = []
+        offset = 0
         for i, label in enumerate(structure):
             # ``length`` for this segment equals the base size plus one if any
             # leftover notes remain to be distributed.
             length = seg_len + (1 if i < remainder else 0)
+
+            # Derive a section-specific phrase plan so the recursive call keeps
+            # the same pitch limits and tension profile as the parent request.
+            segment_plan: Optional[PhrasePlan] = None
+            if phrase_plan is not None:
+                tension_slice = phrase_plan.tension_profile[offset : offset + length]
+                if not tension_slice:
+                    # Degenerate plans fall back to a neutral contour so the
+                    # recursion still receives a usable profile.
+                    tension_slice = [0.5] * length
+                elif len(tension_slice) < length:
+                    # Pad with the last known value when rounding causes the
+                    # slice to undershoot by a few notes.
+                    tension_slice = tension_slice + [tension_slice[-1]] * (
+                        length - len(tension_slice)
+                    )
+                segment_plan = PhrasePlan(length, phrase_plan.pitch_range, tension_slice)
+
             if label not in sections:
                 seg = generate_melody(
                     key,
@@ -1022,11 +1045,18 @@ def generate_melody(
                     pattern=pattern,
                     base_octave=base_octave,
                     structure=None,
+                    allow_tritone=allow_tritone,
+                    phrase_plan=segment_plan,
+                    sequence_model=sequence_model,
+                    rhythm_generator=rhythm_generator,
+                    style=style,
+                    refine=refine,
                 )
                 sections[label] = seg
             else:
                 seg = [_mutate(n) for n in sections[label][:length]]
             final.extend(seg)
+            offset += length
         return final[:num_notes]
 
     # Current octave offset relative to ``base_octave``. This may shift by

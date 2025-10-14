@@ -760,6 +760,118 @@ def test_generate_melody_invalid_structure():
         generate_melody("C", 8, chords, motif_length=4, structure="A1B")
 
 
+def test_generate_melody_structure_propagates_options(monkeypatch):
+    """Sectional generation should honour advanced options for each segment."""
+
+    original_generate = melody_generator.generate_melody
+    captured_calls: list[dict[str, object]] = []
+
+    def recording_generate(key, num_notes, chord_progression, *args, **kwargs):
+        """Record every invocation (top-level and recursive)."""
+
+        captured_calls.append(
+            {
+                "structure": kwargs.get("structure"),
+                "sequence_model": kwargs.get("sequence_model"),
+                "rhythm_generator": kwargs.get("rhythm_generator"),
+                "allow_tritone": kwargs.get("allow_tritone"),
+                "refine": kwargs.get("refine"),
+                "phrase_plan": kwargs.get("phrase_plan"),
+                "style": kwargs.get("style"),
+            }
+        )
+        return original_generate(key, num_notes, chord_progression, *args, **kwargs)
+
+    monkeypatch.setattr(melody_generator, "generate_melody", recording_generate)
+
+    class DummyModel:
+        """Sequence model stub counting predict invocations."""
+
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def predict_logits(self, history):  # pragma: no cover - thin wrapper
+            self.calls += 1
+            return [0.0] * len(melody_generator.SCALE["C"])
+
+    dummy_model = DummyModel()
+
+    class DummyRhythm:
+        """Rhythm generator stub to verify argument forwarding."""
+
+        def __init__(self) -> None:
+            self.calls: list[int] = []
+
+        def generate(self, length: int) -> list[float]:
+            self.calls.append(length)
+            return [0.25] * length
+
+    dummy_rhythm = DummyRhythm()
+
+    style_calls: list[str] = []
+    real_get_style = melody_generator.get_style_vector
+
+    def fake_get_style(name: str):
+        """Return the real vector while tracking how often it is requested."""
+
+        style_calls.append(name)
+        return real_get_style(name)
+
+    monkeypatch.setattr(melody_generator, "get_style_vector", fake_get_style)
+
+    refine_calls: list[list[str]] = []
+
+    def fake_refine(melody, key, chord_prog, base_octave):
+        """Capture refinement passes without altering the melody."""
+
+        refine_calls.append(list(melody))
+        return melody
+
+    monkeypatch.setattr(melody_generator, "refine_with_fmd", fake_refine)
+
+    phrase_plan = melody_generator.PhrasePlan(
+        length=12,
+        pitch_range=(3, 5),
+        tension_profile=[i / 11 for i in range(12)],
+    )
+
+    melody = melody_generator.generate_melody(
+        "C",
+        12,
+        ["C", "G"],
+        motif_length=2,
+        structure="AB",
+        sequence_model=dummy_model,
+        rhythm_generator=dummy_rhythm,
+        allow_tritone=True,
+        phrase_plan=phrase_plan,
+        style="baroque",
+        refine=True,
+    )
+
+    assert len(melody) == 12
+    assert len(captured_calls) == 3
+
+    segment_calls = captured_calls[1:]
+    for call in segment_calls:
+        assert call["structure"] is None
+        assert call["sequence_model"] is dummy_model
+        assert call["rhythm_generator"] is dummy_rhythm
+        assert call["allow_tritone"] is True
+        assert call["refine"] is True
+        assert call["style"] == "baroque"
+        assert isinstance(call["phrase_plan"], melody_generator.PhrasePlan)
+        assert call["phrase_plan"].length == 6
+
+    first_plan, second_plan = (call["phrase_plan"] for call in segment_calls)
+    assert list(first_plan.tension_profile) == [i / 11 for i in range(6)]
+    assert list(second_plan.tension_profile) == [i / 11 for i in range(6, 12)]
+
+    assert len(refine_calls) == 2
+    assert len(style_calls) >= 2
+    assert dummy_model.calls > 0
+
+
 def test_velocity_accent_on_downbeats(tmp_path):
     """Downbeat notes receive a velocity boost."""
 
