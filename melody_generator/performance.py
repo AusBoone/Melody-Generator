@@ -6,6 +6,16 @@ for collecting ``cProfile`` statistics.  ``NumPy`` and ``Numba`` are detected
 at runtime so the algorithms can accelerate themselves transparently when
 available without adding hard dependencies.
 
+Summary of recent changes
+-------------------------
+* ``compute_base_weights`` validates that ``intervals`` and ``chord_mask`` are
+  aligned sequences of equal length and rejects negative interval magnitudes so
+  misuse surfaces as descriptive ``ValueError`` exceptions rather than obscure
+  ``IndexError`` failures inside the weighting loop.
+* ``profile`` accepts ``sort_by`` and ``limit`` keyword arguments so callers can
+  tailor how profiling results are presented, and both parameters are validated
+  eagerly for clearer error handling.
+
 Example
 -------
 >>> compute_base_weights([2, 4], [True, False], 2)
@@ -91,30 +101,93 @@ else:
         return result
 
 
-def compute_base_weights(intervals, chord_mask, prev_interval):
+def compute_base_weights(intervals, chord_mask, prev_interval=None):
     """Return Markov-style weights for candidate intervals.
 
     Parameters
     ----------
     intervals:
         Absolute interval sizes from the previous note. Can be a list or
-        ``numpy.ndarray``.
+        ``numpy.ndarray``. Values must be non-negative and the collection must
+        remain aligned with ``chord_mask``.
     chord_mask:
-        Boolean mask indicating which candidates are chord tones.
+        Boolean mask indicating which candidates are chord tones. Values are
+        coerced to integers so any truthy/falsy objects are acceptable.
     prev_interval:
-        Size of the previous melodic interval. ``-1`` means no prior interval.
+        Size of the previous melodic interval. ``None`` or ``-1`` signal the
+        absence of context.
     """
 
+    # Normalise the ``prev_interval`` input so downstream weighting logic only
+    # needs to handle a single sentinel value. ``None`` is equivalent to ``-1``
+    # (meaning “no previous interval”). Any other negative values are rejected
+    # as they would imply impossible interval sizes.
+    if prev_interval is None:
+        prev_interval = -1
+    try:
+        prev_interval_val = float(prev_interval)
+    except (TypeError, ValueError) as exc:  # pragma: no cover - defensive
+        raise ValueError("prev_interval must be numeric or None") from exc
+    if prev_interval_val < 0 and prev_interval_val != -1:
+        raise ValueError("prev_interval must be -1 or non-negative")
+
     if np is not None:
-        arr = np.array(intervals, dtype=np.float64)
-        mask = np.array(chord_mask, dtype=np.uint8)
-        return _jit_weights(arr, mask, float(prev_interval if prev_interval is not None else -1)).tolist()
-    return _jit_weights(intervals, chord_mask, float(prev_interval if prev_interval is not None else -1))
+        # ``np.asarray`` ensures generators are fully realised and provides a
+        # consistent ``ndarray`` interface for validation and JIT execution.
+        interval_seq = list(intervals)
+        mask_seq = list(chord_mask)
+        arr = np.asarray(interval_seq, dtype=np.float64)
+        mask = np.asarray(mask_seq, dtype=np.uint8)
+
+        if arr.ndim != 1 or mask.ndim != 1:
+            raise ValueError("intervals and chord_mask must be one-dimensional sequences")
+        if arr.shape[0] != mask.shape[0]:
+            raise ValueError("intervals and chord_mask must be the same length")
+        if (arr < 0).any():
+            raise ValueError("interval values must be non-negative")
+
+        return _jit_weights(arr, mask, prev_interval_val).tolist()
+
+    # Without NumPy we perform equivalent validation using pure Python lists so
+    # behaviour remains consistent across optional dependency configurations.
+    interval_list = list(intervals)
+    mask_list = [bool(val) for val in chord_mask]
+    if len(interval_list) != len(mask_list):
+        raise ValueError("intervals and chord_mask must be the same length")
+    if any(val < 0 for val in interval_list):
+        raise ValueError("interval values must be non-negative")
+
+    return _jit_weights(interval_list, mask_list, prev_interval_val)
 
 
 @contextmanager
-def profile(output: Optional[io.TextIOBase] = None):
-    """Context manager that records cProfile statistics for a block."""
+def profile(
+    output: Optional[io.TextIOBase] = None,
+    *,
+    sort_by: str = "cumulative",
+    limit: Optional[int] = 20,
+):
+    """Context manager that records cProfile statistics for a block.
+
+    Parameters
+    ----------
+    output:
+        File-like object that receives the profiling report. When ``None`` the
+        report is suppressed but the caller still receives the raw
+        :class:`cProfile.Profile` object for manual inspection.
+    sort_by:
+        Sort key forwarded to :meth:`pstats.Stats.sort_stats`. Common values are
+        ``"cumulative"`` and ``"time"``.
+    limit:
+        Optional cap on how many functions are displayed in the printed report.
+        ``None`` prints the entire table. Values must be positive when
+        provided.
+    """
+
+    if limit is not None and limit <= 0:
+        raise ValueError("limit must be None or a positive integer")
+    if not isinstance(sort_by, str) or not sort_by:
+        raise ValueError("sort_by must be a non-empty string")
 
     pr = cProfile.Profile()
     pr.enable()
@@ -123,7 +196,10 @@ def profile(output: Optional[io.TextIOBase] = None):
     finally:
         pr.disable()
         if output is not None:
-            stats = pstats.Stats(pr, stream=output).strip_dirs().sort_stats("cumulative")
-            stats.print_stats(20)
+            stats = pstats.Stats(pr, stream=output).strip_dirs().sort_stats(sort_by)
+            if limit is None:
+                stats.print_stats()
+            else:
+                stats.print_stats(limit)
 
 

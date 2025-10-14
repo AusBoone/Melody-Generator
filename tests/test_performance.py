@@ -63,3 +63,57 @@ def test_profile_context_records_stats():
     assert pr.getstats()
     assert "sum" in out.getvalue()
 
+
+def test_compute_base_weights_validates_lengths():
+    """Mismatched interval/mask lengths should raise ``ValueError``."""
+
+    perf = importlib.import_module("melody_generator.performance")
+
+    with pytest.raises(ValueError):
+        # Provide an extra mask entry to trigger the alignment validation.
+        perf.compute_base_weights([0, 2], [True, False, True], prev_interval=1)
+
+
+def test_compute_base_weights_rejects_negative_intervals():
+    """Negative interval magnitudes are invalid and should error."""
+
+    perf = importlib.import_module("melody_generator.performance")
+
+    with pytest.raises(ValueError):
+        # Negative magnitudes imply an error in the caller's preprocessing.
+        perf.compute_base_weights([-1, 2], [True, False], prev_interval=1)
+
+
+def test_profile_honours_limit_argument(monkeypatch):
+    """Custom ``limit`` should be forwarded to ``pstats.Stats.print_stats``."""
+
+    perf = importlib.import_module("melody_generator.performance")
+
+    import pstats
+
+    captured = {}
+
+    def fake_print_stats(self, *args, **kwargs):
+        """Record arguments passed to ``print_stats`` for assertion."""
+
+        captured["args"] = args
+        captured["kwargs"] = kwargs
+        return original_print_stats(self, *args, **kwargs)
+
+    original_print_stats = pstats.Stats.print_stats
+    monkeypatch.setattr(pstats.Stats, "print_stats", fake_print_stats)
+
+    out = io.StringIO()
+    with perf.profile(out, limit=5) as pr:
+        sum(range(5))
+    assert pr.getstats()
+    # ``args`` should contain the custom limit value provided above.
+    assert captured.get("args") == (5,)
+
+    # ``limit=None`` should call ``print_stats`` with no positional arguments.
+    captured.clear()
+    with perf.profile(out, limit=None) as pr:
+        sum(range(6))
+    assert pr.getstats()
+    assert captured.get("args") == ()
+
