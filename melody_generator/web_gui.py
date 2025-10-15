@@ -218,9 +218,36 @@ def rate_limit() -> Optional[Response]:
         otherwise ``None`` to allow the request to proceed.
     """
 
-    limit = current_app.config.get("RATE_LIMIT_PER_MINUTE")
-    if not limit:
-        # Rate limiting is disabled when the limit is unset or zero.
+    limit_raw = current_app.config.get("RATE_LIMIT_PER_MINUTE")
+    if limit_raw is None:
+        # Configuration missing – treat as disabled so deployments that do not
+        # opt in to throttling behave exactly as before the rate limiter was
+        # introduced.
+        return None
+
+    try:
+        # ``int`` handles ``bool`` and string representations of integers. The
+        # conversion occurs before validation so values such as ``"10"`` are
+        # accepted while clearly invalid inputs (``"fast"`` or complex objects)
+        # trigger the ``ValueError`` path below.
+        limit = int(limit_raw)
+    except (TypeError, ValueError):
+        logger.warning(
+            "Invalid RATE_LIMIT_PER_MINUTE %r; disabling rate limiting", limit_raw
+        )
+        return None
+
+    if limit <= 0:
+        # ``0`` is treated as “disabled” while negative values are rejected as
+        # invalid. In both cases we fall back to allowing the request through so
+        # a misconfiguration never blocks legitimate traffic. Only log when the
+        # value is negative to avoid noisy warnings for installations that
+        # intentionally set the limit to zero.
+        if limit < 0:
+            logger.warning(
+                "RATE_LIMIT_PER_MINUTE must be positive; disabling rate limiting (received %r)",
+                limit_raw,
+            )
         return None
 
     now = monotonic()

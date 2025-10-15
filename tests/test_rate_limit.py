@@ -1,11 +1,14 @@
-"""Tests for the ``rate_limit`` helper.
+"""Rate limiter tests for the Flask web interface.
 
-These tests verify that the in-memory request log used by the Flask web
-interface remains correct under normal conditions, purges stale entries and
-handles concurrent access safely.
+Alongside the baseline behaviour, these tests ensure configuration errors do
+not inadvertently throttle legitimate requests. When the limit is missing or
+malformed, the helper should disable throttling and emit a warning instead of
+returning HTTP 429 responses. This matches the project's emphasis on clear
+operator feedback without sacrificing usability.
 """
 
 import threading
+import logging
 
 import test_web_gui as web_gui_tests
 
@@ -66,3 +69,23 @@ def test_rate_limit_thread_safety() -> None:
         thread.join()
 
     assert web_gui.REQUEST_LOG[ip_addr][1] == 10
+
+
+def test_rate_limit_negative_config_disables(caplog) -> None:
+    """Negative configuration values disable the limiter with a warning."""
+
+    caplog.set_level(logging.WARNING)
+    app.config["RATE_LIMIT_PER_MINUTE"] = -5
+    client = app.test_client()
+    assert client.get("/").status_code == 200
+    assert "disabling rate limiting" in caplog.text
+
+
+def test_rate_limit_non_numeric_config_disables(caplog) -> None:
+    """Non-numeric configuration values should not trigger throttling."""
+
+    caplog.set_level(logging.WARNING)
+    app.config["RATE_LIMIT_PER_MINUTE"] = "fast"
+    client = app.test_client()
+    assert client.get("/").status_code == 200
+    assert "Invalid RATE_LIMIT_PER_MINUTE" in caplog.text
