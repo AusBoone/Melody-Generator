@@ -6,6 +6,12 @@ functions here provide a simple mapping from interval sizes to tension
 values and expose helpers for adjusting selection weights during melody
 generation.
 
+Summary of recent changes
+-------------------------
+* ``apply_tension_weights`` now validates that ``weights`` and ``tensions`` are
+  non-empty sequences of matching length so mistakes surface as clear
+  ``ValueError`` exceptions instead of silent truncation.
+
 Example
 -------
 >>> weights = [1.0, 1.0, 1.0]
@@ -75,6 +81,11 @@ def apply_tension_weights(
         Adjusted weights. If ``weights`` is a ``numpy.ndarray`` the returned
         object will also be an array; otherwise a new list is produced.
 
+    Raises
+    ------
+    ValueError
+        If ``weights`` and ``tensions`` are empty or their lengths differ.
+
     Notes
     -----
     NumPy arrays are detected explicitly using :func:`isinstance` so that
@@ -82,12 +93,33 @@ def apply_tension_weights(
     inputs fall back to a pure Python list comprehension.
     """
 
-    # Compute scaling values that bias tensions toward the desired target.
-    values = [1 / (1 + abs(t - target)) for t in tensions]
+    # Convert ``tensions`` to a concrete list so we can validate its contents,
+    # reuse it multiple times and produce helpful error messages when callers
+    # submit malformed input such as mismatched lengths.
+    tension_list = list(tensions)
+    if not tension_list:
+        raise ValueError("weights and tensions must contain at least one element")
 
-    # Use vectorised multiplication only when ``weights`` is a real NumPy array.
+    # NumPy arrays expose their size directly. When available we validate the
+    # length relationship and apply vectorised multiplication for efficiency.
     if np is not None and isinstance(weights, np.ndarray):
-        return weights * np.array(values)
+        if weights.size != len(tension_list):
+            raise ValueError("weights and tensions must be the same length")
+
+        values = np.array([1 / (1 + abs(t - target)) for t in tension_list])
+        return weights * values
+
+    # For non-NumPy inputs convert to a list so the data can be iterated over
+    # multiple times without exhausting a generator and so we can validate the
+    # length relationship explicitly.
+    weight_list = list(weights)
+    if len(weight_list) != len(tension_list):
+        raise ValueError("weights and tensions must be the same length")
+    if not weight_list:
+        raise ValueError("weights and tensions must contain at least one element")
+
+    # Compute scaling values that bias tensions toward the desired target.
+    values = [1 / (1 + abs(t - target)) for t in tension_list]
 
     # For lists, tuples, and other iterables we fall back to a Python loop.
-    return [w * v for w, v in zip(weights, values)]
+    return [w * v for w, v in zip(weight_list, values)]
