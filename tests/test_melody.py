@@ -760,6 +760,18 @@ def test_generate_melody_invalid_structure():
         generate_melody("C", 8, chords, motif_length=4, structure="A1B")
 
 
+def test_generate_melody_structure_clamps_motif_length():
+    """Sectional recursion should handle segments shorter than the motif."""
+
+    # Regression test for a bug where ``structure`` recursion passed the full
+    # motif length to segments that were shorter, raising ``ValueError``. The
+    # motif length should be clamped automatically so the call succeeds.
+    chords = ["C", "G", "Am", "F"]
+    random.seed(0)
+    melody = generate_melody("C", 8, chords, motif_length=5, structure="AB")
+    assert len(melody) == 8
+
+
 def test_generate_melody_structure_propagates_options(monkeypatch):
     """Sectional generation should honour advanced options for each segment."""
 
