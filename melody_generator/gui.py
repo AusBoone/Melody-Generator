@@ -175,6 +175,9 @@ class MelodyGeneratorGUI:
         self.style_var = tk.StringVar(master=self.root, value="")
         # Seed for deterministic generation. Empty string disables seeding.
         self.seed_var = tk.StringVar(master=self.root, value="")
+        # Ornament placeholders can be toggled independently of the main melody
+        # so arrangers only see the helper track when desired.
+        self.ornament_var = tk.BooleanVar(master=self.root, value=False)
         self.styles = sorted(STYLE_VECTORS.keys())
 
         self._setup_theme()
@@ -557,13 +560,21 @@ class MelodyGeneratorGUI:
         include_chords_check.grid(row=13, column=0, columnspan=2)
         self.inputs.append(include_chords_check)
 
+        ornament_check = ttk.Checkbutton(
+            frame,
+            text="Ornament Placeholders",
+            variable=self.ornament_var,
+        )
+        ornament_check.grid(row=14, column=0, columnspan=2)
+        self.inputs.append(ornament_check)
+
         self.chords_same_var = tk.BooleanVar(value=False)
         merge_chords_check = ttk.Checkbutton(
             frame,
             text="Merge Chords With Melody",
             variable=self.chords_same_var,
         )
-        merge_chords_check.grid(row=14, column=0, columnspan=2)
+        merge_chords_check.grid(row=15, column=0, columnspan=2)
         self.inputs.append(merge_chords_check)
 
         humanize_check = ttk.Checkbutton(
@@ -571,7 +582,7 @@ class MelodyGeneratorGUI:
             text="Humanize Performance",
             variable=self.humanize_var,
         )
-        humanize_check.grid(row=15, column=0, columnspan=2)
+        humanize_check.grid(row=16, column=0, columnspan=2)
         self.inputs.append(humanize_check)
 
         # Randomize buttons
@@ -580,14 +591,14 @@ class MelodyGeneratorGUI:
             text="Randomize Chords",
             command=self._randomize_chords,
         )
-        rand_chords_btn.grid(row=16, column=0, columnspan=2, pady=(5, 0))
+        rand_chords_btn.grid(row=17, column=0, columnspan=2, pady=(5, 0))
         self.inputs.append(rand_chords_btn)
         rand_rhythm_btn = ttk.Button(
             frame,
             text="Randomize Rhythm",
             command=self._randomize_rhythm,
         )
-        rand_rhythm_btn.grid(row=17, column=0, columnspan=2, pady=(5, 0))
+        rand_rhythm_btn.grid(row=18, column=0, columnspan=2, pady=(5, 0))
         self.inputs.append(rand_rhythm_btn)
 
         load_prefs_btn = ttk.Button(
@@ -595,7 +606,7 @@ class MelodyGeneratorGUI:
             text="Load Preferences",
             command=self._load_preferences,
         )
-        load_prefs_btn.grid(row=18, column=0, columnspan=2, pady=(5, 0))
+        load_prefs_btn.grid(row=19, column=0, columnspan=2, pady=(5, 0))
         self.inputs.append(load_prefs_btn)
 
         preview_btn = ttk.Button(
@@ -603,14 +614,14 @@ class MelodyGeneratorGUI:
             text="Preview Melody",
             command=self._preview_button_click,
         )
-        preview_btn.grid(row=19, column=0, columnspan=2, pady=(5, 0))
+        preview_btn.grid(row=20, column=0, columnspan=2, pady=(5, 0))
         self.inputs.append(preview_btn)
         self.preview_notice = ttk.Label(
             frame,
             text="",
             foreground="yellow",
         )
-        self.preview_notice.grid(row=19, column=2, sticky="w")
+        self.preview_notice.grid(row=20, column=2, sticky="w")
 
         # Generate button
         generate_btn = ttk.Button(
@@ -618,7 +629,7 @@ class MelodyGeneratorGUI:
             text="Generate Melody",
             command=self._generate_button_click,
         )
-        generate_btn.grid(row=20, column=0, columnspan=2, pady=10)
+        generate_btn.grid(row=21, column=0, columnspan=2, pady=10)
         self.inputs.append(generate_btn)
 
         self.theme_var = tk.BooleanVar(value=self.dark_mode)
@@ -769,6 +780,7 @@ class MelodyGeneratorGUI:
             "program": INSTRUMENTS.get(self.instrument_var.get(), 0),
             "humanize": self.humanize_var.get() if hasattr(self, "humanize_var") else True,
             "rhythm_pattern": self.rhythm_pattern,
+            "ornaments": self.ornament_var.get(),
         }
 
         # Disable controls and show progress indicator while the worker runs.
@@ -817,6 +829,7 @@ class MelodyGeneratorGUI:
                 chords_separate=not params["chords_same"],
                 program=params["program"],
                 humanize=params["humanize"],
+                ornaments=params["ornaments"],
             )
         except Exception as exc:  # pragma: no cover - rare failures
             # Use ``functools.partial`` to bind ``exc`` for the callback executed
@@ -962,6 +975,7 @@ class MelodyGeneratorGUI:
             humanize=self.humanize_var.get()
             if hasattr(self, "humanize_var")
             else True,
+            ornaments=self.ornament_var.get(),
         )
         playback_succeeded = False
         try:
@@ -1083,6 +1097,7 @@ class MelodyGeneratorGUI:
             "harmony_lines": int(self.harmony_lines.get() or 0),
             "chords": chords,
             "include_chords": self.include_chords_var.get(),
+            "ornaments": self.ornament_var.get(),
             "chords_same": self.chords_same_var.get(),
             "instrument": self.instrument_var.get(),
             "soundfont": self.soundfont_var.get(),
@@ -1118,6 +1133,8 @@ class MelodyGeneratorGUI:
             self.harmony_lines.set(str(settings["harmony_lines"]))
         if "include_chords" in settings:
             self.include_chords_var.set(settings["include_chords"])
+        if "ornaments" in settings:
+            self.ornament_var.set(settings["ornaments"])
         if "chords_same" in settings:
             self.chords_same_var.set(settings["chords_same"])
         if "humanize" in settings:

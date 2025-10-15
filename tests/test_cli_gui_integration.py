@@ -317,6 +317,7 @@ def test_generate_button_click(tmp_path, monkeypatch):
 
     def create(mel, bpm, ts, path, harmony=False, pattern=None, extra_tracks=None, **kw):
         calls["args"] = (mel, bpm, ts, path, harmony, pattern, extra_tracks)
+        calls["kwargs"] = kw
         with open(path, "w", encoding="utf-8") as fh:
             fh.write("midi")
 
@@ -348,6 +349,7 @@ def test_generate_button_click(tmp_path, monkeypatch):
     gui.harmony_lines = types.SimpleNamespace(get=lambda: "1")
     gui.include_chords_var = types.SimpleNamespace(get=lambda: True)
     gui.chords_same_var = types.SimpleNamespace(get=lambda: False)
+    gui.ornament_var = types.SimpleNamespace(get=lambda: True)
     lb = types.SimpleNamespace(
         curselection=lambda: (0, 1),
         get=lambda idx: ["C", "G"][idx],
@@ -428,6 +430,7 @@ def test_generate_button_click(tmp_path, monkeypatch):
     assert calls["args"][3] == str(out)
     assert len(calls["args"][6]) == 2
     assert calls["oct"] == 5
+    assert calls["kwargs"]["ornaments"] is True
 
 
 def test_generate_button_click_non_positive(tmp_path, monkeypatch):
@@ -459,6 +462,7 @@ def test_generate_button_click_non_positive(tmp_path, monkeypatch):
     gui.harmony_lines = types.SimpleNamespace(get=lambda: "0")
     gui.include_chords_var = types.SimpleNamespace(get=lambda: False)
     gui.chords_same_var = types.SimpleNamespace(get=lambda: False)
+    gui.ornament_var = types.SimpleNamespace(get=lambda: False)
     lb = types.SimpleNamespace(curselection=lambda: (0,), get=lambda idx: "C")
     gui.chord_listbox = lb
     gui.display_map = {"C": "C"}
@@ -499,6 +503,9 @@ def test_generate_button_click_invalid_denominator(tmp_path, monkeypatch):
     gui.harmony_var = types.SimpleNamespace(get=lambda: False)
     gui.counterpoint_var = types.SimpleNamespace(get=lambda: False)
     gui.harmony_lines = types.SimpleNamespace(get=lambda: "0")
+    gui.include_chords_var = types.SimpleNamespace(get=lambda: False)
+    gui.chords_same_var = types.SimpleNamespace(get=lambda: False)
+    gui.ornament_var = types.SimpleNamespace(get=lambda: False)
     lb = types.SimpleNamespace(curselection=lambda: (0,), get=lambda idx: "C")
     gui.chord_listbox = lb
     gui.display_map = {"C": "C"}
@@ -546,6 +553,9 @@ def test_generate_button_click_invalid_numerator(tmp_path, monkeypatch):
     gui.harmony_var = types.SimpleNamespace(get=lambda: False)
     gui.counterpoint_var = types.SimpleNamespace(get=lambda: False)
     gui.harmony_lines = types.SimpleNamespace(get=lambda: "0")
+    gui.include_chords_var = types.SimpleNamespace(get=lambda: False)
+    gui.chords_same_var = types.SimpleNamespace(get=lambda: False)
+    gui.ornament_var = types.SimpleNamespace(get=lambda: False)
     lb = types.SimpleNamespace(curselection=lambda: (0,), get=lambda idx: "C")
     gui.chord_listbox = lb
     gui.display_map = {"C": "C"}
@@ -593,6 +603,9 @@ def test_generate_button_click_motif_exceeds_notes(tmp_path, monkeypatch):
     gui.harmony_var = types.SimpleNamespace(get=lambda: False)
     gui.counterpoint_var = types.SimpleNamespace(get=lambda: False)
     gui.harmony_lines = types.SimpleNamespace(get=lambda: "0")
+    gui.include_chords_var = types.SimpleNamespace(get=lambda: False)
+    gui.chords_same_var = types.SimpleNamespace(get=lambda: False)
+    gui.ornament_var = types.SimpleNamespace(get=lambda: False)
     lb = types.SimpleNamespace(curselection=lambda: (0,), get=lambda idx: "C")
     gui.chord_listbox = lb
     gui.display_map = {"C": "C"}
@@ -950,6 +963,7 @@ def test_preview_button_uses_playback(monkeypatch, tmp_path):
     gui.harmony_lines = types.SimpleNamespace(get=lambda: "0")
     gui.include_chords_var = types.SimpleNamespace(get=lambda: False)
     gui.chords_same_var = types.SimpleNamespace(get=lambda: False)
+    gui.ornament_var = types.SimpleNamespace(get=lambda: False)
     gui.chord_listbox = types.SimpleNamespace(
         curselection=lambda: (0,), get=lambda idx: "C"
     )
@@ -961,6 +975,7 @@ def test_preview_button_uses_playback(monkeypatch, tmp_path):
 
     stub_play = types.SimpleNamespace(play_midi=lambda path, soundfont=None: calls.setdefault("path", path))
     monkeypatch.setitem(sys.modules, "melody_generator.playback", stub_play)
+    monkeypatch.setattr(mod, "playback", stub_play, raising=False)
     monkeypatch.setattr(mod.gui, "messagebox", types.SimpleNamespace(showerror=lambda *a, **k: None), raising=False)
 
     gui._preview_button_click()
@@ -995,6 +1010,7 @@ def test_preview_button_falls_back(monkeypatch, tmp_path):
     gui.harmony_lines = types.SimpleNamespace(get=lambda: "0")
     gui.include_chords_var = types.SimpleNamespace(get=lambda: False)
     gui.chords_same_var = types.SimpleNamespace(get=lambda: False)
+    gui.ornament_var = types.SimpleNamespace(get=lambda: False)
     gui.chord_listbox = types.SimpleNamespace(
         curselection=lambda: (0,), get=lambda idx: "C"
     )
@@ -1007,6 +1023,7 @@ def test_preview_button_falls_back(monkeypatch, tmp_path):
 
     stub_play = types.SimpleNamespace(play_midi=raise_err)
     monkeypatch.setitem(sys.modules, "melody_generator.playback", stub_play)
+    monkeypatch.setattr(mod, "playback", stub_play, raising=False)
     monkeypatch.setattr(mod.gui.messagebox, "showerror", lambda *a, **k: None, raising=False)
     calls = {}
     monkeypatch.setattr(gui, "_open_default_player", lambda p, delete_after=False: calls.setdefault("fallback", p))
@@ -1043,6 +1060,7 @@ def test_preview_file_removed(monkeypatch, tmp_path):
     gui.harmony_lines = types.SimpleNamespace(get=lambda: "0")
     gui.include_chords_var = types.SimpleNamespace(get=lambda: False)
     gui.chords_same_var = types.SimpleNamespace(get=lambda: False)
+    gui.ornament_var = types.SimpleNamespace(get=lambda: False)
     gui.chord_listbox = types.SimpleNamespace(
         curselection=lambda: (0,), get=lambda idx: "C"
     )
@@ -1055,6 +1073,7 @@ def test_preview_file_removed(monkeypatch, tmp_path):
         play_midi=lambda path, soundfont=None: calls.setdefault("path", path)
     )
     monkeypatch.setitem(sys.modules, "melody_generator.playback", stub_play)
+    monkeypatch.setattr(mod, "playback", stub_play, raising=False)
     monkeypatch.setattr(mod.gui.messagebox, "showerror", lambda *a, **k: None, raising=False)
     monkeypatch.setattr(gui, "_open_default_player", lambda p, delete_after=False: Path(p).unlink())
 
@@ -1091,6 +1110,7 @@ def test_preview_file_waits_for_player(monkeypatch):
     gui.harmony_lines = types.SimpleNamespace(get=lambda: "0")
     gui.include_chords_var = types.SimpleNamespace(get=lambda: False)
     gui.chords_same_var = types.SimpleNamespace(get=lambda: False)
+    gui.ornament_var = types.SimpleNamespace(get=lambda: False)
     gui.chord_listbox = types.SimpleNamespace(
         curselection=lambda: (0,), get=lambda idx: "C"
     )
@@ -1103,6 +1123,7 @@ def test_preview_file_waits_for_player(monkeypatch):
 
     stub_play = types.SimpleNamespace(play_midi=raise_err)
     monkeypatch.setitem(sys.modules, "melody_generator.playback", stub_play)
+    monkeypatch.setattr(mod, "playback", stub_play, raising=False)
     monkeypatch.setattr(mod.gui.messagebox, "showerror", lambda *a, **k: None, raising=False)
 
     calls = {}

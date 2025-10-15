@@ -149,6 +149,7 @@ def gui(monkeypatch):
         self.counterpoint_var = DummyVar(False)
         self.include_chords_var = DummyVar(False)
         self.chords_same_var = DummyVar(False)
+        self.ornament_var = DummyVar(False)
         self.soundfont_var = DummyVar("")
         self.style_var = DummyVar("")
         self.ml_var = DummyVar(False)

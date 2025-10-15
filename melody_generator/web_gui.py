@@ -282,6 +282,7 @@ def _generate_preview(
     style: Optional[str],
     chords: List[str],
     humanize: bool,
+    ornaments: bool,
 ) -> tuple[str, str]:
     """Render a short preview of the requested melody to audio and MIDI.
 
@@ -341,6 +342,7 @@ def _generate_preview(
             chords_separate=not chords_same,
             program=INSTRUMENTS.get(instrument, 0),
             humanize=humanize,
+            ornaments=ornaments,
         )
 
         with open(tmp_path, "rb") as fh:
@@ -517,6 +519,7 @@ def index():
         counterpoint = bool(request.form.get('counterpoint'))
         include_chords = bool(request.form.get('include_chords'))
         chords_same = bool(request.form.get('chords_same'))
+        ornaments = bool(request.form.get('ornaments'))
         # Treat a missing checkbox as ``False`` so unchecking actually
         # disables the humanize feature.
         humanize = bool(request.form.get('humanize'))
@@ -589,6 +592,7 @@ def index():
             enable_ml=enable_ml,
             style=style,
             chords=chords,
+            ornaments=ornaments,
         )
 
         try:

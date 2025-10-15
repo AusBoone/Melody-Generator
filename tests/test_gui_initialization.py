@@ -202,6 +202,7 @@ def test_generate_runs_in_worker_thread(monkeypatch):
         self.counterpoint_var = DummyVar(False)
         self.include_chords_var = DummyVar(False)
         self.chords_same_var = DummyVar(False)
+        self.ornament_var = DummyVar(False)
         self.progress = DummyProgressbar()
         self.inputs = [self.chord_listbox]
         self.rhythm_pattern = None

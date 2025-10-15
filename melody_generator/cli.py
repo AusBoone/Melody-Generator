@@ -143,6 +143,11 @@ def run_cli() -> None:
     parser.add_argument("--instrument", type=int, default=0, help="MIDI program number for the melody instrument")
     parser.add_argument("--seed", type=int, help="Random seed for reproducible output")
     parser.add_argument("--no-humanize", dest="humanize", action="store_false", help="Disable timing and velocity randomization")
+    parser.add_argument(
+        "--ornaments",
+        action="store_true",
+        help="Add a separate grace-note track marking ornament opportunities",
+    )
     parser.add_argument("--enable-ml", action="store_true", help="Activate ML-based weighting using a small sequence model")
     parser.add_argument(
         "--genre",
@@ -314,6 +319,7 @@ def run_cli() -> None:
             chords_separate=not args.chords_same_track,
             program=args.instrument,
             humanize=args.humanize,
+            ornaments=args.ornaments,
         )
     except OSError as exc:
         # Permission issues or full disks may surface as ``OSError``. Logging
