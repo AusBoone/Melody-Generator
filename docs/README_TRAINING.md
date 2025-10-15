@@ -74,6 +74,12 @@ Checkpoints are written as ``{genre}.pt`` into ``models`` by default. These
 files can be selected at runtime via the CLI using ``--genre`` and
 ``--model-dir``.
 
+Under the hood each MIDI file contributes a lightweight training example: the
+script extracts every recognised ``note_on`` event, uses all but the final
+pitch as the **context** and asks the model to predict the final note. This
+keeps the objective well-defined for tiny datasets while still teaching the
+network to anticipate plausible continuations.
+
 ## Weight Tuning Rationale
 
 Hyperparameters such as learning rate, sequence length and style-specific loss

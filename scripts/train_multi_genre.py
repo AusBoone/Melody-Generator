@@ -8,6 +8,14 @@ supplied ``data_root`` path is treated as a genre and is expected to contain
 ``{genre}.pt`` in ``checkpoint_dir``. These checkpoints can later be loaded at
 runtime via :func:`melody_generator.load_genre_sequence_model`.
 
+# Modification summary (2025-02-21):
+# - Adjusted the dataset and training loop to emit ``(context, target)`` pairs
+#   so both bundled models learn genuine next-note prediction rather than
+#   receiving incompatible targets that caused ``CrossEntropyLoss`` to fail.
+# - Normalised the model outputs to simple one-dimensional logits that align
+#   with the updated loss computation and clarified the control flow with
+#   additional comments for future extensions.
+
 Example
 -------
 Assuming ``~/midi_corpus`` contains ``jazz/`` and ``rock/`` folders with MIDI
@@ -51,7 +59,7 @@ except Exception as exc:  # pragma: no cover - MIDI parsing optional
 
 
 class MidiDataset(Dataset):
-    """Convert MIDI note-on messages to pitch indices for model training.
+    """Convert MIDI note-on messages to context/target training pairs.
 
     Parameters
     ----------
@@ -61,6 +69,13 @@ class MidiDataset(Dataset):
         Mapping of MIDI pitch to a contiguous index. Only notes present in
         ``vocab`` are retained; others are skipped to keep the implementation
         compact. Real projects may wish to handle unknown pitches differently.
+
+    Notes
+    -----
+    Each dataset element consists of a prefix of notes (the ``context``) and
+    the immediately following pitch (the ``target``). Returning a tuple keeps
+    the models focused on next-note prediction while remaining lightweight
+    enough for the project’s quick-running examples and test fixtures.
     """
 
     def __init__(self, files: Iterable[Path], vocab: Dict[int, int]) -> None:
@@ -70,7 +85,9 @@ class MidiDataset(Dataset):
     def __len__(self) -> int:  # pragma: no cover - trivial
         return len(self.files)
 
-    def __getitem__(self, idx: int) -> torch.Tensor:
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
+        """Return a ``(context, target)`` pair extracted from ``idx``."""
+
         midi = mido.MidiFile(self.files[idx])
         notes: List[int] = []
         for track in midi.tracks:
@@ -79,10 +96,18 @@ class MidiDataset(Dataset):
                     # Only retain pitches present in the vocabulary.
                     if msg.note in self.vocab:
                         notes.append(self.vocab[msg.note])
+
         if not notes:
-            # Provide a minimal guarantee to avoid zero-length tensors.
-            notes.append(0)
-        return torch.tensor(notes, dtype=torch.long)
+            # Ensure every item produces both a non-empty context and target by
+            # inserting a duplicated placeholder pitch when no recognised notes
+            # are encountered in the file.
+            notes = [0, 0]
+        elif len(notes) == 1:
+            notes.append(notes[0])
+
+        context = torch.tensor(notes[:-1], dtype=torch.long)
+        target = torch.tensor(notes[-1], dtype=torch.long)
+        return context, target
 
 
 # ---------------------------------------------------------------------------
@@ -109,7 +134,9 @@ class SimpleTransformer(nn.Module):
         # ``seq``: (T) tensor of indices. We add a batch dimension for the encoder.
         emb = self.embed(seq).unsqueeze(1)
         encoded = self.encoder(emb)
-        return self.fc(encoded[-1])
+        # ``encoded`` retains a singleton batch dimension; remove it so callers
+        # receive ``(vocab,)`` logits compatible with ``nn.CrossEntropyLoss``.
+        return self.fc(encoded[-1]).squeeze(0)
 
 
 class SimpleVAE(nn.Module):
@@ -137,7 +164,7 @@ class SimpleVAE(nn.Module):
         std = torch.exp(0.5 * logvar)
         z = mean + torch.randn_like(std) * std
         dec_out, _ = self.decoder(z.unsqueeze(0))
-        return self.out(dec_out.squeeze(0))
+        return self.out(dec_out.squeeze(0)).squeeze(0)
 
 
 # ---------------------------------------------------------------------------
@@ -169,18 +196,34 @@ def build_model(model_type: str, vocab_size: int) -> nn.Module:
     raise ValueError(f"Unsupported model type: {model_type}")
 
 
-def train_one_epoch(model: nn.Module, loader: DataLoader, criterion: nn.Module, optim: torch.optim.Optimizer) -> float:
-    """Train ``model`` for a single epoch and return the average loss."""
+def train_one_epoch(
+    model: nn.Module,
+    loader: DataLoader,
+    criterion: nn.Module,
+    optim: torch.optim.Optimizer,
+) -> float:
+    """Train ``model`` for a single epoch and return the average loss.
+
+    The data loader is expected to yield ``(context, target)`` pairs with a
+    leading batch dimension of one.  The batch dimension is removed before
+    feeding the sequence into the model so the bundled architectures receive a
+    simple one-dimensional tensor of note indices.
+    """
 
     model.train()
     total_loss = 0.0
-    for seq in loader:
+    for context, target in loader:
         optim.zero_grad()
-        logits = model(seq[0])  # Use first sequence position to predict next
-        loss = criterion(logits, seq[0])
+
+        context = context.squeeze(0)
+        target = target.squeeze(0)
+
+        logits = model(context)
+        loss = criterion(logits.unsqueeze(0), target.unsqueeze(0))
         loss.backward()
         optim.step()
         total_loss += loss.item()
+
     return total_loss / len(loader)
 
 
