@@ -101,6 +101,10 @@ __version__ = "0.1.0"
 #   phrase planning, tritone filtering and refinement) to each sub-call and
 #   slices the supplied :class:`PhrasePlan` so every section respects the same
 #   pitch range and tension curve.
+# * Sectional generation clamps the motif length per segment and rejects
+#   zero-length sections so ``structure`` patterns that divide the phrase more
+#   finely than the motif no longer raise ``ValueError`` deep inside recursive
+#   calls.
 # * MIDI output uses a crescendo-decrescendo velocity curve with downbeat
 #   accents for a more musical performance.
 # * Candidate weighting now uses a simple transition matrix and the final note
@@ -887,6 +891,10 @@ def generate_melody(
     @param structure (str|None): Optional section pattern such as ``"AABA"``.
         Each unique letter generates a fresh phrase while repeated letters reuse
         and lightly mutate the earlier phrase. Only letters ``A-Z`` are allowed.
+        When sections are shorter than ``motif_length`` the motif length is
+        clamped to the section length automatically so recursion never fails.
+        ``ValueError`` is raised if the structure would create empty sections
+        (for example more section letters than requested notes).
     @param allow_tritone (bool): When ``False`` (default) melodic intervals of
         six semitones are filtered out to avoid the dissonant tritone unless no
         other options exist.
@@ -1017,6 +1025,19 @@ def generate_melody(
             # ``length`` for this segment equals the base size plus one if any
             # leftover notes remain to be distributed.
             length = seg_len + (1 if i < remainder else 0)
+            if length <= 0:
+                # A structure longer than ``num_notes`` would otherwise call the
+                # recursive generator with ``num_notes <= 0`` which raises a
+                # confusing error. Provide a descriptive failure instead.
+                raise ValueError(
+                    "structure length cannot exceed the number of notes"
+                )
+
+            # When sections are shorter than the requested motif we clamp the
+            # motif length so recursive calls remain valid. Without this guard a
+            # structure like ``'AB'`` with ``motif_length=5`` and ``num_notes=8``
+            # would recurse with ``length=4`` and immediately raise ``ValueError``.
+            segment_motif = min(motif_length, length)
 
             # Derive a section-specific phrase plan so the recursive call keeps
             # the same pitch limits and tension profile as the parent request.
@@ -1040,7 +1061,7 @@ def generate_melody(
                     key,
                     length,
                     chord_progression,
-                    motif_length=motif_length,
+                    motif_length=segment_motif,
                     time_signature=time_signature,
                     pattern=pattern,
                     base_octave=base_octave,
