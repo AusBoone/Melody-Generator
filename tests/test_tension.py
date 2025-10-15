@@ -65,3 +65,20 @@ def test_apply_tension_weights_no_numpy(monkeypatch):
     # Reload original module so other tests retain numpy support
     importlib.reload(tension)
 
+
+def test_apply_tension_weights_length_mismatch():
+    """Length mismatches should raise ``ValueError`` instead of truncating."""
+
+    weights = [1.0, 2.0, 3.0]
+    tensions = [0.4, 0.6]
+
+    with pytest.raises(ValueError):
+        tension.apply_tension_weights(weights, tensions, 0.5)
+
+
+def test_apply_tension_weights_empty_inputs():
+    """Empty weight collections should raise an informative ``ValueError``."""
+
+    with pytest.raises(ValueError):
+        tension.apply_tension_weights([], [], 0.5)
+
