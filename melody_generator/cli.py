@@ -5,6 +5,8 @@ Modification summary
 * Expanded module docstring with an explicit usage example and notes on design
   assumptions.
 * Added validation and error handling for ``--random-chords`` values.
+* Centralised chord parsing via :func:`melody_generator.utils.parse_chord_progression`
+  so the CLI and GUI share identical validation and fallback behaviour.
 * Logged playback failures before falling back to the system's default MIDI
   player so users still hear results while developers retain the traceback for
   debugging.
@@ -49,15 +51,8 @@ from importlib import import_module
 from pathlib import Path
 from typing import List
 
-from . import (
-    CHORDS,
-    canonical_chord,
-    canonical_key,
-    MAX_OCTAVE,
-    MIN_OCTAVE,
-    SCALE,
-)
-from .utils import validate_time_signature
+from . import CHORDS, canonical_key, MAX_OCTAVE, MIN_OCTAVE, SCALE
+from .utils import parse_chord_progression, validate_time_signature
 
 
 __all__ = ["run_cli", "main"]
@@ -208,11 +203,6 @@ def run_cli() -> None:
     if not MIN_OCTAVE <= args.base_octave <= MAX_OCTAVE:
         logging.error(f"Base octave must be between {MIN_OCTAVE} and {MAX_OCTAVE}.")
         sys.exit(1)
-    # Ensure random chord generation requests specify a positive count.
-    if args.random_chords is not None and args.random_chords <= 0:
-        logging.error("Random chord count must be a positive integer.")
-        sys.exit(1)
-
     if args.seed is not None:
         # Seeding both Python and NumPy enables reproducible melody generation
         # when the optional ``numpy`` dependency is installed. Failure to seed
@@ -221,7 +211,6 @@ def run_cli() -> None:
 
     try:
         from . import (
-            generate_random_chord_progression,
             generate_random_rhythm_pattern,
             generate_melody,
             generate_harmony_line,
@@ -236,27 +225,19 @@ def run_cli() -> None:
         logging.error("Invalid key provided.")
         sys.exit(1)
 
-    if args.random_chords:
-        # Attempt to generate a random progression while surfacing validation errors
-        try:
-            chord_progression = generate_random_chord_progression(
-                args.key, args.random_chords
-            )
-        except ValueError as exc:
-            logging.error(str(exc))
-            sys.exit(1)
-    else:
-        if not args.chords:
-            logging.error("Chord progression required unless --random-chords is used.")
-            sys.exit(1)
-        chord_names = [chord.strip() for chord in args.chords.split(",")]
-        chord_progression = []
-        for chord in chord_names:
-            try:
-                chord_progression.append(canonical_chord(chord))
-            except ValueError:
-                logging.error(f"Invalid chord in progression: {chord}")
-                sys.exit(1)
+    try:
+        # ``parse_chord_progression`` performs all validation for manual and
+        # random chord requests so the CLI mirrors the GUI's behaviour. Any
+        # ``ValueError`` surfaces directly to the user as a logged error.
+        chord_progression = parse_chord_progression(
+            args.chords,
+            key=args.key,
+            random_count=args.random_chords,
+            allow_empty=False,
+        )
+    except ValueError as exc:
+        logging.error(str(exc))
+        sys.exit(1)
 
     try:
         numerator, denominator = validate_time_signature(args.timesig)
