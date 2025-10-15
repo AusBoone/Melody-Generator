@@ -17,6 +17,13 @@ Example
 # ``IndexError`` when computing inversions because they lack a pivot note.
 # Validation prevents this by raising ``ValueError`` early, ensuring callers are
 # explicitly aware of malformed input.
+#
+# Current update: inverted sequences now respect the transposed pitch space by
+# mirroring each transposed copy around its own first note.  Earlier revisions
+# reused the original pivot which produced duplicate inversions that no longer
+# matched the transposed key.  The new behaviour keeps every augmented pair
+# (transpose + inversion) musically consistent and expands the effective data
+# diversity for downstream training.
 
 from __future__ import annotations
 
@@ -125,12 +132,17 @@ def augment_sequences(
             # pivot note during inversion.
             raise ValueError("subsequences must contain at least one note")
         for t in transpose_range:
-            # Add a transposed version for each semitone offset.
-            augmented.append(transpose_sequence(seq, t))
+            # Compute the transposed copy once so both the direct and inverted
+            # forms share the same pitch space.  ``transpose_sequence`` returns
+            # a new list leaving the caller's sequence untouched.
+            transposed = transpose_sequence(seq, t)
+            augmented.append(transposed)
             if invert:
-                # Optionally include the inverted form using the first note as
-                # the pivot so melodic contour is mirrored.
-                augmented.append(invert_sequence(seq, seq[0]))
+                # Invert around the first note *of the transposed sequence* so
+                # every augmented pair remains harmonically aligned in the new
+                # register.  Mirroring the pre-transpose notes would produce
+                # identical inversions for every ``t`` which limits variety.
+                augmented.append(invert_sequence(transposed, transposed[0]))
     return augmented
 
 
