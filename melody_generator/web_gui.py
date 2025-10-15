@@ -21,6 +21,9 @@ The latest revision introduces several changes:
 * **Retry guidance** – When the limit is exceeded the ``429`` response now
   carries a ``Retry-After`` header indicating how many seconds remain in the
   current window.
+* **Shared chord parsing** – Both the CLI and web interface now rely on
+  :func:`melody_generator.utils.parse_chord_progression` so manual and random
+  chord options behave identically across entry points.
 * **Thread-safe rate limiting** – The throttle now uses a lock for concurrent
   access and purges stale entries each request to bound memory usage.
 """
@@ -103,7 +106,7 @@ from typing import Dict, List, Optional, Tuple
 
 from melody_generator import playback
 from melody_generator.playback import MidiPlaybackError
-from melody_generator.utils import validate_time_signature
+from melody_generator.utils import parse_chord_progression, validate_time_signature
 
 # Celery is an optional dependency. When present we import the main class and
 # the ``TimeoutError`` used when a task exceeds its allotted runtime.  Each
@@ -148,7 +151,6 @@ SCALE = melody_generator.SCALE
 CHORDS = melody_generator.CHORDS
 canonical_key = melody_generator.canonical_key
 canonical_chord = melody_generator.canonical_chord
-generate_random_chord_progression = melody_generator.generate_random_chord_progression
 generate_random_rhythm_pattern = melody_generator.generate_random_rhythm_pattern
 generate_harmony_line = melody_generator.generate_harmony_line
 generate_counterpoint_melody = melody_generator.generate_counterpoint_melody
@@ -553,23 +555,24 @@ def index():
         enable_ml = bool(request.form.get('enable_ml'))
         style = request.form.get('style') or None
 
-        # Determine the chord progression. The user may provide one
-        # manually or tick the "random" box to generate it.
-        if request.form.get('random_chords'):
-            chords = generate_random_chord_progression(key)
-        else:
-            chords_str = request.form.get('chords', '')
-            chord_names = [c.strip() for c in chords_str.split(',') if c.strip()]
-            if not chord_names:
-                chords = generate_random_chord_progression(key)
-            else:
-                chords = []
-                for chord in chord_names:
-                    try:
-                        chords.append(canonical_chord(chord))
-                    except ValueError:
-                        flash(f"Unknown chord: {chord}")
-                        return render_template('index.html', scale=sorted(SCALE.keys()), instruments=INSTRUMENTS.keys(), styles=STYLE_VECTORS.keys())
+        try:
+            # ``parse_chord_progression`` unifies manual entry, checkbox-driven
+            # randomisation and fallback behaviour so the web view mirrors the
+            # CLI. When the random toggle is enabled we ignore any typed text
+            # and rely entirely on the helper to generate a fresh progression.
+            chords = parse_chord_progression(
+                request.form.get('chords'),
+                key=key,
+                force_random=bool(request.form.get('random_chords')),
+            )
+        except ValueError as exc:
+            flash(str(exc))
+            return render_template(
+                'index.html',
+                scale=sorted(SCALE.keys()),
+                instruments=INSTRUMENTS.keys(),
+                styles=STYLE_VECTORS.keys(),
+            )
 
         try:
             numerator, denominator = validate_time_signature(timesig)
