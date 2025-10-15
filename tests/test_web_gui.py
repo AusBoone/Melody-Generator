@@ -487,6 +487,36 @@ def test_include_chords_flag(monkeypatch):
     assert resp.status_code == 200
 
 
+def test_ornament_flag_forwarded(monkeypatch):
+    """The ornament checkbox should set the preview's ornament flag."""
+
+    called: dict = {}
+
+    monkeypatch.setattr(web_gui, "generate_melody", lambda *a, **k: ["C4"] * 4)
+
+    def record_create(*args, **kwargs):
+        called["ornaments"] = kwargs.get("ornaments")
+
+    monkeypatch.setattr(web_gui, "create_midi_file", record_create)
+
+    client = app.test_client()
+    client.post(
+        "/",
+        data={
+            "key": "C",
+            "chords": "C",
+            "bpm": "120",
+            "timesig": "4/4",
+            "notes": "4",
+            "motif_length": "2",
+            "base_octave": "4",
+            "ornaments": "1",
+        },
+    )
+
+    assert called.get("ornaments") is True
+
+
 def test_successful_post_returns_audio(monkeypatch):
     """Valid form submissions embed a WAV audio preview."""
 
@@ -729,6 +759,7 @@ def test_delay_arguments_match_preview_parameters(monkeypatch):
         "harmony_lines": 1,
         "include_chords": False,
         "chords_same": False,
+        "ornaments": False,
         # The web GUI forwards the humanize option to ``create_midi_file``.
         # When the checkbox is unchecked the default ``False`` should be sent.
         "humanize": False,
@@ -995,6 +1026,7 @@ def test_random_rhythm_length_matches_notes(monkeypatch):
         style=None,
         chords=["C"],
         humanize=False,
+        ornaments=False,
     )
 
     assert captured.get("length") == 4
@@ -1046,6 +1078,7 @@ def test_temp_files_cleaned_on_failure(tmp_path, monkeypatch):
             style=None,
             chords=["C"],
             humanize=False,
+            ornaments=False,
         )
 
     for path in created:

@@ -16,6 +16,9 @@ Modification summary
   can load even when the optional dependency is missing.
 * ``create_midi_file`` advertises its ``MidiFile`` return type for clearer
   static type checking and easier inspection in tests.
+* Added optional ornamentation placeholders that emit short grace notes on MIDI
+  channel 2 so arrangers can easily identify suggested trill or mordent
+  locations when importing the file into notation software.
 
 This module contains the low-level helpers used to render melodies as MIDI and
 open the resulting files with the user's default player. It is separated from
@@ -47,6 +50,12 @@ from . import (
 
 __all__ = ["create_midi_file", "_open_default_player"]
 
+# MIDI channel reserved for ornamentation placeholders. Channels are zero-based
+# in the MIDI specification, so ``1`` corresponds to what performers typically
+# refer to as “channel 2”. Keeping this constant centralised ensures both the
+# generation logic and tests agree on the chosen channel.
+ORNAMENT_CHANNEL = 1
+
 
 def create_midi_file(
     melody: List[str],
@@ -60,7 +69,9 @@ def create_midi_file(
     chords_separate: bool = True,
     program: int = 0,
     humanize: bool = True,
-    ) -> "MidiFile":
+    *,
+    ornaments: bool = False,
+) -> "MidiFile":
     """Write ``melody`` to ``output_file`` as a MIDI file.
 
     The generated ``MidiFile`` is returned so callers and tests can inspect the
@@ -77,6 +88,15 @@ def create_midi_file(
     MidiFile
         In-memory representation of the written file for further inspection or
         reuse without reloading from disk.
+
+    Other Parameters
+    ----------------
+    ornaments:
+        When ``True`` an additional MIDI track is emitted on channel 2 containing
+        short grace-note placeholders at the start of each sounded melody note.
+        These markers give arrangers an obvious place to add trills or mordents
+        after importing the file into notation software. The placeholders use a
+        small velocity so they are audible but unobtrusive when previewing.
     """
     # ``mido`` is imported lazily so projects depending on this module do not
     # need the optional MIDI dependency unless they actually render files.  A
@@ -128,6 +148,22 @@ def create_midi_file(
         if chords_separate:
             mid.tracks.append(chord_track)
 
+    ornament_track: Optional[MidiTrack] = None
+    ornament_pending = 0
+    if ornaments:
+        # Ornament placeholders live on their own track to keep the main melody
+        # clean and to ensure notation software can hide or revoice them easily.
+        ornament_track = MidiTrack()
+        mid.tracks.append(ornament_track)
+        ornament_track.append(
+            Message(
+                "program_change",
+                program=program,
+                time=0,
+                channel=ORNAMENT_CHANNEL,
+            )
+        )
+
     track.append(mido.MetaMessage("set_tempo", tempo=mido.bpm2tempo(bpm)))
     track.append(
         mido.MetaMessage(
@@ -173,6 +209,10 @@ def create_midi_file(
             # scheduling. Rests advance musical time just like sounded notes, so
             # update the accumulator here to keep harmony alignment accurate.
             total_beats += 1
+            if ornament_track is not None:
+                # Advance the ornament track's timeline by the same rest so the
+                # next grace note remains aligned with the upcoming melody note.
+                ornament_pending += beat_ticks
             continue
 
         note_duration = int(duration_fraction * whole_note_ticks)
@@ -182,6 +222,35 @@ def create_midi_file(
         note_off = Message("note_off", note=midi_note, velocity=velocity, time=note_duration)
         track.append(note_on)
         track.append(note_off)
+        if ornament_track is not None:
+            # ``ornament_pending`` accumulates the elapsed ticks since the last
+            # ornament event. Incorporate the rest preceding the note so the
+            # placeholder aligns with the melody onset.
+            ornament_pending += rest_ticks
+            grace_duration = max(1, note_duration // 8)
+            grace_pitch = min(midi_note + 1, 127)
+            grace_velocity = min(velocity + 5, 90)
+            ornament_track.append(
+                Message(
+                    "note_on",
+                    note=grace_pitch,
+                    velocity=grace_velocity,
+                    time=ornament_pending,
+                    channel=ORNAMENT_CHANNEL,
+                )
+            )
+            ornament_track.append(
+                Message(
+                    "note_off",
+                    note=grace_pitch,
+                    velocity=grace_velocity,
+                    time=grace_duration,
+                    channel=ORNAMENT_CHANNEL,
+                )
+            )
+            # After scheduling the placeholder, carry forward the remaining
+            # duration so subsequent ornaments know how long to wait.
+            ornament_pending = max(0, note_duration - grace_duration)
         if harmony_track is not None:
             harmony_note = min(midi_note + 4, 127)
             h_on = Message(
@@ -213,7 +282,6 @@ def create_midi_file(
         total_beats += beat_len
         last_note = midi_note
         last_velocity = velocity
-
         if beats_elapsed >= beats_per_segment:
             if last_note is not None and random.random() < 0.5:
                 extra_fraction = random.choice([0.5, 1.0])
@@ -230,6 +298,12 @@ def create_midi_file(
                 # include the additional duration.
                 total_beats += extra_fraction
                 beats_elapsed += extra_fraction
+
+                if ornament_track is not None:
+                    # Match the ornament timeline to the extended sustain so
+                    # subsequent grace notes remain synchronised with the
+                    # elongated melody segment.
+                    ornament_pending += extra_ticks
 
                 rest_ticks = beat_ticks
             # Reset the segment counter after any optional extension so the
@@ -277,10 +351,12 @@ def create_midi_file(
 
     if humanize:
         # Apply humanization to every track so harmony and auxiliary parts
-        # receive the same timing variations as the melody track. Iterating over
-        # ``mid.tracks`` ensures any future tracks added to the file are also
-        # adjusted without additional code changes.
+        # receive the same timing variations as the melody track. Ornament
+        # placeholders remain untouched so their precise alignment continues to
+        # signal where performers might add embellishments.
         for midi_track in mid.tracks:
+            if ornament_track is not None and midi_track is ornament_track:
+                continue
             humanize_events(midi_track)
 
     # Ensure the destination directory exists so ``mid.save`` succeeds even

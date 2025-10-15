@@ -18,6 +18,7 @@ Example
 
 from __future__ import annotations
 
+import importlib
 import builtins
 import sys
 from pathlib import Path
@@ -73,3 +74,47 @@ def test_create_midi_file_missing_mido(monkeypatch, tmp_path):
 
     with pytest.raises(ImportError, match="pip install mido"):
         midi_io.create_midi_file(["C4"], 120, (4, 4), str(out))
+
+
+def test_create_midi_file_ornament_track(tmp_path):
+    """Enabling ornaments should add a dedicated grace-note track."""
+
+    # ``load_module`` test helpers replace ``mido`` with minimal stubs that
+    # intentionally omit rich message objects. Ensure the real dependency is
+    # available so ``create_midi_file`` emits genuine ``Message`` instances that
+    # expose channel metadata for validation.
+    sys.modules.pop("mido", None)
+    mido_mod = importlib.import_module("mido")
+    MidiFile = mido_mod.MidiFile
+
+    out = tmp_path / "ornament.mid"
+    melody = ["C4", "E4", "G4"]
+
+    mid = midi_io.create_midi_file(
+        melody,
+        120,
+        (4, 4),
+        str(out),
+        ornaments=True,
+    )
+
+    assert isinstance(mid, MidiFile)
+    # The ornament track is appended after the main melody track.
+    ornament_track = mid.tracks[-1]
+
+    program_msgs = [
+        msg for msg in ornament_track if getattr(msg, "type", None) == "program_change"
+    ]
+    assert program_msgs, "ornament track should configure its own program"
+    channel = getattr(program_msgs[0], "channel", None)
+    if channel is None and hasattr(program_msgs[0], "dict"):
+        channel = program_msgs[0].dict().get("channel")
+    assert channel == midi_io.ORNAMENT_CHANNEL
+
+    note_on_events = [msg for msg in ornament_track if getattr(msg, "type", None) == "note_on"]
+    assert note_on_events, "ornament track should include grace-note placeholders"
+    first = note_on_events[0]
+    assert first.channel == midi_io.ORNAMENT_CHANNEL
+    assert first.time >= 0
+    # The placeholder should sit close to the melody pitch (within one step).
+    assert abs(first.note - midi_io.note_to_midi(melody[0])) <= 2

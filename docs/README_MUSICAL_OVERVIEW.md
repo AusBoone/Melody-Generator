@@ -138,9 +138,11 @@ output into an ensemble or theory curriculum.
 - **Expressive shaping** – MIDI velocities rise and fall in a gentle arc so the
   phrase feels performed rather than rigidly mechanical. Downbeat accents are +6
   velocity units stronger than upbeats, approximating classical bowing patterns.
-- **Ornamentation Hooks** – Grace-note placeholders (MIDI channel 2) mark where
-  you can add trills or mordents. When exporting to notation software you can
-  replace these with actual ornaments.
+- **Ornamentation Hooks** – When the optional ornament track is enabled from the
+  CLI/GUI or :func:`melody_generator.midi_io.create_midi_file`, grace-note
+  placeholders (MIDI channel 2) mark where you can add trills or mordents.
+  When exporting to notation software you can replace these with actual
+  ornaments.
 - **Immediate playback** – Files open directly in notation software or any DAW
   that supports General MIDI. Use the `harpsichord` program for Baroque-style
   demos or swap to `clarinet` for wind rehearsals.
