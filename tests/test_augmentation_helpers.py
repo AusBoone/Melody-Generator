@@ -45,19 +45,24 @@ def _patch_deps(monkeypatch):
 
 
 def test_augment_sequences_default_transposes_and_inverts():
-    """Default parameters should create five transpositions and their inversions."""
+    """Default augmentation should return ordered transpose/inversion pairs."""
 
     seq = [60, 62]
 
     result = aug.augment_sequences([seq])
 
+    # Five transpositions each produce two entries (transposed + inverted).
     assert len(result) == 10
 
+    expected: list[list[int]] = []
     for t in range(-2, 3):
-        assert aug.transpose_sequence(seq, t) in result
+        # Each pair should be musically related: inversion mirrors the
+        # transposed sequence around its own pivot.
+        transposed = aug.transpose_sequence(seq, t)
+        inverted = aug.invert_sequence(transposed, transposed[0])
+        expected.extend([transposed, inverted])
 
-    inverted = aug.invert_sequence(seq, seq[0])
-    assert result.count(inverted) == 5
+    assert result == expected
 
 
 def test_augment_sequences_empty_input_error():
@@ -75,16 +80,33 @@ def test_augment_sequences_empty_subsequence_error():
 
 
 def test_augment_sequences_custom_transpose_range():
-    """User-supplied ranges must control the transpositions applied."""
+    """Custom ranges should dictate transpose order and matching inversions."""
 
     seq = [60]
     tr = [0, 12]
 
     result = aug.augment_sequences([seq], transpose_range=tr)
 
-    expected = []
+    expected: list[list[int]] = []
     for t in tr:
-        expected.append(aug.transpose_sequence(seq, t))
-        expected.append(aug.invert_sequence(seq, seq[0]))
+        transposed = aug.transpose_sequence(seq, t)
+        expected.append(transposed)
+        expected.append(aug.invert_sequence(transposed, transposed[0]))
 
     assert result == expected
+
+
+def test_augment_sequences_inversions_follow_transpose_pivot():
+    """Inversions must mirror the transposed sequence rather than the original."""
+
+    seq = [60, 64]
+    # ``12`` raises the line by an octave so the correct inversion should be
+    # centred around 72 instead of the original 60.
+    result = aug.augment_sequences([seq], transpose_range=[12])
+
+    transposed = aug.transpose_sequence(seq, 12)
+    expected_inversion = aug.invert_sequence(transposed, transposed[0])
+    unexpected_inversion = aug.invert_sequence(seq, seq[0])
+
+    assert result == [transposed, expected_inversion]
+    assert unexpected_inversion not in result
