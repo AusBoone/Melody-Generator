@@ -15,6 +15,10 @@ runtime via :func:`melody_generator.load_genre_sequence_model`.
 # - Normalised the model outputs to simple one-dimensional logits that align
 #   with the updated loss computation and clarified the control flow with
 #   additional comments for future extensions.
+# - Added robust mini-batch support across the dataset, model forward pass and
+#   ``train_one_epoch`` routine. Callers can now supply data loaders with
+#   ``batch_size`` greater than one without shape errors, which previously made
+#   multi-sample optimisation impossible.
 
 Example
 -------
@@ -100,8 +104,11 @@ class MidiDataset(Dataset):
         if not notes:
             # Ensure every item produces both a non-empty context and target by
             # inserting a duplicated placeholder pitch when no recognised notes
-            # are encountered in the file.
-            notes = [0, 0]
+            # are encountered in the file. ``next(iter(self.vocab.values()), 0)``
+            # yields a valid index drawn from the vocabulary mapping even when
+            # indices do not start at zero.
+            fallback = next(iter(self.vocab.values()), 0)
+            notes = [fallback, fallback]
         elif len(notes) == 1:
             notes.append(notes[0])
 
@@ -130,13 +137,27 @@ class SimpleTransformer(nn.Module):
         self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
         self.fc = nn.Linear(d_model, vocab_size)
 
-    def forward(self, seq: torch.Tensor) -> torch.Tensor:  # pragma: no cover - thin wrapper
-        # ``seq``: (T) tensor of indices. We add a batch dimension for the encoder.
-        emb = self.embed(seq).unsqueeze(1)
-        encoded = self.encoder(emb)
-        # ``encoded`` retains a singleton batch dimension; remove it so callers
-        # receive ``(vocab,)`` logits compatible with ``nn.CrossEntropyLoss``.
-        return self.fc(encoded[-1]).squeeze(0)
+    def forward(self, seq: torch.Tensor) -> torch.Tensor:
+        """Return logits for the next-token prediction task."""
+
+        if seq.dim() == 1:
+            # Historical behaviour: treat ``seq`` as a single example of shape
+            # ``(T,)`` and inject the batch dimension expected by the
+            # ``TransformerEncoder``. The final time step carries the features
+            # used for next-token prediction.
+            emb = self.embed(seq).unsqueeze(1)
+            encoded = self.encoder(emb)
+            return self.fc(encoded[-1]).squeeze(0)
+
+        if seq.dim() == 2:
+            # Mini-batched inputs arrive as ``(batch, T)``. Transpose to
+            # ``(T, batch, features)`` so the encoder receives its preferred
+            # layout and return per-example logits with shape ``(batch, vocab)``.
+            emb = self.embed(seq).transpose(0, 1)
+            encoded = self.encoder(emb)
+            return self.fc(encoded[-1])
+
+        raise ValueError("seq must be a 1D or 2D tensor of token indices")
 
 
 class SimpleVAE(nn.Module):
@@ -204,10 +225,9 @@ def train_one_epoch(
 ) -> float:
     """Train ``model`` for a single epoch and return the average loss.
 
-    The data loader is expected to yield ``(context, target)`` pairs with a
-    leading batch dimension of one.  The batch dimension is removed before
-    feeding the sequence into the model so the bundled architectures receive a
-    simple one-dimensional tensor of note indices.
+    The data loader yields ``(context, target)`` pairs whose first dimension is
+    the batch size. ``SimpleTransformer`` can now consume either scalar batches
+    (``batch_size == 1``) or mini-batches without manual reshaping.
     """
 
     model.train()
@@ -215,11 +235,17 @@ def train_one_epoch(
     for context, target in loader:
         optim.zero_grad()
 
-        context = context.squeeze(0)
-        target = target.squeeze(0)
-
         logits = model(context)
-        loss = criterion(logits.unsqueeze(0), target.unsqueeze(0))
+        if logits.dim() == 1:
+            # Single-example batches produce 1D logits; wrap them so the loss
+            # function receives ``(batch, vocab)`` as expected.
+            logits = logits.unsqueeze(0)
+        if target.dim() == 0:
+            # Align scalar targets with the logits' batch dimension for
+            # consistent ``CrossEntropyLoss`` semantics.
+            target = target.unsqueeze(0)
+
+        loss = criterion(logits, target)
         loss.backward()
         optim.step()
         total_loss += loss.item()
