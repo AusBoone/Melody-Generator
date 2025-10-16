@@ -114,6 +114,58 @@ def test_invalid_timesig_flash():
     assert b"Time signature must be" in resp.data
 
 
+def test_invalid_bpm_preserves_user_input():
+    """When BPM parsing fails the form should retain previous values."""
+
+    client = app.test_client()
+    resp = client.post(
+        "/",
+        data={
+            "key": "C",
+            "chords": "C,Am",
+            "bpm": "fast",
+            "timesig": "4/4",
+            "notes": "12",
+            "motif_length": "4",
+            "base_octave": "4",
+            "random_chords": "1",
+        },
+    )
+
+    # The invalid BPM value should remain in the input element so the user can
+    # correct it without retyping other settings. The ``input-error`` class is
+    # also expected to highlight the problematic field.
+    assert b'value="fast"' in resp.data
+    assert b'field-control input-error' in resp.data
+    assert b'name="random_chords" value="1" checked' in resp.data
+
+
+def test_invalid_harmony_lines_marks_field():
+    """Invalid harmony line counts are highlighted and preserved."""
+
+    client = app.test_client()
+    resp = client.post(
+        "/",
+        data={
+            "key": "C",
+            "chords": "C",
+            "bpm": "120",
+            "timesig": "4/4",
+            "notes": "12",
+            "motif_length": "4",
+            "base_octave": "4",
+            "harmony_lines": "abc",
+        },
+    )
+
+    # The user supplied text remains in the control and the element receives
+    # the error styling class for visual feedback.
+    assert b'Harmony lines must be an integer.' in resp.data
+    assert b'value="abc"' in resp.data
+    assert b'name="harmony_lines"' in resp.data
+    assert b'field-control input-error' in resp.data
+
+
 def test_invalid_timesig_with_zero_harmony():
     """Invalid time signatures should be validated even when harmony is off."""
 
