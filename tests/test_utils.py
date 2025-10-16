@@ -93,3 +93,37 @@ def test_parse_chord_progression_invalid_chord_reports_name():
     message = str(excinfo.value)
     assert "Unknown chord" in message
     assert "H" in message
+
+
+def test_parse_chord_progression_accepts_roman_numerals_major():
+    """Roman numerals should resolve to diatonic triads in the chosen key."""
+
+    chords = parse_chord_progression("I, IV, V", key="C", allow_empty=False)
+    assert chords == ["C", "F", "G"]
+
+
+def test_parse_chord_progression_accepts_unicode_flats():
+    """Unicode accidentals (e.g. ♭VII) should map to the expected chords."""
+
+    chords = parse_chord_progression("♭VII", key="G", allow_empty=False)
+    # In G major the flat seventh triad is F major.
+    assert chords == ["F"]
+
+
+def test_parse_chord_progression_secondary_dominant():
+    """Secondary dominants (e.g. V/ii) should resolve via temporary keys."""
+
+    chords = parse_chord_progression("V/ii", key="C", allow_empty=False)
+    # Dominant of the supertonic (D minor) is A major.
+    assert chords == ["A"]
+
+
+def test_parse_chord_progression_invalid_roman_reports_name():
+    """Malformed Roman numerals should trigger the same descriptive error."""
+
+    with pytest.raises(ValueError) as excinfo:
+        parse_chord_progression("VX", key="C", allow_empty=False)
+
+    message = str(excinfo.value)
+    assert "Unknown chord" in message
+    assert "VX" in message
