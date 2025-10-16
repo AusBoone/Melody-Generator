@@ -597,6 +597,69 @@ def test_successful_post_returns_audio(monkeypatch):
     assert b"audio/wav" in resp.data
 
 
+def test_summary_section_lists_user_choices(monkeypatch):
+    """Successful previews include a human-readable summary of the inputs."""
+
+    client = app.test_client()
+
+    monkeypatch.setattr(web_gui, "generate_melody", lambda *a, **k: ["C4"])
+    monkeypatch.setattr(web_gui, "generate_harmony_line", lambda melody: melody)
+    monkeypatch.setattr(
+        web_gui, "generate_counterpoint_melody", lambda melody, _key: melody
+    )
+    monkeypatch.setattr(web_gui, "create_midi_file", lambda *a, **k: None)
+    monkeypatch.setattr(
+        web_gui.playback,
+        "render_midi_to_wav",
+        lambda mid, wav, soundfont=None: Path(wav).write_bytes(b"wav"),
+    )
+    class DummyModel:
+        """Predictable sequence model used to satisfy the ML toggle."""
+
+        def predict_logits(self, history):  # pragma: no cover - trivial stub
+            return [0.1, 0.2]
+
+    monkeypatch.setattr(web_gui, "load_sequence_model", lambda *a, **k: DummyModel())
+
+    style_name = sorted(web_gui.STYLE_VECTORS.keys())[0]
+
+    response = client.post(
+        "/",
+        data={
+            "key": "C",
+            "chords": "",
+            "random_chords": "1",
+            "bpm": "140",
+            "timesig": "3/4",
+            "notes": "4",
+            "motif_length": "2",
+            "base_octave": "5",
+            "instrument": "Guitar",
+            "harmony": "1",
+            "harmony_lines": "2",
+            "counterpoint": "1",
+            "include_chords": "1",
+            "chords_same": "1",
+            "random_rhythm": "1",
+            "ornaments": "1",
+            "enable_ml": "1",
+            "style": style_name,
+        },
+    )
+
+    html = response.get_data(as_text=True)
+    # The summary panel should report the user's selections so they can
+    # immediately confirm tempo, instrumentation and toggles without revisiting
+    # the form.
+    assert "Session Summary" in html
+    assert "Core Settings" in html
+    assert "140 BPM" in html
+    assert "3/4" in html
+    assert "Instrument" in html and "Guitar" in html
+    assert "randomised" in html  # chord progression flagged as randomised
+    assert "Machine learning weighting" in html
+
+
 def test_lowercase_inputs(monkeypatch):
     """Form values in lowercase should still be processed correctly."""
 

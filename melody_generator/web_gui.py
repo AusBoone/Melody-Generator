@@ -29,6 +29,10 @@ The latest revision introduces several changes:
 * **Form state preservation** – Validation failures now re-render the form with
   the user's previous selections and highlight invalid inputs, reducing the
   frustration of re-entering complex settings and improving accessibility.
+* **Preview summary panel** – Successful generations now render an itemised
+  breakdown of the selected settings alongside the audio controls so users can
+  confirm instrumentation, rhythm options and machine-learning toggles at a
+  glance.
 """
 # This revision introduces validation for the ``base_octave`` input so
 # out-of-range values (anything not between ``MIN_OCTAVE`` and
@@ -402,6 +406,150 @@ if celery_app is not None:
     generate_preview_task = celery_app.task(_generate_preview)  # type: ignore
 
 
+def _format_toggle(flag: bool, *, enabled: str = "Enabled", disabled: str = "Disabled") -> str:
+    """Return a short, user-facing string describing a boolean ``flag``.
+
+    Parameters
+    ----------
+    flag:
+        Boolean option selected by the user.
+    enabled / disabled:
+        Labels returned for ``True`` and ``False`` respectively. Callers may
+        override these defaults to present domain-specific wording such as
+        "Yes/No" or "Merged/Separate".
+
+    Returns
+    -------
+    str
+        ``enabled`` when ``flag`` is true, otherwise ``disabled``.
+    """
+
+    return enabled if flag else disabled
+
+
+def _build_preview_summary(parameters: Mapping[str, object]) -> List[Dict[str, object]]:
+    """Construct summary sections describing the generated preview.
+
+    The playback template presents a concise overview of the options that were
+    used to build the MIDI preview. Surfacing this information helps users
+    verify their selections—particularly when experimenting with multiple
+    iterations—without navigating back to the form.
+
+    Parameters
+    ----------
+    parameters:
+        Mapping of generation inputs mirroring the keyword arguments passed to
+        :func:`_generate_preview`. The mapping should contain primitive types
+        (strings, integers, booleans) so they can be rendered directly in the
+        template.
+
+    Returns
+    -------
+    List[Dict[str, object]]
+        Ordered list of section dictionaries. Each section exposes a
+        ``title`` and an ``entries`` list of ``{"label": str, "value": str}``
+        records so the template can iterate over the data without additional
+        formatting logic.
+    """
+
+    key = str(parameters.get("key", ""))
+    bpm = int(parameters.get("bpm", 0))
+    notes = int(parameters.get("notes", 0))
+    motif_length = int(parameters.get("motif_length", 0))
+    base_octave = int(parameters.get("base_octave", 0))
+    instrument = str(parameters.get("instrument", ""))
+    harmony_lines = int(parameters.get("harmony_lines", 0))
+    style = parameters.get("style") or "None"
+
+    # Time signatures are stored as ``(numerator, denominator)`` tuples. Guard
+    # against unexpected shapes by falling back to the common "4/4" metre so a
+    # helpful value is always displayed.
+    timesig = parameters.get("timesig", (4, 4))
+    try:
+        numerator, denominator = int(timesig[0]), int(timesig[1])  # type: ignore[index]
+    except Exception:  # pragma: no cover - defensive fallback
+        numerator, denominator = 4, 4
+
+    chords_list = parameters.get("chords") or []
+    if isinstance(chords_list, (list, tuple)):
+        progression = ", ".join(str(chord) for chord in chords_list)
+    else:  # pragma: no cover - unexpected user-provided type
+        progression = str(chords_list)
+
+    if parameters.get("random_chords"):
+        progression = f"{progression} (randomised)" if progression else "Randomly generated"
+    elif not progression:
+        progression = "Generated automatically"
+
+    core_section = {
+        "title": "Core Settings",
+        "entries": [
+            {"label": "Key", "value": key},
+            {"label": "Tempo", "value": f"{bpm} BPM"},
+            {"label": "Time signature", "value": f"{numerator}/{denominator}"},
+            {"label": "Melody length", "value": f"{notes} notes"},
+            {"label": "Motif length", "value": str(motif_length)},
+            {"label": "Base octave", "value": str(base_octave)},
+        ],
+    }
+
+    arrangement_section = {
+        "title": "Arrangement",
+        "entries": [
+            {"label": "Instrument", "value": instrument},
+            {"label": "Add harmony line", "value": _format_toggle(bool(parameters.get("harmony")))},
+            {"label": "Additional harmony voices", "value": str(max(0, harmony_lines))},
+            {"label": "Counterpoint", "value": _format_toggle(bool(parameters.get("counterpoint")))},
+            {
+                "label": "Export chord track",
+                "value": _format_toggle(
+                    bool(parameters.get("include_chords")),
+                    enabled="Included",
+                    disabled="Not included",
+                ),
+            },
+            {
+                "label": "Chord placement",
+                "value": _format_toggle(
+                    bool(parameters.get("chords_same")),
+                    enabled="Merged with melody",
+                    disabled="Separate track",
+                ),
+            },
+            {"label": "Chord progression", "value": progression or "N/A"},
+        ],
+    }
+
+    expression_section = {
+        "title": "Expression & Style",
+        "entries": [
+            {
+                "label": "Random rhythm pattern",
+                "value": _format_toggle(bool(parameters.get("random_rhythm"))),
+            },
+            {
+                "label": "Humanise performance",
+                "value": _format_toggle(bool(parameters.get("humanize"))),
+            },
+            {
+                "label": "Ornaments track",
+                "value": _format_toggle(bool(parameters.get("ornaments"))),
+            },
+            {
+                "label": "Machine learning weighting",
+                "value": _format_toggle(
+                    bool(parameters.get("enable_ml")),
+                    enabled="Enabled",
+                    disabled="Disabled",
+                ),
+            },
+            {"label": "Style preset", "value": style},
+        ],
+    }
+
+    return [core_section, arrangement_section, expression_section]
+
+
 def index():
     """Render the form and handle submissions.
 
@@ -558,6 +706,12 @@ def index():
             ornaments=ornaments,
         )
 
+        # ``summary_params`` mirrors ``params`` but also records whether the
+        # progression was randomised. The additional flag is not required for
+        # generation yet it enables the playback page to explain how the chord
+        # list was sourced, which is valuable context when comparing outputs.
+        summary_params = {**params, "random_chords": form_values["random_chords"]}
+
         try:
             if celery_app is not None:
                 try:
@@ -589,7 +743,13 @@ def index():
             flash(
                 "Preview audio could not be generated because FluidSynth or a soundfont is unavailable."
             )
-        return render_template("play.html", audio=audio_encoded, midi=midi_encoded)
+        summary_sections = _build_preview_summary(summary_params)
+        return render_template(
+            "play.html",
+            audio=audio_encoded,
+            midi=midi_encoded,
+            summary_sections=summary_sections,
+        )
 
     return _render_form()
 

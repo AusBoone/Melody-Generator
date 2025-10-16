@@ -103,6 +103,8 @@ deployment.
 ### User interface
 - GUI previews the melody before saving and can reload saved preferences
 - Web interface provides a WAV preview via FluidSynth
+- Playback page now surfaces a session summary detailing tempo, harmony options
+  and ML toggles so you can quickly confirm your selections before exporting.
 
 ### Output customization
 - Dynamic velocity for a more natural sound
