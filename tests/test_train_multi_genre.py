@@ -6,7 +6,7 @@ These tests focus on the pieces that were previously incomplete:
   sequence, enabling the training loop to compute a well-defined
   ``CrossEntropyLoss``.
 * ``train_one_epoch`` consumes those pairs and backpropagates without raising
-  shape errors.
+  shape errors, even when the data loader supplies multi-sample batches.
 * ``train_genre_model`` ties the pieces together and persists a checkpoint so
   downstream components can load genre-specific weights.
 
@@ -109,6 +109,33 @@ def test_train_one_epoch_updates_parameters(training_module):
     assert any(not torch.equal(b, a) for b, a in zip(before, after))
 
 
+def test_train_one_epoch_supports_minibatches(training_module):
+    """Mini-batched loaders should train without triggering shape errors."""
+
+    module = training_module
+
+    class _MiniBatchDataset(Dataset):
+        """Return two distinct training pairs to exercise batch collation."""
+
+        def __len__(self) -> int:  # pragma: no cover - trivial size helper
+            return 2
+
+        def __getitem__(self, index: int):  # pragma: no cover - deterministic
+            base = torch.tensor([index, index + 1, index + 2], dtype=torch.long)
+            target = torch.tensor(index + 3, dtype=torch.long)
+            return base, target
+
+    loader = DataLoader(_MiniBatchDataset(), batch_size=2, shuffle=False)
+    model = module.SimpleTransformer(vocab_size=16)
+    optimiser = torch.optim.Adam(model.parameters(), lr=0.01)
+    criterion = torch.nn.CrossEntropyLoss()
+
+    before = [param.clone() for param in model.parameters()]
+    loss = module.train_one_epoch(model, loader, criterion, optimiser)
+    after = list(model.parameters())
+
+    assert loss > 0
+    assert any(not torch.equal(b, a) for b, a in zip(before, after))
 def test_train_genre_model_writes_checkpoint(training_module, tmp_path):
     """High-level training should materialise a genre checkpoint on disk."""
 
