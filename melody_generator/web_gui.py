@@ -26,6 +26,9 @@ The latest revision introduces several changes:
   chord options behave identically across entry points.
 * **Thread-safe rate limiting** – The throttle now uses a lock for concurrent
   access and purges stale entries each request to bound memory usage.
+* **Form state preservation** – Validation failures now re-render the form with
+  the user's previous selections and highlight invalid inputs, reducing the
+  frustration of re-entering complex settings and improving accessibility.
 """
 # This revision introduces validation for the ``base_octave`` input so
 # out-of-range values (anything not between ``MIN_OCTAVE`` and
@@ -102,7 +105,7 @@ from __future__ import annotations
 from importlib import import_module
 from tempfile import NamedTemporaryFile
 from time import monotonic
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Iterable, List, Mapping, Optional, Set, Tuple
 
 from melody_generator import playback
 from melody_generator.playback import MidiPlaybackError
@@ -412,197 +415,127 @@ def index():
     """
 
     if request.method == 'POST':
-        # Extract user selections, applying sensible defaults when
-        # values are missing.
-        key = request.form.get('key') or 'C'
+        # Merge submitted values with defaults so the form can be re-rendered
+        # with the user's previous selections when validation fails.
+        form_values = _extract_form_values(request.form)
+
+        key_input = form_values["key"] or _FORM_TEXT_DEFAULTS["key"]
         try:
-            key = canonical_key(key)
+            key = canonical_key(key_input)
         except ValueError:
             flash("Invalid key selected. Please choose a valid key.")
-            return render_template('index.html', scale=sorted(SCALE.keys()), instruments=INSTRUMENTS.keys(), styles=STYLE_VECTORS.keys())
+            return _render_form(form_values, {"key"})
+        form_values["key"] = key
 
-        # Convert tempo to an integer, flashing an error when non-numeric text
-        # is supplied. The surrounding ``try`` guards against ``ValueError``
-        # raised by ``int`` when the input cannot be parsed.
+        bpm_raw = form_values.get("bpm", _FORM_TEXT_DEFAULTS["bpm"])
         try:
-            bpm = int(request.form.get('bpm') or 120)
+            bpm = int(bpm_raw)
         except ValueError:
             flash("BPM must be an integer.")
-            return render_template(
-                'index.html',
-                scale=sorted(SCALE.keys()),
-                instruments=INSTRUMENTS.keys(),
-                styles=STYLE_VECTORS.keys(),
-            )
+            return _render_form(form_values, {"bpm"})
+        form_values["bpm"] = str(bpm)
 
-        timesig = request.form.get('timesig') or '4/4'
+        timesig_raw = form_values.get("timesig", _FORM_TEXT_DEFAULTS["timesig"])
 
-        # Number of notes must parse as an integer so generation knows how many
-        # pitches to create. Invalid strings are reported to the user via a
-        # flash message.
+        notes_raw = form_values.get("notes", _FORM_TEXT_DEFAULTS["notes"])
         try:
-            notes = int(request.form.get('notes') or 16)
+            notes = int(notes_raw)
         except ValueError:
             flash("Number of notes must be an integer.")
-            return render_template(
-                'index.html',
-                scale=sorted(SCALE.keys()),
-                instruments=INSTRUMENTS.keys(),
-                styles=STYLE_VECTORS.keys(),
-            )
+            return _render_form(form_values, {"notes"})
+        form_values["notes"] = str(notes)
 
-        # Motif length likewise requires whole numbers; reject malformed input
-        # early so no downstream logic sees invalid data.
+        motif_raw = form_values.get("motif_length", _FORM_TEXT_DEFAULTS["motif_length"])
         try:
-            motif_length = int(request.form.get('motif_length') or 4)
+            motif_length = int(motif_raw)
         except ValueError:
             flash("Motif length must be an integer.")
-            return render_template(
-                'index.html',
-                scale=sorted(SCALE.keys()),
-                instruments=INSTRUMENTS.keys(),
-                styles=STYLE_VECTORS.keys(),
-            )
+            return _render_form(form_values, {"motif_length"})
+        form_values["motif_length"] = str(motif_length)
 
-        # Users may enter a textual ``base_octave`` which would otherwise crash
-        # ``int``. Handle the failure gracefully and re-render the form.
+        base_octave_raw = form_values.get("base_octave", _FORM_TEXT_DEFAULTS["base_octave"])
         try:
-            base_octave = int(request.form.get('base_octave') or 4)
+            base_octave = int(base_octave_raw)
         except ValueError:
             flash("Base octave must be an integer.")
-            return render_template(
-                'index.html',
-                scale=sorted(SCALE.keys()),
-                instruments=INSTRUMENTS.keys(),
-                styles=STYLE_VECTORS.keys(),
-            )
+            return _render_form(form_values, {"base_octave"})
+        form_values["base_octave"] = str(base_octave)
 
-        instrument = request.form.get('instrument') or 'Piano'
+        instrument = form_values.get("instrument", _FORM_TEXT_DEFAULTS["instrument"])
 
-        # ``harmony_lines`` may legally be zero but must still parse as an
-        # integer. Non-numeric input results in a flash message.
+        harmony_lines_raw = form_values.get("harmony_lines", _FORM_TEXT_DEFAULTS["harmony_lines"])
         try:
-            harmony_lines = int(request.form.get('harmony_lines') or 0)
+            harmony_lines = int(harmony_lines_raw or 0)
         except ValueError:
             flash("Harmony lines must be an integer.")
-            return render_template(
-                'index.html',
-                scale=sorted(SCALE.keys()),
-                instruments=INSTRUMENTS.keys(),
-                styles=STYLE_VECTORS.keys(),
-            )
+            return _render_form(form_values, {"harmony_lines"})
+        form_values["harmony_lines"] = str(harmony_lines)
 
-        # Basic sanity checks for numeric inputs. Values less than or equal to
-        # zero cannot produce a valid melody so the form is redisplayed with an
-        # informative message.
         if bpm <= 0:
             flash("BPM must be greater than 0.")
-            return render_template(
-                'index.html',
-                scale=sorted(SCALE.keys()),
-                instruments=INSTRUMENTS.keys(),
-                styles=STYLE_VECTORS.keys(),
-            )
+            return _render_form(form_values, {"bpm"})
 
         if notes <= 0:
             flash("Number of notes must be greater than 0.")
-            return render_template(
-                'index.html',
-                scale=sorted(SCALE.keys()),
-                instruments=INSTRUMENTS.keys(),
-                styles=STYLE_VECTORS.keys(),
-            )
+            return _render_form(form_values, {"notes"})
 
         if motif_length <= 0:
             flash("Motif length must be greater than 0.")
-            return render_template(
-                'index.html',
-                scale=sorted(SCALE.keys()),
-                instruments=INSTRUMENTS.keys(),
-                styles=STYLE_VECTORS.keys(),
-            )
+            return _render_form(form_values, {"motif_length"})
 
         if harmony_lines < 0:
-            # Inform the user that negative values are invalid while zero is
-            # acceptable so monophonic melodies remain supported.
             flash("Harmony lines must be non-negative.")
-            return render_template(
-                'index.html',
-                scale=sorted(SCALE.keys()),
-                instruments=INSTRUMENTS.keys(),
-                styles=STYLE_VECTORS.keys(),
-            )
+            return _render_form(form_values, {"harmony_lines"})
 
-        # Validate the selected instrument against the known General MIDI
-        # mapping. Unknown values likely mean the form was tampered with.
         if instrument not in INSTRUMENTS:
             flash("Unknown instrument")
-            return render_template(
-                'index.html',
-                scale=sorted(SCALE.keys()),
-                instruments=INSTRUMENTS.keys(),
-                styles=STYLE_VECTORS.keys(),
-            )
-        harmony = bool(request.form.get('harmony'))
-        random_rhythm = bool(request.form.get('random_rhythm'))
-        counterpoint = bool(request.form.get('counterpoint'))
-        include_chords = bool(request.form.get('include_chords'))
-        chords_same = bool(request.form.get('chords_same'))
-        ornaments = bool(request.form.get('ornaments'))
-        # Treat a missing checkbox as ``False`` so unchecking actually
-        # disables the humanize feature.
-        humanize = bool(request.form.get('humanize'))
-        enable_ml = bool(request.form.get('enable_ml'))
-        style = request.form.get('style') or None
+            return _render_form(form_values, {"instrument"})
+
+        harmony = form_values["harmony"]
+        random_rhythm = form_values["random_rhythm"]
+        counterpoint = form_values["counterpoint"]
+        include_chords = form_values["include_chords"]
+        chords_same = form_values["chords_same"]
+        ornaments = form_values["ornaments"]
+        humanize = form_values["humanize"]
+        enable_ml = form_values["enable_ml"]
+        style = form_values.get("style") or None
 
         try:
-            # ``parse_chord_progression`` unifies manual entry, checkbox-driven
-            # randomisation and fallback behaviour so the web view mirrors the
-            # CLI. When the random toggle is enabled we ignore any typed text
-            # and rely entirely on the helper to generate a fresh progression.
             chords = parse_chord_progression(
-                request.form.get('chords'),
+                form_values.get("chords"),
                 key=key,
-                force_random=bool(request.form.get('random_chords')),
+                force_random=form_values["random_chords"],
             )
         except ValueError as exc:
             flash(str(exc))
-            return render_template(
-                'index.html',
-                scale=sorted(SCALE.keys()),
-                instruments=INSTRUMENTS.keys(),
-                styles=STYLE_VECTORS.keys(),
-            )
+            return _render_form(form_values, {"chords"})
 
         try:
-            numerator, denominator = validate_time_signature(timesig)
+            numerator, denominator = validate_time_signature(timesig_raw)
         except ValueError:
             flash(
                 "Time signature must be in the form 'numerator/denominator' with numerator > 0 and denominator one of 1, 2, 4, 8 or 16."
             )
-            return render_template(
-                'index.html',
-                scale=sorted(SCALE.keys()),
-                instruments=INSTRUMENTS.keys(),
-                styles=STYLE_VECTORS.keys(),
-            )
+            return _render_form(form_values, {"timesig"})
+        form_values["timesig"] = f"{numerator}/{denominator}"
 
         if motif_length > notes:
             flash("Motif length cannot exceed the number of notes.")
-            return render_template('index.html', scale=sorted(SCALE.keys()), instruments=INSTRUMENTS.keys(), styles=STYLE_VECTORS.keys())
+            return _render_form(form_values, {"motif_length"})
 
         if not MIN_OCTAVE <= base_octave <= MAX_OCTAVE:
             flash(
                 f"Base octave must be between {MIN_OCTAVE} and {MAX_OCTAVE}."
             )
-            return render_template('index.html', scale=sorted(SCALE.keys()), instruments=INSTRUMENTS.keys(), styles=STYLE_VECTORS.keys())
+            return _render_form(form_values, {"base_octave"})
 
         if style:
             try:
                 get_style_vector(style)
             except KeyError:
                 flash(f"Unknown style: {style}")
-                return render_template('index.html', scale=sorted(SCALE.keys()), instruments=INSTRUMENTS.keys(), styles=STYLE_VECTORS.keys())
+                return _render_form(form_values, {"style"})
 
         params = dict(
             key=key,
@@ -618,30 +551,21 @@ def index():
             harmony_lines=harmony_lines,
             include_chords=include_chords,
             chords_same=chords_same,
-            humanize=humanize,
             enable_ml=enable_ml,
             style=style,
             chords=chords,
+            humanize=humanize,
             ornaments=ornaments,
         )
 
         try:
             if celery_app is not None:
                 try:
-                    # ``delay`` may raise immediately if the broker cannot be
-                    # reached.  Wrapping the call ensures we handle that case
-                    # and still generate the preview in-process so the user sees
-                    # a result instead of an error page.
-                    async_result = generate_preview_task.delay(**params)
+                    async_result = generate_preview_task.delay(**params)  # type: ignore
                     try:
-                        # ``get`` could otherwise block indefinitely if the
-                        # worker is unavailable. A short timeout keeps the
-                        # request responsive.
-                        result = async_result.get(timeout=10)
+                        timeout = current_app.config.get("CELERY_TASK_TIMEOUT", 10)
+                        result = async_result.get(timeout=timeout)
                     except CeleryTimeoutError as exc:
-                        # Log the timeout for debugging and fall back to a
-                        # synchronous preview so the user still receives a
-                        # response.
                         logger.exception(
                             "Timed out waiting for background worker: %s", exc
                         )
@@ -655,16 +579,10 @@ def index():
                     )
                     result = _generate_preview(**params)
             else:
-                # Execute synchronously when Celery is unavailable.
                 result = _generate_preview(**params)
         except RuntimeError as exc:
             flash(str(exc))
-            return render_template(
-                'index.html',
-                scale=sorted(SCALE.keys()),
-                instruments=INSTRUMENTS.keys(),
-                styles=STYLE_VECTORS.keys(),
-            )
+            return _render_form(form_values, {"enable_ml"})
 
         audio_encoded, midi_encoded = result
         if not audio_encoded:
@@ -673,14 +591,7 @@ def index():
             )
         return render_template("play.html", audio=audio_encoded, midi=midi_encoded)
 
-    # On a normal GET request simply render the form so the user can
-    # enter their parameters.
-    return render_template(
-        "index.html",
-        scale=sorted(SCALE.keys()),
-        instruments=INSTRUMENTS.keys(),
-        styles=STYLE_VECTORS.keys(),
-    )
+    return _render_form()
 
 
 def create_app() -> Flask:
@@ -770,3 +681,133 @@ def create_app() -> Flask:
 # Instantiate a default application for ad-hoc scripts and tests while still
 # exposing ``create_app`` for production WSGI servers.
 app = create_app()
+# Default values for text inputs. Values are stored as strings so they can be
+# injected directly into the HTML ``value`` attribute without additional
+# formatting.
+_FORM_TEXT_DEFAULTS: Dict[str, str] = {
+    "key": "C",
+    "chords": "",
+    "bpm": "120",
+    "timesig": "4/4",
+    "notes": "16",
+    "motif_length": "4",
+    "base_octave": "4",
+    "instrument": "Piano",
+    "style": "",
+    "harmony_lines": "0",
+}
+
+# Default values for boolean checkboxes. These map directly to HTML ``checked``
+# states and are always represented as :class:`bool` to simplify template
+# rendering.
+_FORM_CHECKBOX_DEFAULTS: Dict[str, bool] = {
+    "random_chords": False,
+    "harmony": False,
+    "random_rhythm": False,
+    "counterpoint": False,
+    "include_chords": False,
+    "chords_same": False,
+    "ornaments": False,
+    "humanize": True,
+    "enable_ml": False,
+}
+
+# ---------------------------------------------------------------------------
+# Form rendering helpers
+# ---------------------------------------------------------------------------
+
+
+def _default_form_values() -> Dict[str, object]:
+    """Return a merged copy of default form values.
+
+    The helper combines defaults for both text inputs and checkboxes. Returning
+    a new dictionary on every call ensures request handlers can safely mutate
+    the structure without affecting subsequent requests.
+
+    Returns:
+        Dict[str, object]: Mapping keyed by form input names containing the
+            default values expected by the templates.
+    """
+
+    values: Dict[str, object] = {**_FORM_TEXT_DEFAULTS, **_FORM_CHECKBOX_DEFAULTS}
+    return values
+
+
+def _extract_form_values(form: Mapping[str, str]) -> Dict[str, object]:
+    """Return request data merged with defaults for re-rendering.
+
+    Parameters:
+        form: Immutable mapping provided by Flask representing submitted form
+            data. Values are strings as sent by the browser.
+
+    Returns:
+        Dict[str, object]: Dictionary containing the user's selections. Text
+        fields remain strings so they can be reinserted into input elements,
+        while checkbox values become booleans for easier conditional handling.
+    """
+
+    merged = _default_form_values()
+
+    # Copy textual values if the user supplied them. Empty strings are
+    # preserved—allowing blank fields is important so validation can highlight
+    # the offending input without substituting defaults.
+    for field in _FORM_TEXT_DEFAULTS:
+        if field in form:
+            merged[field] = form.get(field, "")
+
+    # Checkboxes are considered active when the browser submits any value for
+    # the field. ``bool`` conversion handles common cases like "1" or "on".
+    for field in _FORM_CHECKBOX_DEFAULTS:
+        merged[field] = bool(form.get(field))
+
+    return merged
+
+
+def _build_form_context(
+    form_values: Optional[Mapping[str, object]] = None,
+    error_fields: Optional[Iterable[str]] = None,
+) -> Dict[str, object]:
+    """Assemble template context used for rendering the index form.
+
+    Parameters:
+        form_values: Optional mapping of form field names to values. When
+            provided the data is merged with defaults to ensure all expected
+            keys are present.
+        error_fields: Iterable of field names that failed validation. The
+            template uses this set to style problematic inputs and announce the
+            issue to assistive technology via ``aria`` attributes.
+
+    Returns:
+        Dict[str, object]: Context dictionary passed directly to
+        :func:`flask.render_template`.
+    """
+
+    context_values = _default_form_values()
+    if form_values is not None:
+        for name, value in form_values.items():
+            # Only merge known fields so unexpected keys cannot leak into the
+            # template context. This guards against malicious submissions that
+            # attempt to override unrelated template variables.
+            if name in context_values:
+                context_values[name] = value
+
+    highlighted: Set[str] = set(error_fields or [])
+
+    return {
+        "scale": sorted(SCALE.keys()),
+        "instruments": list(INSTRUMENTS.keys()),
+        "styles": sorted(STYLE_VECTORS.keys()),
+        "form_values": context_values,
+        "error_fields": highlighted,
+    }
+
+
+def _render_form(
+    form_values: Optional[Mapping[str, object]] = None,
+    error_fields: Optional[Iterable[str]] = None,
+):
+    """Render the generator form with supplied values and error highlights."""
+
+    return render_template(
+        "index.html", **_build_form_context(form_values, error_fields)
+    )

@@ -1,32 +1,48 @@
 <!doctype html>
+<!--
+  Playback page for Melody Generator
+  ----------------------------------
+  Renders the preview audio player and provides a direct download link for the
+  generated MIDI file. The template expects ``audio`` (base64 WAV data, may be
+  empty) and ``midi`` (base64 MIDI data) in the context along with any flashed
+  status messages.
+-->
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <title>Melody Generated</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
-<body>
-  <h1>Your Melody</h1>
-  <!-- Display any flash messages such as playback failures -->
-  {% with messages = get_flashed_messages() %}
-    {% if messages %}
-      <ul class="flashes">
-      {% for msg in messages %}
-        <li>{{ msg }}</li>
-      {% endfor %}
-      </ul>
+<body class="app-body">
+  <div class="app-container">
+    <header class="page-header">
+      <h1 class="page-title">Your Melody</h1>
+      <p class="page-subtitle">Preview the arrangement or download the MIDI file for use in your DAW.</p>
+    </header>
+
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <ul class="flash-list" role="alert">
+        {% for msg in messages %}
+          <li class="flash-item">{{ msg }}</li>
+        {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+
+    {% if audio %}
+      <div class="audio-preview">
+        <audio controls autoplay class="audio-player">
+          <source src="data:audio/wav;base64,{{ audio }}" type="audio/wav">
+          Your browser does not support the audio tag.
+        </audio>
+      </div>
     {% endif %}
-  {% endwith %}
-  <!-- Embedded player previews the generated audio file when available -->
-  {% if audio %}
-  <audio controls autoplay>
-    <source src="data:audio/wav;base64,{{ audio }}" type="audio/wav">
-    Your browser does not support the audio tag.
-  </audio>
-  {% endif %}
-  <!-- Download link for saving the MIDI file locally -->
-  <p><a download="melody.mid" href="data:audio/midi;base64,{{ midi }}">Download MIDI</a></p>
-  <!-- Link back to the generator form -->
-  <p><a href="/">Generate another</a></p>
+
+    <div class="playback-actions">
+      <a class="primary-button" download="melody.mid" href="data:audio/midi;base64,{{ midi }}">Download MIDI</a>
+      <a class="secondary-link" href="/">Generate another melody</a>
+    </div>
+  </div>
 </body>
 </html>
