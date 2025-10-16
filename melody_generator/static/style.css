@@ -5,7 +5,9 @@
  * interface. The latest revision introduces a responsive grid, visual
  * hierarchy for section headings and accessible error highlighting so the new
  * form layout in ``templates/index.html`` remains usable on small screens and
- * clearly indicates validation errors.
+ * clearly indicates validation errors. It also styles the playback summary
+ * cards displayed on ``templates/play.html`` so generated settings are easy to
+ * scan after previewing a melody.
  */
 
 .app-body {
@@ -199,6 +201,74 @@
 
 .secondary-link:hover {
     text-decoration: underline;
+}
+
+.summary-section {
+    margin-top: 3rem;
+    border: 1px solid #e4e7eb;
+    border-radius: 12px;
+    padding: 1.75rem;
+    background: #f9fbff;
+}
+
+.summary-heading {
+    margin: 0;
+    font-size: 1.5rem;
+    color: #102a43;
+}
+
+.summary-description {
+    margin: 0.75rem 0 1.5rem;
+    color: #52606d;
+    line-height: 1.5;
+}
+
+.summary-grid {
+    display: grid;
+    gap: 1.25rem;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.summary-card {
+    background: #ffffff;
+    border-radius: 10px;
+    border: 1px solid #e4e7eb;
+    padding: 1.25rem;
+    box-shadow: 0 12px 24px rgba(15, 23, 42, 0.05);
+}
+
+.summary-title {
+    margin: 0 0 0.75rem;
+    font-size: 1.15rem;
+    color: #243b53;
+}
+
+.summary-list {
+    margin: 0;
+    padding: 0;
+}
+
+.summary-item {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 0.4rem 0.75rem;
+    align-items: baseline;
+    padding: 0.45rem 0;
+    border-bottom: 1px solid #eef2f7;
+}
+
+.summary-item:last-child {
+    border-bottom: none;
+}
+
+.summary-term {
+    font-weight: 600;
+    color: #334e68;
+}
+
+.summary-value {
+    margin: 0;
+    color: #52606d;
 }
 
 .input-error {

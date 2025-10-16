@@ -5,7 +5,10 @@
   Renders the preview audio player and provides a direct download link for the
   generated MIDI file. The template expects ``audio`` (base64 WAV data, may be
   empty) and ``midi`` (base64 MIDI data) in the context along with any flashed
-  status messages.
+  status messages. The latest revision introduces a summary panel fed by the
+  ``summary_sections`` context variable so listeners can review the key
+  settings—tempo, instrumentation, harmony toggles and ML options—without
+  returning to the form.
 -->
 <html lang="en">
 <head>
@@ -43,6 +46,28 @@
       <a class="primary-button" download="melody.mid" href="data:audio/midi;base64,{{ midi }}">Download MIDI</a>
       <a class="secondary-link" href="/">Generate another melody</a>
     </div>
+
+    <section class="summary-section">
+      <h2 class="summary-heading">Session Summary</h2>
+      <p class="summary-description">
+        Review the parameters used to create this preview before exporting or tweaking another variation.
+      </p>
+      <div class="summary-grid">
+        {% for section in summary_sections %}
+          <article class="summary-card">
+            <h3 class="summary-title">{{ section.title }}</h3>
+            <dl class="summary-list">
+              {% for item in section.entries %}
+                <div class="summary-item">
+                  <dt class="summary-term">{{ item.label }}</dt>
+                  <dd class="summary-value">{{ item.value }}</dd>
+                </div>
+              {% endfor %}
+            </dl>
+          </article>
+        {% endfor %}
+      </div>
+    </section>
   </div>
 </body>
 </html>
