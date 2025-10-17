@@ -21,6 +21,10 @@ Revision Summary
   enharmonic preferences from the current key signature and resolve secondary
   dominants recursively. Inline comments highlight design decisions and edge
   cases for future contributors.
+* Extended :func:`validate_time_signature` to recognise textual aliases for
+  common-time (``"C"``/``"common time"``) and cut-time (``"C|"``/``"alla
+  breve"``/``"¢"``) signatures so musicians can use familiar notation symbols in
+  the CLI, GUI and web form without triggering validation errors.
 """
 
 from __future__ import annotations
@@ -245,8 +249,40 @@ def validate_time_signature(ts: str) -> tuple[int, int]:
         If ``ts`` is malformed or uses an unsupported denominator.
     """
 
-    # Accept input such as "4/4" or " 3 / 8 " by trimming whitespace
-    parts = ts.strip().split("/")
+    # ``ts`` may be provided either in "NUM/DEN" form or as a textual alias such
+    # as "C" for common time or "alla breve" for cut time. Normalise whitespace
+    # and case so the alias lookup remains robust regardless of user input.
+    cleaned = " ".join(ts.split()).strip()
+    alias_key = cleaned.casefold()
+
+    # Mapping of case-insensitive textual aliases to their corresponding
+    # ``(numerator, denominator)`` values. ``casefold`` handles accented
+    # characters (e.g. the "¢" cut-time symbol) so users can paste notation
+    # symbols directly from documentation without triggering errors.
+    alias_map = {
+        "c": (4, 4),
+        "commontime": (4, 4),
+        "common time": (4, 4),
+        "c|": (2, 2),
+        "cuttime": (2, 2),
+        "cut time": (2, 2),
+        "alla breve": (2, 2),
+        "¢": (2, 2),
+    }
+
+    # Some aliases include spaces while others may be entered without them.
+    # Check both the spaced and condensed versions so inputs like "CutTime" or
+    # "common time" map to their canonical meters.
+    condensed_alias_key = alias_key.replace(" ", "")
+    if alias_key in alias_map:
+        return alias_map[alias_key]
+    if condensed_alias_key in alias_map:
+        return alias_map[condensed_alias_key]
+
+    # Accept input such as "4/4" or " 3 / 8 " by trimming whitespace. The
+    # cleaned alias is re-used so that any stray spaces inserted around the
+    # slash do not affect parsing.
+    parts = cleaned.split("/")
     if len(parts) != 2:
         raise ValueError(
             "Time signature must be in the form 'numerator/denominator'."
