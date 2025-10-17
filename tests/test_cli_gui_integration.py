@@ -350,6 +350,7 @@ def test_generate_button_click(tmp_path, monkeypatch):
     gui.include_chords_var = types.SimpleNamespace(get=lambda: True)
     gui.chords_same_var = types.SimpleNamespace(get=lambda: False)
     gui.ornament_var = types.SimpleNamespace(get=lambda: True)
+    gui.plagal_var = types.SimpleNamespace(get=lambda: False)
     lb = types.SimpleNamespace(
         curselection=lambda: (0, 1),
         get=lambda idx: ["C", "G"][idx],
@@ -463,6 +464,10 @@ def test_generate_button_click_non_positive(tmp_path, monkeypatch):
     gui.include_chords_var = types.SimpleNamespace(get=lambda: False)
     gui.chords_same_var = types.SimpleNamespace(get=lambda: False)
     gui.ornament_var = types.SimpleNamespace(get=lambda: False)
+    gui.plagal_var = types.SimpleNamespace(get=lambda: False)
+    gui.plagal_var = types.SimpleNamespace(get=lambda: False)
+    gui.plagal_var = types.SimpleNamespace(get=lambda: False)
+    gui.plagal_var = types.SimpleNamespace(get=lambda: False)
     lb = types.SimpleNamespace(curselection=lambda: (0,), get=lambda idx: "C")
     gui.chord_listbox = lb
     gui.display_map = {"C": "C"}
@@ -506,6 +511,8 @@ def test_generate_button_click_invalid_denominator(tmp_path, monkeypatch):
     gui.include_chords_var = types.SimpleNamespace(get=lambda: False)
     gui.chords_same_var = types.SimpleNamespace(get=lambda: False)
     gui.ornament_var = types.SimpleNamespace(get=lambda: False)
+    gui.plagal_var = types.SimpleNamespace(get=lambda: False)
+    gui.plagal_var = types.SimpleNamespace(get=lambda: False)
     lb = types.SimpleNamespace(curselection=lambda: (0,), get=lambda idx: "C")
     gui.chord_listbox = lb
     gui.display_map = {"C": "C"}
@@ -964,6 +971,7 @@ def test_preview_button_uses_playback(monkeypatch, tmp_path):
     gui.include_chords_var = types.SimpleNamespace(get=lambda: False)
     gui.chords_same_var = types.SimpleNamespace(get=lambda: False)
     gui.ornament_var = types.SimpleNamespace(get=lambda: False)
+    gui.plagal_var = types.SimpleNamespace(get=lambda: False)
     gui.chord_listbox = types.SimpleNamespace(
         curselection=lambda: (0,), get=lambda idx: "C"
     )
@@ -1011,6 +1019,7 @@ def test_preview_button_falls_back(monkeypatch, tmp_path):
     gui.include_chords_var = types.SimpleNamespace(get=lambda: False)
     gui.chords_same_var = types.SimpleNamespace(get=lambda: False)
     gui.ornament_var = types.SimpleNamespace(get=lambda: False)
+    gui.plagal_var = types.SimpleNamespace(get=lambda: False)
     gui.chord_listbox = types.SimpleNamespace(
         curselection=lambda: (0,), get=lambda idx: "C"
     )
@@ -1061,6 +1070,9 @@ def test_preview_file_removed(monkeypatch, tmp_path):
     gui.include_chords_var = types.SimpleNamespace(get=lambda: False)
     gui.chords_same_var = types.SimpleNamespace(get=lambda: False)
     gui.ornament_var = types.SimpleNamespace(get=lambda: False)
+    # Provide the plagal cadence toggle introduced by the GUI so the preview
+    # workflow sees the same state as a real window.
+    gui.plagal_var = types.SimpleNamespace(get=lambda: False)
     gui.chord_listbox = types.SimpleNamespace(
         curselection=lambda: (0,), get=lambda idx: "C"
     )
@@ -1111,6 +1123,8 @@ def test_preview_file_waits_for_player(monkeypatch):
     gui.include_chords_var = types.SimpleNamespace(get=lambda: False)
     gui.chords_same_var = types.SimpleNamespace(get=lambda: False)
     gui.ornament_var = types.SimpleNamespace(get=lambda: False)
+    # Mirror the plagal cadence checkbox state to satisfy the preview logic.
+    gui.plagal_var = types.SimpleNamespace(get=lambda: False)
     gui.chord_listbox = types.SimpleNamespace(
         curselection=lambda: (0,), get=lambda idx: "C"
     )
@@ -1272,6 +1286,51 @@ def test_cli_soundfont_forwarded(monkeypatch, tmp_path):
     sys.argv = old
 
     assert calls.get("args") == (str(out), "custom.sf2")
+
+
+def test_cli_plagal_cadence_forwarded(monkeypatch, tmp_path):
+    """``--plagal-cadence`` should reach ``generate_melody``."""
+
+    mod, _, _ = load_module()
+    out = tmp_path / "cad.mid"
+    argv = [
+        "prog",
+        "--key",
+        "C",
+        "--chords",
+        "C,G",
+        "--bpm",
+        "120",
+        "--timesig",
+        "4/4",
+        "--notes",
+        "4",
+        "--base-octave",
+        "4",
+        "--output",
+        str(out),
+        "--plagal-cadence",
+    ]
+
+    captured = {}
+
+    def fake_generate(*args, **kwargs):
+        captured["plagal"] = kwargs.get("plagal_cadence")
+        return ["C4"] * args[1]
+
+    monkeypatch.setattr(mod, "generate_melody", fake_generate)
+    monkeypatch.setattr(
+        mod,
+        "create_midi_file",
+        lambda *a, **k: Path(a[3]).write_text("midi"),
+    )
+
+    old = sys.argv
+    sys.argv = argv
+    mod.run_cli()
+    sys.argv = old
+
+    assert captured.get("plagal") is True
 
 
 def test_cli_soundfont_without_play(monkeypatch, tmp_path):
