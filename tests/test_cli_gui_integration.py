@@ -434,6 +434,55 @@ def test_generate_button_click(tmp_path, monkeypatch):
     assert calls["kwargs"]["ornaments"] is True
 
 
+def test_gui_generate_worker_plagal_forwarded(monkeypatch):
+    """Background generation should forward the plagal cadence flag."""
+
+    mod, gui_mod, _ = load_module()
+    gui = gui_mod.MelodyGeneratorGUI.__new__(gui_mod.MelodyGeneratorGUI)
+    captured: dict[str, object] = {}
+
+    def fake_generate(*args, **kwargs):
+        captured["plagal"] = kwargs.get("plagal_cadence")
+        return ["C4", "E4"]
+
+    gui.generate_melody = fake_generate
+    gui.create_midi_file = lambda *a, **k: None
+    gui.harmony_line_fn = None
+    gui.counterpoint_fn = None
+    gui.save_settings = None
+    gui.progress = types.SimpleNamespace(start=lambda: None, stop=lambda: None, grid=lambda: None, grid_remove=lambda: None)
+    gui.inputs = []
+    gui.root = types.SimpleNamespace(after=lambda _delay, callback, **kwargs: callback(**kwargs))
+    gui._generation_complete = lambda **k: None
+
+    params = {
+        "key": "C",
+        "notes_count": 4,
+        "chord_progression": ["C", "G"],
+        "motif_length": 2,
+        "base_octave": 4,
+        "seq_model": None,
+        "style_name": None,
+        "harmony_lines": 0,
+        "add_counterpoint": False,
+        "harmony": False,
+        "include_chords": False,
+        "chords_same": False,
+        "program": 0,
+        "humanize": True,
+        "rhythm_pattern": None,
+        "ornaments": False,
+        "plagal_cadence": True,
+        "bpm": 120,
+        "timesig": (4, 4),
+        "output_file": "out.mid",
+    }
+
+    gui._generate_worker(params)
+
+    assert captured.get("plagal") is True
+
+
 def test_generate_button_click_non_positive(tmp_path, monkeypatch):
     """Reject negative or zero values entered in the GUI.
 
@@ -989,6 +1038,56 @@ def test_preview_button_uses_playback(monkeypatch, tmp_path):
     gui._preview_button_click()
 
     assert "path" in calls
+
+
+def test_preview_button_plagal_cadence_forwarded(monkeypatch, tmp_path):
+    """``_preview_button_click`` should pass the plagal cadence flag."""
+
+    mod, gui_mod, _ = load_module()
+
+    captured: dict[str, object] = {}
+
+    def fake_generate(*args, **kwargs):
+        captured["plagal"] = kwargs.get("plagal_cadence")
+        return ["C4"] * 4
+
+    gui = gui_mod.MelodyGeneratorGUI.__new__(gui_mod.MelodyGeneratorGUI)
+    gui.generate_melody = fake_generate
+    gui.create_midi_file = lambda *a, **k: Path(a[3]).write_text("midi")
+    gui.harmony_line_fn = None
+    gui.counterpoint_fn = None
+    gui.save_settings = None
+    gui.rhythm_pattern = None
+    gui.seed_var = types.SimpleNamespace(get=lambda: "")
+    gui.ml_var = types.SimpleNamespace(get=lambda: False)
+    gui.style_var = types.SimpleNamespace(get=lambda: "")
+    gui.key_var = types.SimpleNamespace(get=lambda: "C")
+    gui.bpm_var = types.SimpleNamespace(get=lambda: 120)
+    gui.timesig_var = types.SimpleNamespace(get=lambda: "4/4")
+    gui.notes_var = types.SimpleNamespace(get=lambda: 4)
+    gui.motif_entry = types.SimpleNamespace(get=lambda: "2")
+    gui.base_octave_var = types.SimpleNamespace(get=lambda: 4)
+    gui.instrument_var = types.SimpleNamespace(get=lambda: "Piano")
+    gui.harmony_var = types.SimpleNamespace(get=lambda: False)
+    gui.counterpoint_var = types.SimpleNamespace(get=lambda: False)
+    gui.harmony_lines = types.SimpleNamespace(get=lambda: "0")
+    gui.include_chords_var = types.SimpleNamespace(get=lambda: False)
+    gui.chords_same_var = types.SimpleNamespace(get=lambda: False)
+    gui.ornament_var = types.SimpleNamespace(get=lambda: False)
+    gui.plagal_var = types.SimpleNamespace(get=lambda: True)
+    gui.chord_listbox = types.SimpleNamespace(
+        curselection=lambda: (0,), get=lambda idx: "C"
+    )
+    gui.display_map = {"C": "C"}
+    gui.sorted_chords = ["C"]
+    gui.soundfont_var = types.SimpleNamespace(get=lambda: "")
+
+    monkeypatch.setattr(mod, "playback", types.SimpleNamespace(play_midi=lambda *a, **k: None), raising=False)
+    monkeypatch.setattr(mod.gui, "messagebox", types.SimpleNamespace(showerror=lambda *a, **k: None), raising=False)
+
+    gui._preview_button_click()
+
+    assert captured.get("plagal") is True
 
 
 def test_preview_button_falls_back(monkeypatch, tmp_path):

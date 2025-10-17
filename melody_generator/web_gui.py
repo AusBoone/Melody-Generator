@@ -319,6 +319,7 @@ def _generate_preview(
     chords: List[str],
     humanize: bool,
     ornaments: bool,
+    plagal_cadence: bool,
 ) -> tuple[str, str]:
     """Render a short preview of the requested melody to audio and MIDI.
 
@@ -343,6 +344,7 @@ def _generate_preview(
         base_octave=base_octave,
         sequence_model=seq_model,
         style=style or None,
+        plagal_cadence=plagal_cadence,
     )
     # When random rhythmic patterns are requested, generate a list of durations
     # equal in length to ``notes`` so each pitch receives a corresponding value.
@@ -517,6 +519,10 @@ def _build_preview_summary(parameters: Mapping[str, object]) -> List[Dict[str, o
                 ),
             },
             {"label": "Chord progression", "value": progression or "N/A"},
+            {
+                "label": "Plagal cadence",
+                "value": _format_toggle(bool(parameters.get("plagal_cadence"))),
+            },
         ],
     }
 
@@ -647,6 +653,7 @@ def index():
         ornaments = form_values["ornaments"]
         humanize = form_values["humanize"]
         enable_ml = form_values["enable_ml"]
+        plagal_cadence = form_values["plagal_cadence"]
         style = form_values.get("style") or None
 
         try:
@@ -704,13 +711,17 @@ def index():
             chords=chords,
             humanize=humanize,
             ornaments=ornaments,
+            plagal_cadence=plagal_cadence,
         )
 
         # ``summary_params`` mirrors ``params`` but also records whether the
         # progression was randomised. The additional flag is not required for
         # generation yet it enables the playback page to explain how the chord
         # list was sourced, which is valuable context when comparing outputs.
-        summary_params = {**params, "random_chords": form_values["random_chords"]}
+        summary_params = {
+            **params,
+            "random_chords": form_values["random_chords"],
+        }
 
         try:
             if celery_app is not None:
@@ -870,6 +881,7 @@ _FORM_CHECKBOX_DEFAULTS: Dict[str, bool] = {
     "ornaments": False,
     "humanize": True,
     "enable_ml": False,
+    "plagal_cadence": False,
 }
 
 # ---------------------------------------------------------------------------

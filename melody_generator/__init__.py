@@ -108,7 +108,12 @@ __version__ = "0.1.0"
 # * MIDI output uses a crescendo-decrescendo velocity curve with downbeat
 #   accents for a more musical performance.
 # * Candidate weighting now uses a simple transition matrix and the final note
-#   resolves to the root of the last chord for a basic cadence.
+#   resolves to the root of the last chord for a basic cadence.  An optional
+#   plagal cadence flag now reharmonises the final bar with a IV–I gesture and
+#   reshapes the soprano line to descend ^4–^3–^1 for a gospel-inspired close.
+# * Sectional phrases that reuse earlier material (e.g. ``AABA``) now reapply the
+#   plagal cadence adjustments after concatenation so the final repeat still
+#   resolves with the intended IV–I motion even when no new notes are generated.
 # * Added ``PhrasePlanner`` for hierarchical skeleton/infill planning so phrases
 #   exhibit clearer A/B structure.
 # * Introduced ``SequenceModel`` interface; LSTM logits now bias candidate
@@ -147,7 +152,7 @@ import random
 import logging
 import json
 from pathlib import Path
-from typing import List, Tuple, Optional, Sequence
+from typing import Dict, List, Tuple, Optional, Sequence
 from mido import Message, MidiFile, MidiTrack  # noqa: F401
 from functools import lru_cache
 import os
@@ -440,6 +445,19 @@ CHORDS = {
 CANONICAL_KEYS = {name.lower(): name for name in SCALE}
 CANONICAL_CHORDS = {name.lower(): name for name in CHORDS}
 
+# Enharmonic fallbacks used when a theoretically correct spelling is missing
+# from :data:`CHORDS`.  Helpers that synthesise diatonic chords consult this
+# mapping so progressions never devolve into random substitutions simply because
+# a rarely used spelling (e.g. ``A#``) is absent from the static lookup table.
+_ENHARMONIC_EQUIVALENTS: dict[str, str] = {
+    "A#": "Bb",
+    "A#m": "Bbm",
+    "Db": "C#",
+    "Dbm": "C#m",
+    "Ab": "G#",
+    "Abm": "G#m",
+}
+
 
 @lru_cache(maxsize=None)
 def canonical_key(name: str) -> str:
@@ -572,16 +590,10 @@ def generate_random_chord_progression(key: str, length: int = 4) -> List[str]:
         quality = qualities[idx % len(qualities)]
         chord = note + quality
         if chord not in CHORDS:
-            # Translate enharmonic spellings to match available chord names
-            translation = {
-                "A#": "Bb",
-                "A#m": "Bbm",
-                "Db": "C#",
-                "Dbm": "C#m",
-                "Ab": "G#",
-                "Abm": "G#m",
-            }
-            chord = translation.get(chord, chord)
+            # Translate enharmonic spellings to match available chord names.
+            # Using the shared mapping keeps behaviour consistent across
+            # helpers that synthesise chords from scale degrees.
+            chord = _ENHARMONIC_EQUIVALENTS.get(chord, chord)
         return chord if chord in CHORDS else random.choice(list(CHORDS.keys()))
 
     # Convert degree numbers to concrete chord names
@@ -628,20 +640,12 @@ def diatonic_chords(key: str) -> List[str]:
         else ["", "m", "m", "", "", "m", "dim"]
     )
     chords = []
-    translation = {
-        "A#": "Bb",
-        "A#m": "Bbm",
-        "Db": "C#",
-        "Dbm": "C#m",
-        "Ab": "G#",
-        "Abm": "G#m",
-    }
     for note, qual in zip(notes, qualities):
         # Concatenate the quality directly so diminished chords retain the
         # "dim" suffix instead of collapsing to a bare major triad.
         chord = note + qual
         if chord not in CHORDS:
-            chord = translation.get(chord, chord)
+            chord = _ENHARMONIC_EQUIVALENTS.get(chord, chord)
         if chord in CHORDS and chord not in chords:
             chords.append(chord)
     return chords
@@ -847,6 +851,7 @@ def generate_melody(
     rhythm_generator: Optional[RhythmGenerator] = None,
     style: Optional[str] = None,
     refine: bool = False,
+    plagal_cadence: bool = False,
 ) -> List[str]:
     """Return a melody in ``key`` spanning ``num_notes`` notes.
 
@@ -915,6 +920,10 @@ def generate_melody(
     @param refine (bool): When ``True`` apply a Frechet Music Distance based
         hill-climb to tweak up to five percent of notes and clamp the melody
         to the planned pitch range.
+    @param plagal_cadence (bool): When ``True`` reharmonise the final two
+        positions as IV→I and force the top line to resolve ^4–^3–^1. This
+        mirrors the GUI's "plagal cadence" toggle and produces an
+        ecclesiastical-sounding close regardless of the original chord list.
     @returns List[str]: Generated melody as note strings.
     """
     # The chord progression provides harmonic context for each note. Reject an
@@ -942,6 +951,40 @@ def generate_melody(
 
     notes_in_key = SCALE[key]
     indices_in_key = _SCALE_INDICES[key]
+
+    # Track optional overrides for the cadence so only the final beat pair is
+    # reharmonised. ``plagal_overrides`` maps absolute note indices to chord
+    # names, ensuring that earlier repetitions of the progression remain
+    # untouched even when the same chords loop via modulo arithmetic.
+    plagal_overrides: Dict[int, str] = {}
+    tonic_override: Optional[str] = None
+    if plagal_cadence:
+        # ``diatonic_chords`` returns the scale's triads in order.  The tonic
+        # and subdominant provide the IV–I cadence while still respecting the
+        # user's chosen mode (major/minor and modal variants).
+        chords_in_key = diatonic_chords(key)
+        if len(chords_in_key) >= 4:
+            tonic_override = canonical_chord(chords_in_key[0])
+            subdominant_override = canonical_chord(chords_in_key[3])
+            if num_notes >= 1:
+                plagal_overrides[num_notes - 1] = tonic_override
+            if num_notes >= 2:
+                plagal_overrides[num_notes - 2] = subdominant_override
+        else:
+            # Missing chords indicate a malformed scale definition. Rather than
+            # crash, disable the plagal option and proceed with the user's
+            # original progression while logging the issue for diagnostics.
+            logging.warning(
+                "Plagal cadence unavailable for %s because diatonic chords are incomplete.",
+                key,
+            )
+            plagal_cadence = False
+
+    def _chord_at(index: int) -> str:
+        """Return the active chord for ``index`` honouring cadence overrides."""
+
+        override = plagal_overrides.get(index)
+        return override if override is not None else chord_progression[index % len(chord_progression)]
 
     # Choose a rhythmic pattern when the caller does not supply one.  The
     # pattern cycles throughout the melody to give it an underlying pulse.
@@ -983,6 +1026,64 @@ def generate_melody(
     phrase_plan = phrase_plan or generate_phrase_plan(num_notes, base_octave)
     plan_min_oct, plan_max_oct = phrase_plan.pitch_range
     base_octave = max(plan_min_oct, min(base_octave, plan_max_oct - 1))
+
+    def _choose_resolution(
+        target_name: str,
+        reference_note: str,
+        *,
+        prefer_descending: bool,
+    ) -> str:
+        """Select ``target_name`` close to ``reference_note`` within plan limits."""
+
+        reference_midi = note_to_midi(reference_note)
+        best: Optional[str] = None
+        best_score: Optional[tuple[float, int, int, int]] = None
+        for octv in range(plan_min_oct, plan_max_oct + 1):
+            candidate = f"{target_name}{octv}"
+            midi_val = note_to_midi(candidate)
+            distance = abs(midi_val - reference_midi)
+            descent_penalty = 0 if (not prefer_descending or midi_val <= reference_midi) else 1
+            octave_bias = abs(octv - base_octave)
+            score = (distance, descent_penalty, octave_bias, midi_val)
+            if best_score is None or score < best_score:
+                best_score = score
+                best = candidate
+        if best is None:
+            # Fallback should never trigger but provides a safe default when the
+            # plan range is unexpectedly empty.
+            best = f"{target_name}{max(plan_min_oct, min(plan_max_oct, base_octave))}"
+        return best
+
+    def _apply_plagal_cadence(sequence: List[str]) -> None:
+        """Mutate ``sequence`` in place to realise a IV–I plagal cadence."""
+
+        if not plagal_cadence or tonic_override is None:
+            return
+        # Guard against misconfigured scales. Without at least four distinct
+        # scale degrees we cannot outline ^4–^3–^1 reliably.
+        if len(notes_in_key) < 4:
+            return
+
+        tonic_root = get_chord_notes(tonic_override)[0]
+        degree_three = notes_in_key[2]
+        degree_four = notes_in_key[3]
+        total = len(sequence)
+        if total == 0:
+            return
+        if total == 1:
+            sequence[-1] = _choose_resolution(tonic_root, sequence[-1], prefer_descending=True)
+            return
+        if total == 2:
+            first = _choose_resolution(degree_four, sequence[-2], prefer_descending=False)
+            second = _choose_resolution(tonic_root, first, prefer_descending=True)
+            sequence[-2], sequence[-1] = first, second
+            return
+
+        anchor = sequence[-4] if total > 3 else sequence[0]
+        third = _choose_resolution(degree_four, anchor, prefer_descending=False)
+        second = _choose_resolution(degree_three, third, prefer_descending=True)
+        final_note = _choose_resolution(tonic_root, second, prefer_descending=True)
+        sequence[-3], sequence[-2], sequence[-1] = third, second, final_note
 
     # Style vectors may be provided directly via ``style`` or retrieved from
     # thread-local storage via :func:`set_style`. When both are absent, no
@@ -1072,13 +1173,20 @@ def generate_melody(
                     rhythm_generator=rhythm_generator,
                     style=style,
                     refine=refine,
+                    plagal_cadence=plagal_cadence and i == len(structure) - 1,
                 )
                 sections[label] = seg
             else:
                 seg = [_mutate(n) for n in sections[label][:length]]
             final.extend(seg)
             offset += length
-        return final[:num_notes]
+        final = final[:num_notes]
+        if plagal_cadence and tonic_override is not None:
+            # Reapply the cadence to the concatenated melody so repeated
+            # sections (e.g. ``AABA``) still conclude with the requested IV–I
+            # gesture even when the last label reuses earlier material.
+            _apply_plagal_cadence(final)
+        return final
 
     # Current octave offset relative to ``base_octave``. This may shift by
     # one at phrase boundaries to vary the register slightly.
@@ -1109,7 +1217,7 @@ def generate_melody(
     # phrase begins solidly over the chord changes.
     for j in range(motif_length):
         strong = abs(start_beat - round(start_beat)) < 1e-6
-        chord = chord_progression[j % len(chord_progression)]
+        chord = _chord_at(j)
         chord_notes = get_chord_notes(chord)
         if strong:
             name, octv = melody[j][:-1], melody[j][-1]
@@ -1179,7 +1287,7 @@ def generate_melody(
             else:
                 octave = max(allowed_min, min(allowed_max, octave))
             new_name = notes_in_key[new_idx]
-            chord = chord_progression[i % len(chord_progression)]
+            chord = _chord_at(i)
             chord_notes = get_chord_notes(chord)
             if strong and new_name not in chord_notes:
                 new_name = min(
@@ -1191,7 +1299,7 @@ def generate_melody(
             melody.append(new_name + str(octave))
             start_beat += pattern[i % len(pattern)] / beat_unit
             continue
-        chord = chord_progression[i % len(chord_progression)]
+        chord = _chord_at(i)
         chord_notes = get_chord_notes(chord)
         scale_for_chord(key, chord)
         prev_note = melody[-1]
@@ -1384,10 +1492,7 @@ def generate_melody(
         # Evaluate counterpoint against the bass line by comparing the previous
         # and current chord roots. We only need the root note of each chord to
         # detect parallel motion.
-        prev_root = (
-            get_chord_notes(chord_progression[(i - 1) % len(chord_progression)])[0]
-            + str(base_octave)
-        )
+        prev_root = get_chord_notes(_chord_at(i - 1))[0] + str(base_octave)
         curr_root = get_chord_notes(chord)[0] + str(base_octave)
         if np is not None:
             # ``parallel_fifths_mask`` returns True for candidates forming
@@ -1447,26 +1552,27 @@ def generate_melody(
             leap_dir = 1 if interval > 0 else -1
         prev_dir = 1 if interval > 0 else -1 if interval < 0 else 0
 
-    # Resolve the phrase by forcing the last note to the root of the
-    # final chord. This creates a basic cadence so melodies feel
-    # complete even when the stochastic process would end on a
-    # non-resolving tone.
-    final_chord = chord_progression[(num_notes - 1) % len(chord_progression)]
-    final_root = get_chord_notes(final_chord)[0]
-    last_oct = melody[-1][-1]
-    # Always select the root of the final chord but choose the octave that
-    # yields the smallest leap from the previous note. When the melody
-    # contains only a single note the previous pitch is reused so the
-    # cadence calculation does not fail.
-    low_oct = max(plan_min_oct, int(last_oct) - 1)
-    high_oct = min(plan_max_oct, int(last_oct))
-    low = f"{final_root}{low_oct}"
-    high = f"{final_root}{high_oct}"
-    prev_midi = note_to_midi(melody[-2]) if len(melody) >= 2 else note_to_midi(melody[-1])
-    if note_to_midi(low) <= prev_midi:
-        melody[-1] = low
+    if plagal_cadence and tonic_override is not None:
+        # Apply the cadence helper so both the mainline generation path and the
+        # sectional recursion share the same IV–I realisation logic.
+        _apply_plagal_cadence(melody)
     else:
-        melody[-1] = high
+        # Resolve the phrase by forcing the last note to the root of the final
+        # chord. This creates a basic cadence so melodies feel complete even
+        # when the stochastic process would end on a non-resolving tone.
+        final_chord = _chord_at(num_notes - 1)
+        final_root = get_chord_notes(final_chord)[0]
+        last_oct = melody[-1][-1]
+        # Always select the root of the final chord but choose the octave that
+        # yields the smallest leap from the previous note. When the melody
+        # contains only a single note the previous pitch is reused so the
+        # cadence calculation does not fail.
+        low_oct = max(plan_min_oct, int(last_oct) - 1)
+        high_oct = min(plan_max_oct, int(last_oct))
+        low = f"{final_root}{low_oct}"
+        high = f"{final_root}{high_oct}"
+        prev_midi = note_to_midi(melody[-2]) if len(melody) >= 2 else note_to_midi(melody[-1])
+        melody[-1] = low if note_to_midi(low) <= prev_midi else high
 
     if refine:
         # Use Frechet Music Distance to hill-climb toward the training

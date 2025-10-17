@@ -247,6 +247,8 @@ This command creates `song.mid` with one harmony line and an additional counterp
 The `--instrument` option selects the General MIDI program number used for the melody.
 Pass `--no-humanize` if you want deterministic timing so events align exactly on the beat.
 Use `--play` to automatically preview the file once it is written.
+Add `--plagal-cadence` when you want the generator to reharmonise the final
+measure as a IV–I "Amen" cadence with a matching soprano descent.
 
 Another short example enabling the sequence model and selecting a style:
 
@@ -270,9 +272,10 @@ melody-generator
 1. Choose a key, BPM, time signature and chord progression.
 2. Optionally tick **Use ML Model** and pick a **Style** to bias note choices.
 3. Check the **Harmony** or **Counterpoint** boxes to add extra tracks.
-4. Leave **Humanize Performance** enabled for natural timing or untick it for strict quantization.
-5. Click **Preview Melody** to hear the result without saving.
-6. Click **Generate Melody** and select where to save the MIDI file.
+4. Toggle **Plagal Cadence** if you want the last bar to resolve with a IV–I ending.
+5. Leave **Humanize Performance** enabled for natural timing or untick it for strict quantization.
+6. Click **Preview Melody** to hear the result without saving.
+7. Click **Generate Melody** and select where to save the MIDI file.
 
 
 ### Web Interface

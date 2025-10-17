@@ -126,6 +126,11 @@ def run_cli() -> None:
     parser.add_argument("--harmony", action="store_true", help="Add a simple harmony track.")
     parser.add_argument("--random-rhythm", action="store_true", help="Generate a random rhythmic pattern.")
     parser.add_argument("--counterpoint", action="store_true", help="Generate a counterpoint line.")
+    parser.add_argument(
+        "--plagal-cadence",
+        action="store_true",
+        help="Reharmonise the final bar with a IV–I plagal cadence",
+    )
     parser.add_argument("--harmony-lines", type=int, default=0, metavar="N", help="Number of harmony lines to add in parallel")
     parser.add_argument(
         "--base-octave",
@@ -276,6 +281,7 @@ def run_cli() -> None:
         sequence_model=seq_model,
         style=args.style,
         pattern=rhythm,
+        plagal_cadence=args.plagal_cadence,
     )
     extra: List[List[str]] = []
     for _ in range(max(0, args.harmony_lines)):

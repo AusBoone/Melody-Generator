@@ -905,6 +905,45 @@ def test_final_cadence_matches_last_chord():
     assert mel[-1][:-1] == melody_generator.CHORDS[chords[-1]][0]
 
 
+def test_plagal_cadence_shapes_final_major_resolution():
+    """Enabling plagal cadence enforces an F–E–C ending in C major."""
+
+    melody = generate_melody("C", 8, ["C", "G"], motif_length=4, plagal_cadence=True)
+    assert [note[:-1] for note in melody[-3:]] == ["F", "E", "C"]
+
+
+def test_plagal_cadence_minor_mode_uses_diatonic_degrees():
+    """Minor keys descend ^4–^3–^1 using the natural scale tones."""
+
+    melody = generate_melody("Am", 6, ["Am", "Em"], motif_length=3, plagal_cadence=True)
+    assert [note[:-1] for note in melody[-3:]] == ["D", "C", "A"]
+
+
+def test_plagal_cadence_short_phrase_handles_two_notes():
+    """Very short melodies still honour the IV–I resolution when requested."""
+
+    melody = generate_melody("C", 2, ["G"], motif_length=2, plagal_cadence=True)
+    assert [note[:-1] for note in melody] == ["F", "C"]
+
+
+def test_plagal_cadence_structure_reuse_adjusts_final_section():
+    """Repeated structure labels should still end with a IV–I cadence."""
+
+    # ``AABA`` reuses the initial section for the finale. Without post-processing
+    # the last segment would replicate the earlier "A" material and miss the
+    # plagal cadence. The helper must reshape the ending regardless of reuse.
+    random.seed(0)
+    melody = generate_melody(
+        "C",
+        12,
+        ["C", "F", "G", "C"],
+        motif_length=3,
+        structure="AABA",
+        plagal_cadence=True,
+    )
+    assert [note[:-1] for note in melody[-3:]] == ["F", "E", "C"]
+
+
 def test_allow_tritone_filter():
     """Disallowing tritone intervals removes them from the melody."""
 
