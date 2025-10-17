@@ -569,6 +569,36 @@ def test_ornament_flag_forwarded(monkeypatch):
     assert called.get("ornaments") is True
 
 
+def test_plagal_cadence_forwarded(monkeypatch):
+    """Checking the plagal cadence box forwards the option to the engine."""
+
+    captured: dict[str, object] = {}
+
+    def record_melody(*args, **kwargs):
+        captured["plagal"] = kwargs.get("plagal_cadence")
+        return ["C4"] * 4
+
+    monkeypatch.setattr(web_gui, "generate_melody", record_melody)
+    monkeypatch.setattr(web_gui, "create_midi_file", lambda *a, **k: None)
+
+    client = app.test_client()
+    client.post(
+        "/",
+        data={
+            "key": "C",
+            "chords": "C",
+            "bpm": "120",
+            "timesig": "4/4",
+            "notes": "4",
+            "motif_length": "2",
+            "base_octave": "4",
+            "plagal_cadence": "1",
+        },
+    )
+
+    assert captured.get("plagal") is True
+
+
 def test_successful_post_returns_audio(monkeypatch):
     """Valid form submissions embed a WAV audio preview."""
 
@@ -644,6 +674,7 @@ def test_summary_section_lists_user_choices(monkeypatch):
             "ornaments": "1",
             "enable_ml": "1",
             "style": style_name,
+            "plagal_cadence": "1",
         },
     )
 
@@ -658,6 +689,7 @@ def test_summary_section_lists_user_choices(monkeypatch):
     assert "Instrument" in html and "Guitar" in html
     assert "randomised" in html  # chord progression flagged as randomised
     assert "Machine learning weighting" in html
+    assert "Plagal cadence" in html
 
 
 def test_lowercase_inputs(monkeypatch):
@@ -881,6 +913,7 @@ def test_delay_arguments_match_preview_parameters(monkeypatch):
         "enable_ml": False,
         "style": None,
         "chords": ["C"],
+        "plagal_cadence": False,
     }
 
     assert called.get("task")
@@ -1142,6 +1175,7 @@ def test_random_rhythm_length_matches_notes(monkeypatch):
         chords=["C"],
         humanize=False,
         ornaments=False,
+        plagal_cadence=False,
     )
 
     assert captured.get("length") == 4
@@ -1194,6 +1228,7 @@ def test_temp_files_cleaned_on_failure(tmp_path, monkeypatch):
             chords=["C"],
             humanize=False,
             ornaments=False,
+            plagal_cadence=False,
         )
 
     for path in created:

@@ -179,6 +179,10 @@
             Include counterpoint
           </label>
           <label class="checkbox-item">
+            <input type="checkbox" name="plagal_cadence" value="1" {% if form_values.plagal_cadence %}checked{% endif %}>
+            Plagal cadence (IV–I ending)
+          </label>
+          <label class="checkbox-item">
             <input type="checkbox" name="include_chords" value="1" {% if form_values.include_chords %}checked{% endif %}>
             Export chord track
           </label>

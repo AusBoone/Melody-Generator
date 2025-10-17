@@ -178,6 +178,9 @@ class MelodyGeneratorGUI:
         # Ornament placeholders can be toggled independently of the main melody
         # so arrangers only see the helper track when desired.
         self.ornament_var = tk.BooleanVar(master=self.root, value=False)
+        # Optional plagal cadence toggle mirrors the CLI flag, enabling a IV–I
+        # resolution for gospel-inspired endings.
+        self.plagal_var = tk.BooleanVar(master=self.root, value=False)
         self.styles = sorted(STYLE_VECTORS.keys())
 
         self._setup_theme()
@@ -545,10 +548,18 @@ class MelodyGeneratorGUI:
         counterpoint_check.grid(row=11, column=0, columnspan=2)
         self.inputs.append(counterpoint_check)
 
-        ttk.Label(frame, text="Harmony Lines:").grid(row=12, column=0, sticky="w")
+        plagal_check = ttk.Checkbutton(
+            frame,
+            text="Plagal Cadence (IV–I ending)",
+            variable=self.plagal_var,
+        )
+        plagal_check.grid(row=12, column=0, columnspan=2)
+        self.inputs.append(plagal_check)
+
+        ttk.Label(frame, text="Harmony Lines:").grid(row=13, column=0, sticky="w")
         self.harmony_lines = ttk.Spinbox(frame, from_=0, to=4, width=5)
         self.harmony_lines.set(0)
-        self.harmony_lines.grid(row=12, column=1)
+        self.harmony_lines.grid(row=13, column=1)
         self.inputs.append(self.harmony_lines)
 
         self.include_chords_var = tk.BooleanVar(value=False)
@@ -557,7 +568,7 @@ class MelodyGeneratorGUI:
             text="Include Chords",
             variable=self.include_chords_var,
         )
-        include_chords_check.grid(row=13, column=0, columnspan=2)
+        include_chords_check.grid(row=14, column=0, columnspan=2)
         self.inputs.append(include_chords_check)
 
         ornament_check = ttk.Checkbutton(
@@ -565,7 +576,7 @@ class MelodyGeneratorGUI:
             text="Ornament Placeholders",
             variable=self.ornament_var,
         )
-        ornament_check.grid(row=14, column=0, columnspan=2)
+        ornament_check.grid(row=15, column=0, columnspan=2)
         self.inputs.append(ornament_check)
 
         self.chords_same_var = tk.BooleanVar(value=False)
@@ -574,7 +585,7 @@ class MelodyGeneratorGUI:
             text="Merge Chords With Melody",
             variable=self.chords_same_var,
         )
-        merge_chords_check.grid(row=15, column=0, columnspan=2)
+        merge_chords_check.grid(row=16, column=0, columnspan=2)
         self.inputs.append(merge_chords_check)
 
         humanize_check = ttk.Checkbutton(
@@ -582,7 +593,7 @@ class MelodyGeneratorGUI:
             text="Humanize Performance",
             variable=self.humanize_var,
         )
-        humanize_check.grid(row=16, column=0, columnspan=2)
+        humanize_check.grid(row=17, column=0, columnspan=2)
         self.inputs.append(humanize_check)
 
         # Randomize buttons
@@ -591,14 +602,14 @@ class MelodyGeneratorGUI:
             text="Randomize Chords",
             command=self._randomize_chords,
         )
-        rand_chords_btn.grid(row=17, column=0, columnspan=2, pady=(5, 0))
+        rand_chords_btn.grid(row=18, column=0, columnspan=2, pady=(5, 0))
         self.inputs.append(rand_chords_btn)
         rand_rhythm_btn = ttk.Button(
             frame,
             text="Randomize Rhythm",
             command=self._randomize_rhythm,
         )
-        rand_rhythm_btn.grid(row=18, column=0, columnspan=2, pady=(5, 0))
+        rand_rhythm_btn.grid(row=19, column=0, columnspan=2, pady=(5, 0))
         self.inputs.append(rand_rhythm_btn)
 
         load_prefs_btn = ttk.Button(
@@ -606,7 +617,7 @@ class MelodyGeneratorGUI:
             text="Load Preferences",
             command=self._load_preferences,
         )
-        load_prefs_btn.grid(row=19, column=0, columnspan=2, pady=(5, 0))
+        load_prefs_btn.grid(row=20, column=0, columnspan=2, pady=(5, 0))
         self.inputs.append(load_prefs_btn)
 
         preview_btn = ttk.Button(
@@ -614,14 +625,14 @@ class MelodyGeneratorGUI:
             text="Preview Melody",
             command=self._preview_button_click,
         )
-        preview_btn.grid(row=20, column=0, columnspan=2, pady=(5, 0))
+        preview_btn.grid(row=21, column=0, columnspan=2, pady=(5, 0))
         self.inputs.append(preview_btn)
         self.preview_notice = ttk.Label(
             frame,
             text="",
             foreground="yellow",
         )
-        self.preview_notice.grid(row=20, column=2, sticky="w")
+        self.preview_notice.grid(row=21, column=2, sticky="w")
 
         # Generate button
         generate_btn = ttk.Button(
@@ -629,7 +640,7 @@ class MelodyGeneratorGUI:
             text="Generate Melody",
             command=self._generate_button_click,
         )
-        generate_btn.grid(row=21, column=0, columnspan=2, pady=10)
+        generate_btn.grid(row=22, column=0, columnspan=2, pady=10)
         self.inputs.append(generate_btn)
 
         self.theme_var = tk.BooleanVar(value=self.dark_mode)
@@ -639,12 +650,12 @@ class MelodyGeneratorGUI:
             command=self._toggle_theme,
             variable=self.theme_var,
         )
-        theme_toggle.grid(row=21, column=0, columnspan=2, pady=(5, 0))
+        theme_toggle.grid(row=23, column=0, columnspan=2, pady=(5, 0))
         self.inputs.append(theme_toggle)
 
         # Progress bar shown while generation runs. Hidden by default.
         self.progress = ttk.Progressbar(frame, mode="indeterminate")
-        self.progress.grid(row=22, column=0, columnspan=5, pady=(5, 0))
+        self.progress.grid(row=24, column=0, columnspan=5, pady=(5, 0))
         self.progress.grid_remove()
 
         # Apply persisted settings if available
@@ -781,6 +792,7 @@ class MelodyGeneratorGUI:
             "humanize": self.humanize_var.get() if hasattr(self, "humanize_var") else True,
             "rhythm_pattern": self.rhythm_pattern,
             "ornaments": self.ornament_var.get(),
+            "plagal_cadence": self.plagal_var.get(),
         }
 
         # Disable controls and show progress indicator while the worker runs.
@@ -808,6 +820,7 @@ class MelodyGeneratorGUI:
                 base_octave=params["base_octave"],
                 sequence_model=params["seq_model"],
                 style=params["style_name"],
+                plagal_cadence=params["plagal_cadence"],
             )
             extra: List[List[str]] = []
             if self.harmony_line_fn is not None:
@@ -947,6 +960,7 @@ class MelodyGeneratorGUI:
             base_octave=self.base_octave_var.get(),
             sequence_model=seq_model,
             style=style_name,
+            plagal_cadence=self.plagal_var.get(),
         )
         extra: List[List[str]] = []
         if self.harmony_line_fn is not None:
@@ -1103,6 +1117,7 @@ class MelodyGeneratorGUI:
             "soundfont": self.soundfont_var.get(),
             "humanize": self.humanize_var.get(),
             "seed": self.seed_var.get(),
+            "plagal_cadence": self.plagal_var.get(),
         }
 
     def _apply_settings(self, settings: Dict) -> None:
@@ -1139,6 +1154,8 @@ class MelodyGeneratorGUI:
             self.chords_same_var.set(settings["chords_same"])
         if "humanize" in settings:
             self.humanize_var.set(settings["humanize"])
+        if "plagal_cadence" in settings:
+            self.plagal_var.set(settings["plagal_cadence"])
         if "instrument" in settings and settings["instrument"] in INSTRUMENTS:
             self.instrument_var.set(settings["instrument"])
         if "soundfont" in settings:
