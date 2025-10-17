@@ -114,6 +114,21 @@ def test_validate_time_signature_success() -> None:
     assert validate_time_signature("7/8") == (7, 8)
 
 
+def test_validate_time_signature_textual_aliases() -> None:
+    """Musicians often enter common/cut time by name—ensure those aliases work."""
+
+    # Common-time aliases should round-trip to 4/4 regardless of spacing or case.
+    assert validate_time_signature("C") == (4, 4)
+    assert validate_time_signature("common time") == (4, 4)
+    assert validate_time_signature(" CommonTime ") == (4, 4)
+
+    # Cut-time / alla breve aliases should map to 2/2, including the Unicode ¢ symbol.
+    assert validate_time_signature("C|") == (2, 2)
+    assert validate_time_signature("alla breve") == (2, 2)
+    assert validate_time_signature("CuT TiMe") == (2, 2)
+    assert validate_time_signature("¢") == (2, 2)
+
+
 @pytest.mark.parametrize(
     "value",
     ["4", "3/5", "0/4", "-2/4", "A/B"],
