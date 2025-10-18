@@ -146,13 +146,17 @@ __version__ = "0.1.0"
 #   lowercase or mixed-case values.
 # * ``generate_random_chord_progression`` samples all seven scale degrees when
 #   padding progressions so the leading tone chord can be chosen.
+# * Added ``midi_to_degrees`` helper for converting MIDI note-on events into
+#   scale-degree indices. The function sorts events across tracks, handles
+#   chromatic tones via nearest-degree snapping and surfaces clear validation
+#   errors for malformed input so dataset preparation scripts can rely on it.
 # ---------------------------------------------------------------
 
 import random
 import logging
 import json
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional, Sequence
+from typing import Dict, List, Tuple, Optional, Sequence, Union
 from mido import Message, MidiFile, MidiTrack  # noqa: F401
 from functools import lru_cache
 import os
@@ -754,6 +758,141 @@ def generate_random_rhythm_pattern(length: int = 3) -> List[float]:
     return pattern
 
 
+def midi_to_degrees(
+    midi: Union["MidiFile", str, os.PathLike[str]],
+    key: str,
+    *,
+    drop_out_of_key: bool = False,
+    allow_empty: bool = False,
+) -> List[int]:
+    """Return scale-degree indices extracted from a MIDI file or object.
+
+    This helper bridges raw MIDI data and the model-friendly integer sequences
+    expected by the training utilities documented in :mod:`scripts`. The
+    function reads all ``note_on`` messages, orders them chronologically across
+    tracks and maps their pitch classes onto the diatonic scale for ``key``.
+
+    Parameters
+    ----------
+    midi:
+        Either an in-memory :class:`mido.MidiFile` instance or a filesystem path
+        pointing to a MIDI file. Paths are resolved lazily so callers can reuse
+        existing objects when batching conversions.
+    key:
+        Musical key forming the reference diatonic scale. Values are normalised
+        via :func:`canonical_key` so lowercase inputs are accepted. Unknown keys
+        raise ``ValueError``.
+    drop_out_of_key:
+        When ``True`` any chromatic tones that fall outside the diatonic scale
+        are skipped entirely. When ``False`` (default) these pitches are snapped
+        to the nearest diatonic degree so expressive passing notes continue to
+        influence the resulting sequence.
+    allow_empty:
+        ``False`` (default) raises ``ValueError`` when no usable ``note_on``
+        events are present after filtering. Set to ``True`` to return an empty
+        list in that situation.
+
+    Returns
+    -------
+    List[int]
+        Ordered scale-degree indices starting at ``0`` for the tonic.
+
+    Raises
+    ------
+    ValueError
+        If ``key`` is unknown, the MIDI file cannot be parsed or all notes are
+        filtered out while ``allow_empty`` is ``False``.
+
+    Notes
+    -----
+    The routine is intentionally conservative: it only inspects ``note_on``
+    events with positive velocity and ignores timing or duration information.
+    This keeps the output deterministic regardless of how the source MIDI file
+    distributes notes across multiple tracks.
+    """
+
+    # Convert ``midi`` into a concrete ``MidiFile`` object while surfacing a
+    # clear error if the supplied path is unreadable. The lazy conversion lets
+    # callers hand over an existing object without reloading from disk.
+    if isinstance(midi, MidiFile):
+        mid = midi
+    else:
+        try:
+            mid = MidiFile(midi)
+        except Exception as exc:  # pragma: no cover - malformed MIDI surfaced to caller
+            raise ValueError(f"Unable to load MIDI file: {midi}") from exc
+
+    # Canonicalise the key once so note mapping remains consistent and we can
+    # index into the global ``SCALE`` definition without worrying about casing.
+    canonical = canonical_key(key)
+    scale = SCALE[canonical]
+
+    # Translate each scale degree into a chromatic semitone number. Comparing
+    # semitone values instead of raw note strings means enharmonic spellings
+    # from ``midi_to_note`` (e.g. ``A#``) align correctly with diatonic notes
+    # such as ``Bb``.
+    scale_semitones = [NOTE_TO_SEMITONE[name] for name in scale]
+
+    # Collect ``note_on`` events alongside their absolute tick position. The
+    # cumulative time keeps cross-track ordering deterministic once sorted.
+    events: List[Tuple[int, int, int]] = []
+    for track_index, track in enumerate(mid.tracks):
+        absolute_time = 0
+        for message in track:
+            absolute_time += getattr(message, "time", 0)
+            if getattr(message, "type", None) == "note_on" and getattr(message, "velocity", 0) > 0:
+                events.append((absolute_time, track_index, int(message.note)))
+
+    if not events:
+        if allow_empty:
+            return []
+        raise ValueError("MIDI file does not contain any note_on events")
+
+    # Sort primarily by time and secondarily by track index so simultaneous
+    # events remain ordered yet deterministic.
+    events.sort(key=lambda item: (item[0], item[1]))
+
+    degrees: List[int] = []
+    for _, _, midi_value in events:
+        # Convert the MIDI number back into a pitch-class string (``C#``, ``G``)
+        # and strip the octave. ``midi_to_note`` always returns sharps, which are
+        # readily translated into semitone numbers via ``NOTE_TO_SEMITONE``.
+        note_name = midi_to_note(midi_value)
+        pitch_class = note_name.rstrip("0123456789-")
+        semitone = NOTE_TO_SEMITONE[pitch_class]
+
+        try:
+            idx = scale_semitones.index(semitone)
+            degrees.append(idx)
+            continue
+        except ValueError:
+            # Chromatic tone – optionally skip it or approximate with the
+            # nearest diatonic degree based on minimal circular distance.
+            if drop_out_of_key:
+                continue
+
+        best_index: Optional[int] = None
+        best_distance: Optional[int] = None
+        for idx, scale_semitone in enumerate(scale_semitones):
+            diff = (semitone - scale_semitone) % 12
+            distance = diff if diff <= 6 else 12 - diff
+            if (
+                best_distance is None
+                or distance < best_distance
+                or (distance == best_distance and (best_index is None or idx < best_index))
+            ):
+                best_distance = distance
+                best_index = idx
+
+        if best_index is not None:
+            degrees.append(best_index)
+        elif not allow_empty:
+            raise ValueError(f"Unable to map MIDI note {note_name} to scale degrees")
+
+    if not degrees and not allow_empty:
+        raise ValueError("No scale degrees could be derived from the MIDI file")
+
+    return degrees
 
 
 def get_chord_notes(chord: str) -> List[str]:
