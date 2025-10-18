@@ -150,6 +150,9 @@ __version__ = "0.1.0"
 #   scale-degree indices. The function sorts events across tracks, handles
 #   chromatic tones via nearest-degree snapping and surfaces clear validation
 #   errors for malformed input so dataset preparation scripts can rely on it.
+# * ``generate_motif`` and ``generate_counterpoint_melody`` now canonicalise key
+#   inputs via :func:`canonical_key` so lowercase or mixed-case values behave
+#   identically to uppercase usage across the public API.
 # ---------------------------------------------------------------
 
 import random
@@ -953,16 +956,19 @@ def generate_motif(length: int, key: str, base_octave: int = 4) -> List[str]:
 
     @param length (int): Number of notes in the motif. Must be positive or a
         ``ValueError`` is raised.
-    @param key (str): Musical key for the motif. A ``ValueError`` is raised if
-        ``key`` is not present in :data:`SCALE` so callers receive a clear error
-        instead of ``KeyError``.
+    @param key (str): Musical key for the motif. The value is canonicalised via
+        :func:`canonical_key` so lowercase and mixed-case names match the
+        package's preferred capitalisation. A ``ValueError`` is raised when the
+        key is unknown so callers receive a clear error instead of a ``KeyError``.
     @param base_octave (int): Starting octave, usually ``4``. The value must be
         within ``MIN_OCTAVE`` and ``MAX_OCTAVE`` otherwise a ``ValueError`` is
         raised so generated notes always map to valid MIDI numbers.
     @returns List[str]: List of note names forming the motif.
     """
-    if key not in SCALE:
-        raise ValueError(f"Unknown key '{key}'")
+    # Normalise key capitalisation to keep behaviour consistent with other
+    # helpers like :func:`generate_melody`. ``canonical_key`` raises
+    # ``ValueError`` for unknown names so invalid keys are still rejected.
+    key = canonical_key(key)
     if length <= 0:
         raise ValueError("length must be positive")
     if not MIN_OCTAVE <= base_octave <= MAX_OCTAVE:
@@ -1771,15 +1777,15 @@ def generate_counterpoint_melody(melody: List[str], key: str) -> List[str]:
     sixths, fifths and octaves.
 
     @param melody (List[str]): Base melody to accompany.
-    @param key (str): Musical key for scale context.
+    @param key (str): Musical key for scale context. The value is normalised via
+        :func:`canonical_key` so lowercase inputs behave identically to the
+        uppercase keys stored in :data:`SCALE`.
     @returns List[str]: Generated counterpoint line.
     """
-    # Validate the key before attempting to index into ``SCALE`` so callers
-    # receive a clear error rather than ``KeyError`` when an unknown key is
-    # supplied.
-    if key not in SCALE:
-        raise ValueError(f"Unknown key '{key}'")
-
+    # Canonicalise the key upfront. ``canonical_key`` raises ``ValueError`` for
+    # unknown inputs which keeps error handling consistent with the rest of the
+    # package while allowing callers to pass lowercase or mixed-case values.
+    key = canonical_key(key)
     scale_notes = SCALE[key]
     counter: List[str] = []
     prev_note = None
