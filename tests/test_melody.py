@@ -549,11 +549,33 @@ def test_counterpoint_invalid_key():
         generate_counterpoint_melody(melody, "H")
 
 
+def test_counterpoint_accepts_lowercase_key():
+    """Lowercase key names should produce identical counterpoint lines."""
+
+    melody = ["C4", "E4", "G4", "F4"]
+    # Seed the RNG so both calls explore the same random branches.
+    random.seed(42)
+    upper = generate_counterpoint_melody(melody, "C")
+    random.seed(42)
+    lower = generate_counterpoint_melody(melody, "c")
+    assert upper == lower
+
+
 def test_generate_motif_invalid_key():
     """``generate_motif`` should raise ``ValueError`` for unknown keys."""
 
     with pytest.raises(ValueError):
         melody_generator.generate_motif(4, "H")
+
+
+def test_generate_motif_accepts_lowercase_key():
+    """Motif generation should normalise lowercase key names via canonical_key."""
+
+    random.seed(7)
+    motif_upper = melody_generator.generate_motif(4, "C")
+    random.seed(7)
+    motif_lower = melody_generator.generate_motif(4, "c")
+    assert motif_upper == motif_lower
 
 
 def test_generate_motif_invalid_length():
